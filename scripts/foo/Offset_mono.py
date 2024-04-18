@@ -267,7 +267,10 @@ class Offset(object):
             # compare the max rpfs at same offset of 5end and 3end
             max_offset_site = offset_rpfs[length].idxmax()
             temp_offset_rpfs = offset_rpfs[length].copy()
-
+            
+            if temp_offset_rpfs[max_offset_site] == 0:
+                max_offset_site = candidate_offset[5]
+                
             while max_offset_site not in candidate_offset:
                 del temp_offset_rpfs[max_offset_site]
                 max_offset_site = temp_offset_rpfs.idxmax()
