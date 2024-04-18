@@ -1,0 +1,128 @@
+{
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.wordWrapColumn": 200,
+    "editor.wordWrap": "wordWrapColumn",
+    // pylint
+    "python.linting.pylintEnabled": true,
+    // yapf
+    "python.formatting.provider": "yapf",
+    "python.formatting.yapfArgs": [
+        "--style",
+        "{column_limit: 1200}"
+    ],
+    // create the header
+    "HEADER": {
+        "prefix": "make_header",
+        "body": [
+            "#!/usr/bin/env python",
+            "# -*- encoding: utf-8 -*-",
+            "'''",
+            "@Project      : $WORKSPACE_NAME",
+            "@Script       : $TM_FILENAME",
+            "@Environment  : python 3.8.5",
+            "@Version      : 1.0",
+            "@Author       : Rensc ",
+            "@Time         : $CURRENT_YEAR/$CURRENT_MONTH/$CURRENT_DATE $CURRENT_HOUR:$CURRENT_MINUTE:$CURRENT_SECOND",
+            "@E-mail       : rensc0718@163.com",
+            "@License      : (C)Copyright 2023-2025, Ren Shuchao",
+            "'''",
+            "",
+            "",
+            "# import pandas as pd",
+            "# import polars as pl",
+            "# import numpy as np",
+            "# from collections import OrderedDict",
+            "# from Bio import SeqIO",
+            "# import argparse",
+            "",
+            "$0"
+        ],
+    },
+    // create the usage function
+    "USAGE": {
+        "prefix": "make_usage",
+        "body": [
+            "'''",
+            "@Message  : function for .",
+            "@Input    : param --> description",
+            "@Return   : output --> description",
+            "@Flow     : step1 --> run",
+            "'''",
+            "$0"
+        ],
+    },
+    // create the Argument function
+    "ARGUMENTS": {
+        "prefix": "make_param",
+        "body": [
+            "def _args_parser():",
+            "",
+            "    parser = argparse.ArgumentParser(description='This script is used to ....')",
+            "",
+            "    # needed arguments",
+            "    input_group = parser.add_argument_group('Required arguments')",
+            "    input_group.add_argument(",
+            "        '-i', dest='input', required=True, type=str, help='input file name.'",
+            "    )",
+            "    input_group.add_argument(",
+            "        '-o', dest='output', required=True, type=str, help='output file name.'",
+            "    )",
+            "",
+            "    # optional arguments",
+            "    parser.add_argument(",
+            "        '-l', dest='length', required=False, type=int, default=6, help='nucleotide length (default: %(default)s nt).'",
+            "    )",
+            "    parser.add_argument(",
+            "        '-c', dest='coding', required=False, action='store_true', default=False, help='check (default: %(default)s).'",
+            "    )",
+            "",
+            "    args = parser.parse_args()",
+            "    args_dict = vars(args)",
+            "    for k, v in args_dict.items():",
+            "        print('{:<12}:  {:<}'.format(k, str(v)), flush=True)",
+            "",
+            "    return args",
+            "$0"
+        ]
+    },
+    // create the main function
+    "MAIN": {
+        "prefix": "make_main",
+        "body": [
+            "if __name__ == '__main__':",
+            "",
+            "    main()",
+            "$0"
+        ]
+    },
+    // create the main programe function
+    "MAINPROGRAME": {
+        "prefix": "make_main_programe",
+        "body": [
+            "def main():",
+            "    print('explain the function of scripts.', flush=True)",
+            "    args = args_parser()",
+            "    print('Step1: first step1 for something.', flush=True)",
+            "    record = step1(args.input)",
+            "$0",
+            "    print('Step2: first step2 for something.', flush=True)",
+            "    results = step2(record)",
+            "$0",
+            "    print('Step3: first step3 for something.', flush=True)",
+            "    step3(results, args.output)",
+            "$0"
+        ]
+    },
+    // create the line summary function
+    "LINECOUNT": {
+        "prefix": "make_linecount",
+        "body": [
+            "line += 1",
+            "if line % 1000000 == 0:",
+            "    print('rows : ' + str(line), flush=True)",
+            "$0"
+        ]
+    },
+    "r.lsp.promptToInstall": false
+}
