@@ -87,7 +87,7 @@ class Ribo(object):
             if self.longest:
                 for line in islice(trans_file_in, 1, None):
                     record = line.strip().split('\t')
-                    if int(record[7]) % 3 != 0 and not self.silence:
+                    if int(record[6]) % 3 != 0 and not self.silence:
                         sys.stdout.write("{gene} CDS did not fit 3nt periodicity. \n".format(gene=record[2]))
 
                     if record[9] == "True":
@@ -106,7 +106,7 @@ class Ribo(object):
             else:
                 for line in islice(trans_file_in, 1, None):
                     record = line.strip().split('\t')
-                    if int(record[7]) % 3 != 0:
+                    if int(record[6]) % 3 != 0:
                         sys.stdout.write("{gene} CDS did not fit 3nt periodicity. \n".format(gene=record[2]))
 
                     now_mrna = Mrna(record)
