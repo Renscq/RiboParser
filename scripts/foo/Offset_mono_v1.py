@@ -9,8 +9,12 @@ import sys
 from collections import OrderedDict
 from itertools import islice
 
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import pysam
+import seaborn as sns
 
 
 class Mrna(object):
@@ -18,16 +22,16 @@ class Mrna(object):
     def __init__(self, record):
         self.chromosome = record[0]
         self.gene_id = record[1]
-        self.gene_name = record[2]
-        self.transcript_id = record[3]
-        self.start = record[4]
-        self.end = record[5]
-        self.utr5_length = int(record[6])
-        self.cds_length = int(record[7])
-        self.utr3_length = int(record[8])
-        self.strand = record[9]
-        self.rep_transcript = record[10]
-        self.modified = record[11]
+        #self.gene_name = record[2]
+        self.transcript_id = record[2]
+        self.start = record[3]
+        self.end = record[4]
+        self.utr5_length = int(record[5])
+        self.cds_length = int(record[6])
+        self.utr3_length = int(record[7])
+        self.strand = record[8]
+        self.rep_transcript = record[9]
+        self.modified = record[10]
         self.bam = []
         self.rpf = []
         self.seq = None
@@ -40,23 +44,32 @@ class Offset(object):
         self.max_length = args.max
         self.nt_num = self.max_length - self.min_length + 1
         self.mrna_file = args.transcript
-
+        
         # set the offset to contain the raw reads offset, adj_tis_offset to alter the error offset.
-        self.column_name = ["length", "from_tis", "tis_5end", "tis_5end_per",
-                            "from_tts", "tts_3end", "tts_3end_per", "sum"]
+        # self.column_name = ["length", "from_tis", "tis_5end", "tis_5end_per", "from_tts", "tts_3end", "tts_3end_per", "sum"]
+
         # self.tis_offset = {"start_codon": OrderedDict(), "stop_codon": OrderedDict()}
         self.tis_offset = {"tis_5end": OrderedDict(), "tis_3end": OrderedDict(),
                            "tts_5end": OrderedDict(), "tts_3end": OrderedDict()}
-        self.adj_tis_offset = pd.DataFrame(columns=self.column_name)
+        self.adj_tis_offset = OrderedDict()
+        self.tis_5end = None
+        self.tis_3end = None
+        self.tts_5end = None
+        self.tts_3end = None
+        self.detail = args.detail
+
         self.frame_offset = OrderedDict()
-        self.adj_frame_offset = pd.DataFrame(columns=["length", "frame1", "rpf_1",
-                                                      "frame2", "rpf_2", "frame3", "rpf_3", "sum", "p_site", "ribo"])
+        self.merge_frame_offset = pd.DataFrame(columns=["length", "frame0", "rpfs0", "frame1", "rpfs1",
+                                                        "frame2", "rpfs2", "p_site", "rpfs"])
         self.frame_offset_len = {}
         self.mode = args.mode
+        self.shift_nt = args.shift
 
         self.mrna_dict = OrderedDict()
         self.length_dict = {}
 
+        # arguments for bam file parsing
+        self.silence = args.silence
         self.sample_file = args.bam
         self.sample_format = os.path.splitext(args.bam)[1]
 
@@ -112,12 +125,18 @@ class Offset(object):
                     except KeyError:
                         self.length_dict[read_length] = [1, 0]
                     self.mrna_dict[line.reference_name].bam.append(line)
+            elif self.silence:
+                pass
+            else:
+                print(line.reference_name + ': not in reference file.')
 
         peak_length, self.peak_reads = max(self.length_dict.items(), key=lambda length: length[1])
         if self.peak_length:
-            pass
+            self.peak_length -= 1
         else:
-            self.peak_length = peak_length
+            self.peak_length = peak_length - 1
+
+        self.pysam_input.close()
 
     @staticmethod
     def check_zero_offset(temp_offset):
@@ -134,12 +153,13 @@ class Offset(object):
             return temp_offset
 
     def get_tis_offset(self):
+
         # build the offset table
         for number in range(self.min_length, self.max_length + 1):
-            self.tis_offset["start_codon"][number] = {"tis_5end": {}, "tis_3end": {}}
-            self.tis_offset["stop_codon"][number] = {"tts_5end": {}, "tts_3end": {}}
-        # open the output file flag
-        self.pysam_output = pysam.AlignmentFile(self.output_prefix + "_mrna.bam", 'wb', template=self.pysam_input)
+            self.tis_offset["tis_5end"][number] = OrderedDict({-i: 0 for i in range(self.max_length + 1, 0, -1)})
+            self.tis_offset["tis_3end"][number] = OrderedDict({i: 0 for i in range(self.max_length + 1)})
+            self.tis_offset["tts_5end"][number] = OrderedDict({-i: 0 for i in range(self.max_length + 1, 0, -1)})
+            self.tis_offset["tts_3end"][number] = OrderedDict({i: 0 for i in range(self.max_length + 1)})
 
         for mrna, mrna_attr in self.mrna_dict.items():
             # eliminate the transcript without read mapped
@@ -147,300 +167,478 @@ class Offset(object):
                 continue
             else:
                 # get the TIS and TTS from mRNA dict.
-                cds_start, cds_end = mrna_attr.utr5_length + 1, mrna_attr.utr5_length + mrna_attr.cds_length
-                for line in mrna_attr.bam:
-                    self.pysam_output.write(line)
-                    map_start, map_end = line.get_blocks()[0]
-                    # map start is not included, so add 1 nt.
-                    # map_start = map_start + 1
-                    read_length = line.infer_read_length()
+                # 6:shift 3 nt for stop codon, shift 2 nt for p-site， and shift 1 for the python index start
+                # cds_start, cds_end = mrna_attr.utr5_length, mrna_attr.utr5_length + mrna_attr.cds_length - 6
+                cds_start, cds_end = mrna_attr.utr5_length, mrna_attr.utr5_length + mrna_attr.cds_length - 6
 
-                    # reads that match a specific length are retained.
-                    if self.min_length <= read_length <= self.max_length:
-                        # specifies the possible range of offset lengths around the start codon.
-                        # start codon position like this [8, 9, 10, 11, "12", 13, 14, 15, 16]
-                        if map_start + 9 <= cds_start <= map_end - 14:
-                            offset_5end = cds_start - map_start
-                            offset_3end = map_end - cds_start
-                            try:
-                                self.tis_offset["start_codon"][read_length]["tis_5end"][offset_5end] += 1
-                            except KeyError:
-                                self.tis_offset["start_codon"][read_length]["tis_5end"][offset_5end] = 1
-                            try:
-                                self.tis_offset["start_codon"][read_length]["tis_3end"][offset_3end] += 1
-                            except KeyError:
-                                self.tis_offset["start_codon"][read_length]["tis_3end"][offset_3end] = 1
-
-                        # specifies the possible range of offset lengths around the stop codon.
-                        elif map_start + 14 <= cds_end <= map_end - 9:
-                            # shift -5 nt to align the last AA.  like the list [-6, -5, -4, -3, -2, -1, 0, 1, 2]
-                            offset_5end = (cds_end - 2 - 3) - map_start
-                            offset_3end = map_end - (cds_end - 2 - 3)
-                            try:
-                                self.tis_offset["stop_codon"][read_length]["tts_5end"][offset_5end] += 1
-                            except KeyError:
-                                self.tis_offset["stop_codon"][read_length]["tts_5end"][offset_5end] = 1
-                            try:
-                                self.tis_offset["stop_codon"][read_length]["tts_3end"][offset_3end] += 1
-                            except KeyError:
-                                self.tis_offset["stop_codon"][read_length]["tts_3end"][offset_3end] = 1
-                    else:
-                        pass
-
-        self.pysam_output.close()
-        self.pysam_input.close()
-
-    def get_tis_offset2(self):
-        # build the offset table
-        for number in range(self.min_length, self.max_length + 1):
-            self.tis_offset["start_codon"][number] = {"tis_5end": {}, "tis_3end": {}}
-            self.tis_offset["stop_codon"][number] = {"tts_5end": {}, "tts_3end": {}}
-
-        for mrna, mrna_attr in self.mrna_dict.items():
-            # eliminate the transcript without read mapped
-            if len(mrna_attr.bam) == 0:
-                continue
-            else:
-                # get the TIS and TTS from mRNA dict.
-                cds_start, cds_end = mrna_attr.utr5_length + 1, mrna_attr.utr5_length + mrna_attr.cds_length
                 for line in mrna_attr.bam:
                     map_start, map_end = line.get_blocks()[0]
                     # map start is not included, so add 1 nt.
                     # map_start = map_start + 1
+                    map_start = map_start
                     read_length = line.infer_read_length()
 
                     # reads that match a specific length are retained.
+                    # an other way is to calculate whole rpfs, and filter the min-max length in the plot module
                     if self.min_length <= read_length <= self.max_length:
-                        # specifies the possible range of offset lengths around the start codon.
-                        # start codon position like this [8, 9, 10, 11, "12", 13, 14, 15, 16]
-
+                        # filter the possible range of offset lengths around the start codon.
                         if map_start <= cds_start <= map_end:
-                            offset_5end = cds_start - map_start
+                            offset_5end = map_start - cds_start
                             offset_3end = map_end - cds_start
                             try:
-                                self.tis_offset["start_codon"][read_length]["tis_5end"][offset_5end] += 1
+                                self.tis_offset["tis_5end"][read_length][offset_5end] += 1
                             except KeyError:
-                                self.tis_offset["start_codon"][read_length]["tis_5end"][offset_5end] = 1
+                                # self.tis_offset["tis_5end"][read_length][offset_5end] = 1
+                                pass
                             try:
-                                self.tis_offset["start_codon"][read_length]["tis_3end"][offset_3end] += 1
+                                self.tis_offset["tis_3end"][read_length][offset_3end] += 1
                             except KeyError:
-                                self.tis_offset["start_codon"][read_length]["tis_3end"][offset_3end] = 1
+                                pass
+                                # self.tis_offset["tis_3end"][read_length][offset_3end] = 1
 
-                        # specifies the possible range of offset lengths around the stop codon.
-                        elif map_start + 14 <= cds_end <= map_end - 9:
-                            # shift -5 nt to align the last AA.  like the list [-6, -5, -4, -3, -2, -1, 0, 1, 2]
-                            offset_5end = (cds_end - 2 - 3) - map_start
-                            offset_3end = map_end - (cds_end - 2 - 3)
+                        # filter the possible range of offset lengths around the stop codon.
+                        elif map_start <= cds_end <= map_end:
+                            offset_5end = map_start - cds_end
+                            offset_3end = map_end - cds_end
                             try:
-                                self.tis_offset["stop_codon"][read_length]["tts_5end"][offset_5end] += 1
+                                self.tis_offset["tts_5end"][read_length][offset_5end] += 1
                             except KeyError:
-                                self.tis_offset["stop_codon"][read_length]["tts_5end"][offset_5end] = 1
+                                pass
+                                # self.tis_offset["tts_5end"][read_length][offset_5end] = 1
                             try:
-                                self.tis_offset["stop_codon"][read_length]["tts_3end"][offset_3end] += 1
+                                self.tis_offset["tts_3end"][read_length][offset_3end] += 1
                             except KeyError:
-                                self.tis_offset["stop_codon"][read_length]["tts_3end"][offset_3end] = 1
+                                pass
+                                # self.tis_offset["tts_3end"][read_length][offset_3end] = 1
                     else:
                         pass
 
-        self.pysam_input.close()
+        self.tis_5end = pd.DataFrame(self.tis_offset['tis_5end']).T
+        self.tis_3end = pd.DataFrame(self.tis_offset['tis_3end']).T
+        self.tts_5end = pd.DataFrame(self.tis_offset['tts_5end']).T
+        self.tts_3end = pd.DataFrame(self.tis_offset['tts_3end']).T
 
-    def align_to_start_codon(self, length, start_codon, stop_codon):
+        if self.detail:
+            self.tis_5end.to_csv(self.output_prefix + '_' + 'tis_5end.txt', sep='\t', header=True, index=True)
+            self.tis_3end.to_csv(self.output_prefix + '_' + 'tis_3end.txt', sep='\t', header=True, index=True)
+            self.tts_5end.to_csv(self.output_prefix + '_' + 'tts_5end.txt', sep='\t', header=True, index=True)
+            self.tts_3end.to_csv(self.output_prefix + '_' + 'tts_3end.txt', sep='\t', header=True, index=True)
 
-        start_reads = start_codon.loc[start_codon["length"] == length].copy()
-        stop_reads = stop_codon.loc[stop_codon["length"] == length].copy()
 
-        # calculate the complementary length of offset and align it to the start codon.
-        del stop_reads["length"]
-        stop_reads["from_tis"] = length - 1 - stop_reads["from_tts"]
+    @staticmethod
+    def offset_scale(offset):
+        offset_norm = offset.sub(offset.mean(axis=1), axis=0)
+        offset_norm_row = offset_norm.div(offset_norm.std(axis=1), axis=0)
+        offset_norm_row.fillna(0, inplace=True)
+        return offset_norm_row
 
-        shift_nt = round((length - self.peak_length) / 2)
-        # shift_nt = shift_nt if shift_nt <= 3 else 3
-        candidate_offset = [i for i in range(9 + shift_nt, 15 + shift_nt)]
-        start_reads = start_reads[start_reads["from_tis"].isin(candidate_offset)]
-        stop_reads = stop_reads[stop_reads["from_tis"].isin(candidate_offset)]
+    def draw_tis_heatmap(self):
+        # draw the offset heatmap
+        def draw_figure(tis_5end, tis_3end, tts_5end, tts_3end, out_pdf, out_png):
+            matplotlib.use('Agg')
+            now_cmap = 'Blues'
 
-        # get the percentage of each candidate offset.
-        start_reads["tis_5end_per"] = start_reads["tis_5end"].div(start_reads["tis_5end"].sum()) * 100
-        stop_reads["tts_3end_per"] = stop_reads["tts_3end"].div(stop_reads["tts_3end"].sum()) * 100
+            fig = plt.figure(figsize=(12, 8), dpi=300)
+            # start codon 5 end
+            ax1 = plt.subplot(2, 2, 1)
+            sns.heatmap(data=tis_5end, annot=None, linewidths=0.5, ax=ax1, cmap=now_cmap)
+            # label_y = ax1.get_yticklabels()
+            # plt.setp(label_y, rotation=0, horizontalalignment='right')
+            ax1.set_title('RPFs 5end')
+            ax1.set_ylabel("RPFs length")
+            ax1.set_xlabel("from start codon")
+            # start codon 3 end
+            ax2 = plt.subplot(2, 2, 2)
+            sns.heatmap(data=tis_3end, annot=None, linewidths=0.5, ax=ax2, cmap=now_cmap)
+            # label_y = ax1.get_yticklabels()
+            # plt.setp(label_y, rotation=0, horizontalalignment='right')
+            ax2.set_title('RPFs 3end')
+            ax2.set_ylabel("RPFs length")
+            ax2.set_xlabel("from start codon")
+            # stop codon 5 end
+            ax3 = plt.subplot(2, 2, 3)
+            sns.heatmap(data=tts_5end, annot=None, linewidths=0.5, ax=ax3, cmap=now_cmap)
+            # label_y = ax1.get_yticklabels()
+            # plt.setp(label_y, rotation=0, horizontalalignment='right')
+            ax3.set_title('RPFs 5end')
+            ax3.set_ylabel("RPFs length")
+            ax3.set_xlabel("from stop codon")
+            # stop codon 3 end
+            ax4 = plt.subplot(2, 2, 4)
+            sns.heatmap(data=tts_3end, annot=None, linewidths=0.5, ax=ax4, cmap=now_cmap)
+            # label_y = ax1.get_yticklabels()
+            # plt.setp(label_y, rotation=0, horizontalalignment='right')
+            ax4.set_title('RPFs 3end')
+            ax4.set_ylabel("RPFs length")
+            ax4.set_xlabel("from stop codon")
 
-        # alter the merged dataframe.
-        temp_offset = pd.merge(start_reads, stop_reads, how='outer', left_on="from_tis", right_on="from_tis")
-        temp_offset["length"] = length
-        temp_offset = temp_offset.fillna(0)
-        temp_offset = temp_offset.apply(self.check_zero_offset, axis=1)
-        temp_offset["sum"] = temp_offset["tis_5end"] + temp_offset["tts_3end"]
-        temp_offset = temp_offset[self.column_name]
+            plt.tight_layout()
+            # plt.show()
+            fig.savefig(fname=out_pdf)
+            fig.savefig(fname=out_png)
 
-        return temp_offset
+        # draw the raw offset heatmap
+        out_pdf = self.output_prefix + "_tis_offset.pdf"
+        out_png = self.output_prefix + "_tis_offset.png"
+        draw_figure(self.tis_5end, self.tis_3end, self.tts_5end, self.tts_3end, out_pdf, out_png)
 
-    def align_to_tis(self, length, start_codon, stop_codon):
+        # draw the scaled offset heatmap
+        out_pdf_s = self.output_prefix + "_tis_offset_scale.pdf"
+        out_png_s = self.output_prefix + "_tis_offset_scale.png"
+        tis_5end_s = self.offset_scale(self.tis_5end)
+        tis_3end_s = self.offset_scale(self.tis_3end)
+        tts_5end_s = self.offset_scale(self.tts_5end)
+        tts_3end_s = self.offset_scale(self.tts_3end)
+        draw_figure(tis_5end_s, tis_3end_s, tts_5end_s, tts_3end_s, out_pdf_s, out_png_s)
 
-        start_reads = start_codon.loc[start_codon["length"] == length].copy()
-        stop_reads = stop_codon.loc[stop_codon["length"] == length].copy()
+    def shift_codon(self, now_psite, length):
 
-        # calculate the complementary length of offset and align it to the start codon.
-        del stop_reads["length"]
-        stop_reads["from_tis"] = length - 1 - stop_reads["from_tts"]
+        # shift the codon with 3nt to the normal p-site range
+        if now_psite in range(7, 20):
+            return now_psite
 
-        shift_nt = round((length - self.peak_length) / 2)
-        # shift_nt = shift_nt if shift_nt <= 3 else 3
-        candidate_offset = [i for i in range(9 + shift_nt, 15 + shift_nt)]
-        start_reads = start_reads[start_reads["from_tis"].isin(candidate_offset)]
-        stop_reads = stop_reads[stop_reads["from_tis"].isin(candidate_offset)]
+        if self.adj_tis_offset:
+            if self.adj_tis_offset[length-1][-1]:
+                if self.adj_tis_offset[length-1][-1] + 2 < now_psite:
+                    return self.shift_codon(now_psite - 3, length)
+                elif now_psite < self.adj_tis_offset[length-1][-1] - 2:
+                    return self.shift_codon(now_psite + 3, length)
+            else:
+                return np.nan
 
-        # get the percentage of each candidate offset.
-        start_reads["tis_5end_per"] = start_reads["tis_5end"].div(start_reads["tis_5end"].sum()) * 100
-        stop_reads["tts_3end_per"] = stop_reads["tts_3end"].div(stop_reads["tts_3end"].sum()) * 100
+        elif not self.adj_tis_offset:
+            if now_psite > 19:
+                return self.shift_codon(now_psite - 3, length)
+            elif now_psite < 7:
+                return self.shift_codon(now_psite + 3, length)
 
-        # alter the merged dataframe.
-        temp_offset = pd.merge(start_reads, stop_reads, how='outer', left_on="from_tis", right_on="from_tis")
-        temp_offset["length"] = length
-        temp_offset = temp_offset.fillna(0)
-        temp_offset = temp_offset.apply(self.check_zero_offset, axis=1)
-        temp_offset["sum"] = temp_offset["tis_5end"] + temp_offset["tts_3end"]
-        temp_offset = temp_offset[self.column_name]
-
-        return temp_offset
-
-    def align_to_stop_codon(self, length, start_codon, stop_codon):
-
-        start_reads = start_codon.loc[start_codon["length"] == length].copy()
-        stop_reads = stop_codon.loc[stop_codon["length"] == length].copy()
-
-        # calculate the complementary length of offset and align it to the start codon.
-        del start_reads["length"]
-        start_reads["from_tts"] = length - 1 - start_reads["from_tis"]
-        shift_nt = round((length - self.peak_length) / 2)
-        # shift_nt = shift_nt if shift_nt <= 3 else 3
-        candidate_offset = [i for i in range(14 + shift_nt, 20 + shift_nt)]
-        start_reads = start_reads[start_reads["from_tts"].isin(candidate_offset)]
-        stop_reads = stop_reads[stop_reads["from_tts"].isin(candidate_offset)]
-
-        # get the percentage of each candidate offset.
-        start_reads["tis_5end_per"] = start_reads["tis_5end"].div(start_reads["tis_5end"].sum()) * 100
-        stop_reads["tts_3end_per"] = stop_reads["tts_3end"].div(stop_reads["tts_3end"].sum()) * 100
-
-        # alter the merged dataframe.
-        temp_offset = pd.merge(start_reads, stop_reads, how='outer', left_on="from_tts", right_on="from_tts")
-        temp_offset["length"] = length
-        temp_offset = temp_offset.fillna(0)
-        temp_offset = temp_offset.apply(self.check_zero_offset, axis=1)
-        temp_offset["sum"] = temp_offset["tis_5end"] + temp_offset["tts_3end"]
-        temp_offset = temp_offset[self.column_name]
-
-        return temp_offset
-
-    def format_tis_offset(self):
-        self.adj_tis_offset[["tis_5end_per", "tts_3end_per"]] = self.adj_tis_offset[
-            ["tis_5end_per", "tts_3end_per"]].astype(float).round(2)
-        self.adj_tis_offset[["from_tis", "tis_5end", "from_tts", "tts_3end", "sum"]] = self.adj_tis_offset[
-            ["from_tis", "tis_5end", "from_tts", "tts_3end", "sum"]].astype(int)
-
-    def adjust_tis_offset(self, start_codon, stop_codon):
-        column_name = ["length", "from_tis", "tis_5end", "tis_5end_per", "from_tts", "tts_3end", "tts_3end_per", "sum"]
+    def adjust_tis_offset_bak(self):
         # monosome data only needs to align p-site on one side.
+        tis_5end = self.tis_5end.T.copy()
+        tis_5end.index = abs(tis_5end.index)
+        tts_5end = self.tts_5end.T.copy()
+        tts_5end.index = abs(tts_5end.index)
+        offset_rpfs = tis_5end + tts_5end
+
         for length in range(self.min_length, self.max_length + 1):
-            start_offset = self.align_to_start_codon(length, start_codon, stop_codon)
-            start_offset_peak = pd.DataFrame(start_offset.sort_values("sum", ascending=False).iloc[0]).T
-            self.adj_tis_offset = pd.concat([self.adj_tis_offset, start_offset_peak])
-        self.format_tis_offset()
-        self.adj_tis_offset["p_site"] = self.adj_tis_offset["from_tis"] + 1
-        self.adj_tis_offset["ribo"] = ["first"] * self.nt_num
+            # shift 1 nt for the both 5/3 reads end (5end + 3end = 2)
+            # Empirical value: 2nt for Eukaryotes, 1nt for prokaryotes
+            shift_nt = (length - self.peak_length) // self.shift_nt
+            candidate_offset = [i for i in range(8 + shift_nt, 15 + shift_nt + 1)]
+
+            # compare the max rpfs at same offset of 5end and 3end
+            max_offset_site = offset_rpfs[length].idxmax()
+            temp_offset_rpfs = offset_rpfs.copy()
+
+            while max_offset_site not in candidate_offset:
+                del temp_offset_rpfs[length][max_offset_site]
+                max_offset_site = temp_offset_rpfs[length].idxmax()
+
+            # sum the max frame rpfs of [E-site, P-site, A-site], and the psite is the max_offset_site
+            offset_max_range = range(max_offset_site - 3, max_offset_site + 6, 3)
+            max_offset_rpfs = offset_rpfs[length][offset_max_range].sum()
+
+            # sum the all frame rpfs of [E-site, P-site, A-site]
+            offset_sum_range = range(max_offset_site - 3, max_offset_site + 6)
+            max_offset_per = np.true_divide(max_offset_rpfs, offset_rpfs[length][offset_sum_range].sum())
+
+            # sum the all frame rpfs of [E-site, P-site, A-site] from TIS
+            from_tis_rpfs = tis_5end[length][offset_max_range].sum()
+            from_tts_rpfs = tts_5end[length][offset_max_range].sum()
+
+            from_tis_per = np.true_divide(from_tis_rpfs, tis_5end[length][offset_sum_range].sum())
+            from_tts_per = np.true_divide(from_tts_rpfs, tts_5end[length][offset_sum_range].sum())
+
+            # psite = offset + 1
+            psite = max_offset_site + 1
+            # if psite == 1:
+            #     self.adj_tis_offset[length] = [length, max_offset_site, max_offset_rpfs, max_offset_per, from_tis_rpfs,
+            #                                    from_tis_per, from_tts_rpfs, from_tts_per, psite]
+            # else:
+            psite = self.shift_codon(psite, length)
+
+            self.adj_tis_offset[length] = [length, 
+                                           from_tis_rpfs, from_tis_per,
+                                           from_tts_rpfs, from_tts_per,
+                                           max_offset_site, max_offset_rpfs, max_offset_per, 
+                                           psite]
+
+    def adjust_tis_offset(self):
+        # monosome data only needs to align p-site on one side.
+        tis_5end = self.tis_5end.T.copy()
+        tis_5end.index = abs(tis_5end.index)
+        tts_5end = self.tts_5end.T.copy()
+        tts_5end.index = abs(tts_5end.index)
+        offset_rpfs = tis_5end + tts_5end
+
+        for length in range(self.min_length, self.max_length + 1):
+            # shift 1 nt for the both 5/3 reads end (5end + 3end = 2)
+            # Empirical value: 2nt for Eukaryotes, 1nt for prokaryotes
+            shift_nt = (length - self.peak_length) // self.shift_nt
+            candidate_offset = [i for i in range(8 + shift_nt, 15 + shift_nt + 1)]
+
+            # compare the max rpfs at same offset of 5end and 3end
+            max_offset_site = offset_rpfs[length].idxmax()
+            temp_offset_rpfs = offset_rpfs.copy()
+
+            while max_offset_site not in candidate_offset:
+                del temp_offset_rpfs[length][max_offset_site]
+                max_offset_site = temp_offset_rpfs[length].idxmax()
+
+            # sum the max frame rpfs of [E-site, P-site, A-site], and the psite is the max_offset_site
+            offset_frame0_range = range(max_offset_site - 3, max_offset_site + 6, 3)
+            offset_frame1_range = range(max_offset_site - 2, max_offset_site + 6, 3)
+            offset_frame2_range = range(max_offset_site - 1, max_offset_site + 6, 3)
+
+            frame0_offset_rpfs = offset_rpfs[length][offset_frame0_range].sum()
+            frame1_offset_rpfs = offset_rpfs[length][offset_frame1_range].sum()
+            frame2_offset_rpfs = offset_rpfs[length][offset_frame2_range].sum()
+
+            # sum the all frame rpfs of [E-site, P-site, A-site]
+            offset_sum_range = range(max_offset_site - 3, max_offset_site + 6)
+            offset_sum = offset_rpfs[length][offset_sum_range].sum()
+            max_offset_per = np.true_divide(frame0_offset_rpfs, offset_sum)
+
+            # psite = offset + 1
+            psite = max_offset_site + 1
+            psite = self.shift_codon(psite, length)
+
+            self.adj_tis_offset[length] = [length,
+                                           max_offset_site, frame0_offset_rpfs,
+                                           max_offset_site + 1, frame1_offset_rpfs,
+                                           max_offset_site + 2, frame2_offset_rpfs,
+                                           psite, offset_sum, max_offset_per]
+
 
     def write_tis_offset(self):
 
-        start_codon = pd.DataFrame(columns=("length", "from_tis", "tis_5end"))
-        for length, data in self.tis_offset['start_codon'].items():
-            df = pd.DataFrame(data)
-            df = df.fillna(0)
-            df["length"] = length
-            df["from_tis"] = df.index
-            start_codon = pd.concat([start_codon, df[["length", "from_tis", "tis_5end"]]])
+        column_name = ["length", "frame0", "rpfs0", "frame1", "rpfs1", "frame2", "rpfs2", "p_site", "rpfs", "periodicity"]
 
-        stop_codon = pd.DataFrame(columns=("length", "from_tts", "tts_3end"))
-        for length, data in self.tis_offset['stop_codon'].items():
-            df = pd.DataFrame(data)
-            df = df.fillna(0).astype(int)
-            df["length"] = length
-            df["from_tts"] = df.index
-            stop_codon = pd.concat([stop_codon, df[["length", "from_tts", "tts_3end"]]])
+        adj_tis_offset = pd.DataFrame(self.adj_tis_offset).T.copy()
 
-        self.adjust_tis_offset(start_codon, stop_codon)
-        self.adj_tis_offset.sort_values(['ribo', 'length'], inplace=True)
+        adj_tis_offset.columns = column_name
+        adj_tis_offset["periodicity"] = adj_tis_offset["periodicity"] * 100
+        adj_tis_offset["periodicity"] = adj_tis_offset["periodicity"].astype(float).round(2)
 
-        self.adj_tis_offset = self.adj_tis_offset.reset_index(drop=True)
-        psite_num = len(self.adj_tis_offset.index)
-        for rows in range(psite_num):
-            if rows > psite_num - 2:
-                break
-            elif self.adj_tis_offset.loc[rows, 'p_site'] - self.adj_tis_offset.loc[rows + 1, 'p_site'] > 1:
-                self.adj_tis_offset.loc[rows, 'p_site'] -= 3
-        self.adj_tis_offset.to_csv(self.output_prefix + "_tis_offset.txt", sep='\t', index=False)
+        adj_tis_offset[["length", "frame0", "rpfs0", "frame1", "rpfs1", "frame2", "rpfs2", "p_site",
+                        "rpfs"]] = adj_tis_offset[["length", "frame0", "rpfs0", "frame1", "rpfs1", "frame2", "rpfs2", "p_site", "rpfs"]].astype(int)
+
+        adj_tis_offset.sort_values(['length'], inplace=True)
+        adj_tis_offset["ribo"] = ["first"] * self.nt_num
+        adj_tis_offset.to_csv(self.output_prefix + "_tis_offset.txt", sep='\t', index=False)
+
+    def make_frame_offset(self):
+        '''
+        make the offset dict
+
+        1. peak of ribosome protect fragments about 30nt, 
+        the read length distribution also varies significantly due to different protocols and species.
+        So shift 1 nt (depend on the reads length) for the both 5/3 reads end to solve this problem (5end + 3end = 2).
+        Empirical value: 2nt for Eukaryotes, 1nt for prokaryotes
+        
+        2. set the minimum and maximum window for p-site location
+        3. set the first window for p-site calculation
+
+        '''
+
+        for length in range(self.min_length, self.max_length + 1):
+            shift_nt = (length - self.peak_length) // self.shift_nt
+            if shift_nt < -3:
+                shift_nt = -3
+            elif shift_nt > 6:
+                shift_nt = 6
+            else:
+                pass
+
+            left_offset1, left_offset2, left_offset3 = 11 + shift_nt, 12 + shift_nt, 13 + shift_nt
+
+            self.frame_offset_len[length] = [left_offset1, left_offset2, left_offset3]
+            self.frame_offset[length] = [0, 0, 0]
 
     def calc_frame(self, map_start, cds_start, reads_length, num1, num2, num3):
-        if (map_start + self.frame_offset_len[reads_length][num1] - cds_start + 1) % 3 == 0:
+        '''
+        calculate the offset frame of each reads
+
+        1. trim the offset_length dependent on the reads length
+        2. fit the offset length of each reads in the codon frame
+        3. arrange the [0, 1, 2] frame reads into frame_offset dictionary
+        '''
+
+        if (map_start + self.frame_offset_len[reads_length][num1] - cds_start) % 3 == 0:
             try:
                 self.frame_offset[reads_length][num1] += 1
             except KeyError:
                 pass
-        elif (map_start + self.frame_offset_len[reads_length][num2] - cds_start + 1) % 3 == 0:
+        elif (map_start + self.frame_offset_len[reads_length][num2] - cds_start) % 3 == 0:
             try:
                 self.frame_offset[reads_length][num2] += 1
             except KeyError:
                 pass
-        elif (map_start + self.frame_offset_len[reads_length][num3] - cds_start + 1) % 3 == 0:
+        elif (map_start + self.frame_offset_len[reads_length][num3] - cds_start) % 3 == 0:
             try:
                 self.frame_offset[reads_length][num3] += 1
             except KeyError:
                 pass
 
     def get_mono_frame(self, mrna_attr, cds_start):
+        '''
+        through the entire bam file,
+        1. reterieve the reads map start site of gene body
+        2. Remove any reads that are too long or too short
+        3. arrange predicted psite for each reads
+        '''
         for line in mrna_attr.bam:
-            self.pysam_output.write(line)
             map_start, map_end = line.get_blocks()[0]
-            # map start is not included, so add 1 nt.
-            # map_start = map_start + 1
             reads_length = line.infer_read_length()
             if self.min_length <= reads_length <= self.max_length:
                 self.calc_frame(map_start, cds_start, reads_length, 0, 1, 2)
 
-    def make_frame_offset(self):
-        for number in range(self.min_length, self.max_length + 1):
-            # shift 1 nt for the both 5/3 read end (5end + 3end = 2)
-            length_normalised = (number - self.peak_length) // 2
-            left_offset1, left_offset2, left_offset3 = 11 + length_normalised, 12 + length_normalised, 13 + length_normalised
-
-            self.frame_offset_len[number] = [left_offset1, left_offset2, left_offset3]
-            self.frame_offset[number] = [0, 0, 0]
-
     def get_frame_offset(self):
+        '''
+        through the entire mrna dict file,
+        1. define the frame offset dict file
+        2. eliminate the transcript without read mapped
+        3. set the gene body range for offset calculation, trim the stop codon from gene CDS
+        4. check the category of sequencing profile
+        monosome, disome, trisome
+        5. disome and trisome need to perform two and three times psite calculations respectively
+
+        '''
         self.make_frame_offset()
-        self.pysam_output = pysam.AlignmentFile(self.output_prefix + "_mrna.bam", 'wb', template=self.pysam_input)
+
         for mrna, mrna_attr in self.mrna_dict.items():
-            # eliminate the transcript without read mapped
+            
             if len(mrna_attr.bam) == 0:
                 continue
             else:
-                cds_start, cds_end = mrna_attr.utr5_length + 1, mrna_attr.utr5_length + mrna_attr.cds_length - 3
+                cds_start, cds_end = mrna_attr.utr5_length, mrna_attr.utr5_length + mrna_attr.cds_length - 3 - 2
                 self.get_mono_frame(mrna_attr, cds_start)
 
-        self.pysam_output.close()
-        self.pysam_input.close()
+    def adjust_frame_offset(self):
+        '''
+        The length of reads varies in different sequencing files,
+        so offset should be normalise to suitable length.
 
-    def write_frame_offset(self):
-        columns = ["length", "frame1", "rpf_1", "frame2", "rpf_2", "frame3", "rpf_3", "sum", "p_site", "ribo"]
+        1. first we need to check the peak length from offset dict
 
+        2. In general, the offset codon frame of shorter reads will not be larger than the offset of peak reads length.
+        so the abnormal offset will shift to smaller offset by step of one codon frame
+
+        3. Similarly, an offset codon frame of longer reads will not be shorter than peak reads length.
+
+        '''
+
+        # adjust the frame shift of reads shorter than peak length
+        for length in range(self.peak_length, self.min_length, -1):
+            psite1 = self.merge_frame_offset.loc[self.merge_frame_offset['length'] == length, 'p_site'].reset_index(drop=True)[0]
+            psite2 = self.merge_frame_offset.loc[self.merge_frame_offset['length'] == length - 1, 'p_site'].reset_index(drop=True)[0]
+
+            if psite2 + 2 < psite1:
+                self.merge_frame_offset.loc[self.merge_frame_offset['length'] == length - 1, 'p_site'] = psite2 + 3
+            elif psite2 - 2 > psite1:
+                self.merge_frame_offset.loc[self.merge_frame_offset['length'] == length - 1, 'p_site'] = psite2 - 3
+            else:
+                continue
+
+        # adjust the frame shift of reads longer than peak length
+        for length in range(self.min_length, self.peak_length, 1):
+            psite1 = self.merge_frame_offset.loc[self.merge_frame_offset['length'] == length, 'length'].reset_index(drop=True)[0]
+            psite2 = self.merge_frame_offset.loc[self.merge_frame_offset['length'] == length + 1, 'length'].reset_index(drop=True)[0]
+            
+            if psite2 - 2 > psite1:
+                self.merge_frame_offset.loc[self.merge_frame_offset['length'] == length + 1, 'length'] = psite2 - 3
+            elif psite2 + 2 < psite1:
+                self.merge_frame_offset.loc[self.merge_frame_offset['length'] == length + 1, 'length'] = psite2 + 3
+            else:
+                continue
+
+    def format_frame_offset(self):
+        columns = ["length", "frame0", "rpfs0", "frame1", "rpfs1", "frame2", "rpfs2", "p_site", "rpfs"]
+
+        # different flag for the disome and trisome sequencing profiles
+        # next version
         ribo = [["first"], ["second"], ["third"]]
         frame_offset = pd.DataFrame(self.frame_offset).T
         rows, cols = frame_offset.shape[0], frame_offset.shape[1]
+        
         for part in range(0, cols, 3):
             temp_offset = frame_offset.iloc[:, part:part + 3].copy()
             temp_offset["p_site"] = [self.frame_offset_len[k][v] + 1 for k, v in dict(temp_offset.idxmax(1)).items()]
             temp_offset["sum"] = temp_offset.apply(lambda x: x.iloc[0:3].sum(), axis=1)
-            temp_offset.columns = ["rpf_1", "rpf_2", "rpf_3", "p_site", "sum"]
-            temp_offset[["frame1", "frame2", "frame3"]] = [i[part:part + 3] for i in self.frame_offset_len.values()]
+            temp_offset.columns = ["rpfs0", "rpfs1", "rpfs2", "p_site", "rpfs"]
+            temp_offset[["frame0", "frame1", "frame2"]] = [i[part:part + 3] for i in self.frame_offset_len.values()]
             temp_offset["length"] = temp_offset.index
-            temp_offset["ribo"] = ribo[part // 3] * rows
-            self.adj_frame_offset = pd.concat([self.adj_frame_offset, temp_offset[columns]])
+            self.merge_frame_offset = pd.concat([self.merge_frame_offset, temp_offset[columns]])
 
-        self.adj_frame_offset.to_csv(self.output_prefix + "_frame_offset.txt", sep='\t', index=False)
+        self.merge_frame_offset["periodicity"] = self.merge_frame_offset[["rpfs0", "rpfs1", "rpfs2"]].max(axis = 1) / self.merge_frame_offset["rpfs"]
+        self.merge_frame_offset["periodicity"] = self.merge_frame_offset["periodicity"] * 100
+        self.merge_frame_offset["periodicity"] = self.merge_frame_offset["periodicity"].astype(float).round(2)
+        self.merge_frame_offset["ribo"] = ribo[part // 3] * rows
+        self.merge_frame_offset[columns] = self.merge_frame_offset[columns].astype(int)
+
+    def write_frame_offset(self):
+        '''
+        arrange the frame offset with predicted psite
+        '''
+        for length in range(0, self.merge_frame_offset.shape[0]):
+            offset_line = self.merge_frame_offset.iloc[length, :]
+            offset_psite = offset_line[[1, 3, 5]]
+            offset_rpfs = offset_line[[2, 4, 6]]
+        
+            offset_index = (offset_psite - offset_line[-4] + 1) % 3
+
+            offset_psite.index = offset_index
+            offset_psite = offset_psite.loc[[0, 1, 2]]
+
+            offset_rpfs.index = offset_index
+            offset_rpfs = offset_rpfs.loc[[0, 1, 2]]
+
+            self.merge_frame_offset.iloc[length, [1, 3, 5]] = offset_psite
+            self.merge_frame_offset.iloc[length, [2, 4, 6]] = offset_rpfs
+
+        self.merge_frame_offset.to_csv(self.output_prefix + "_frame_offset.txt", sep='\t', index=False)
+
+    def draw_frame_heatmap(self):
+        out_pdf = self.output_prefix + "_frame_offset.pdf"
+        out_png = self.output_prefix + "_frame_offset.png"
+
+        # reterieve the psite and rpfs
+        raw_frame_offset = self.merge_frame_offset.loc[:, ["length", "p_site", 'rpfs0', 'rpfs1', 'rpfs2']]
+
+        # rename the ylabel
+        offset_num = raw_frame_offset.shape[0]
+        raw_frame_offset.index = [str(raw_frame_offset["length"].to_list()[i]) + '_' + str(raw_frame_offset["p_site"].to_list()[i]) for i in range(0, offset_num)]
+
+        # format the offset table and rename the columns
+        raw_frame_offset = raw_frame_offset.drop(columns=["length", "p_site"])
+        raw_frame_offset.columns = ["frame0", "frame1", "frame2"]
+        raw_frame_offset = raw_frame_offset.apply(pd.to_numeric)
+
+        # scale the frame offset to range [0, 1]
+        scale_frame_offset = self.offset_scale(raw_frame_offset)
+        scale_frame_offset = scale_frame_offset.apply(pd.to_numeric)
+
+        # draw the frame offset heatmap
+        matplotlib.use('Agg')
+        now_cmap = 'Blues'
+
+        fig = plt.figure(figsize=(12, 6), dpi=300)
+
+        # raw RPFs frame offset
+        ax1 = plt.subplot(1, 2, 1)
+        sns.heatmap(data=raw_frame_offset, annot=None, linewidths=0.5, ax=ax1, cmap=now_cmap)
+        ax1.set_title('raw counts')
+        ax1.set_ylabel("RPFs length")
+        ax1.set_xlabel("open reading frame")
+
+        # scale RPFs frame offset
+        ax2 = plt.subplot(1, 2, 2)
+        sns.heatmap(data=scale_frame_offset, annot=None, linewidths=0.5, ax=ax2, cmap=now_cmap)
+        ax2.set_title('scaled counts')
+        ax2.set_ylabel("RPFs length")
+        ax2.set_xlabel("open reading frame")
+
+        plt.tight_layout()
+        # plt.show()
+        fig.savefig(fname=out_pdf)
+        fig.savefig(fname=out_png)
