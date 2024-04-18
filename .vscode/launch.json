@@ -644,17 +644,18 @@
             "program": "${workspaceRoot}/scripts/rpf_Offset.py",
             "args": [
                 "-t",
-                "/mnt/t64/database/usda110/norm/usda110.norm.txt",
+                // "/mnt/t64/database/usda110/norm/usda110.norm.txt",
+                "/home/rensc/software/temp/tests/bam/test01.norm.txt",
                 "-b",
-                "/home/rensc/software/riboParser/tests/bam/R_GR_in_25d_1.bam",
+                // "/home/rensc/software/riboParser/tests/bam/R_GR_in_25d_1.bam",
+                "/home/rensc/software/temp/tests/bam/test01.bam",
                 "-o",
-                "/home/rensc/software/riboParser/tests/bam/R_GR_in_25d_1",
-                "--mode",
-                "frame",
+                // "/home/rensc/software/riboParser/tests/bam/R_GR_in_25d_1",
+                "/home/rensc/software/temp/tests/bam/test01",
                 "-m",
-                "27",
+                "26",
                 "-M",
-                "33"
+                "34"
             ],
             "console": "integratedTerminal",
             "justMyCode": true

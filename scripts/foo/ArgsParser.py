@@ -164,19 +164,20 @@ def offset_args_parser():
                              help="the prefix of output file. (prefix + _offset.txt)")
 
     # arguments for the offset detection
-    parser.add_argument('--mode', dest="mode", required=False, type=str, default='tis',
-                        help="specify the mode of offset detect [frame, tis]. (default: %(default)s).")
+    # parser.add_argument('--mode', dest="mode", required=False, type=str, default='tis',
+    #                     help="specify the mode of offset detect [frame, tis]. (default: %(default)s).")
     parser.add_argument('-l', dest="longest", action='store_true', required=False, default=False,
                         help="only retain the transcript with longest CDS of each gene (default: %(default)s).")
     parser.add_argument('-m', dest="min", required=False, type=int, default=27,
                         help="the minimum reads length to keep (default: %(default)s nt).")
     parser.add_argument('-M', dest="max", required=False, type=int, default=33,
                         help="the maximum reads length to keep (default: %(default)s nt).")
-    parser.add_argument('-p', dest="peak_length", required=False, type=int, default=30,
-                        help="RPFs peak length [~30 nt] (default: %(default)s nt).")
+    parser.add_argument('-p', dest="exp_peak", required=False, type=int, default=30,
+                        help="Expected RPFs peak length [~30 nt] (default: %(default)s nt).")
+    # parser.add_argument('-e', dest="exp_offset", required=False, type=int, default=None,
+    #                     help="expected offset length (default: %(default)s).")
     parser.add_argument('-s', dest="shift", required=False, type=int, default=2,
-                        help="psite shift for different RPFs length."
-                             "Empirical value: 2nt for Eukaryotes, 1nt for prokaryotes. (default: %(default)s nt).")
+                        help="psite shift for different RPFs length. (default: %(default)s nt).")
     parser.add_argument('--silence', dest="silence", required=False, action='store_true', default=True,
                         help="discard the warning information. (default: %(default)s).")
     parser.add_argument('-d', dest="detail", action='store_true', required=False, default=False,
