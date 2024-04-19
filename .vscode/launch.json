@@ -1,6 +1,23 @@
 {
     "configurations": [
         {
+            "name": "Python: rpf_Shuffle.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceRoot}/scripts/rpf_Shuffle.py",
+            "args": [
+                "-r",
+                "/home/rensc/software/temp/tests/density/usda_rpf_retrieve.txt",
+                "-s",
+                "0",
+                "-i",
+                "-o",
+                "/home/rensc/software/temp/tests/ncr",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Python: serp_retrieve_seq.py",
             "type": "debugpy",
             "request": "launch",

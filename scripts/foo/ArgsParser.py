@@ -327,6 +327,30 @@ def rna_args_parser():
     return args
 
 
+def shuffle_args_parser():
+    parser = argparse.ArgumentParser(description="This script is used to shuffle the RPFs data.")
+
+    # arguments for the Required arguments
+    input_group = parser.add_argument_group('Required arguments')
+    input_group.add_argument('-r', dest="rpf", required=True, type=str,
+                             help="the name of input RPFs density file in TXT format.")
+    input_group.add_argument('-o', dest="output", required=True, type=str,
+                             help="the prefix of output file. (prefix + _shuffle.txt)")
+
+    # arguments for the ribo-seq parsing
+    parser.add_argument('-l', dest="list", required=False, type=str,
+                        help="the list of input genes for transcript id.")
+    parser.add_argument('-s', dest="seed", required=False, type=int, default=0,
+                        help="the random seed for shuffle. (default: %(default)s).")
+    parser.add_argument('-i', dest="individual", action='store_true', required=False, default=False,
+                        help="shuffle the RPFs data for each samples. (default: %(default)s).")
+    args = parser.parse_args()
+    file_check(args.rpf)
+    args_print(args)
+
+    return args
+
+
 def retrieve_args_parser():
     parser = argparse.ArgumentParser(description="This script is used to retrieve density files.")
 
