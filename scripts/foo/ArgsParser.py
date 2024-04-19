@@ -75,6 +75,9 @@ def make_ribo_ref():
                         help="only retain the protein coding transcripts (default: %(default)s).")
     parser.add_argument('-l', dest="longest", required=False, action="store_true", default=False,
                         help="only retain the longest protein coding transcripts (default: %(default)s).")
+    parser.add_argument('-w', dest="whole", required=False, action="store_true", default=False,
+                        help="output whole message (default: %(default)s).")
+    
     args = parser.parse_args()
     file_check(args.genome, args.gtf)
     args_print(args)

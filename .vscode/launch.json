@@ -85,6 +85,25 @@
             "justMyCode": true
         },
         {
+            "name": "Python: rpf_Reference.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceRoot}/scripts/rpf_Reference.py",
+            "args": [
+                "-g",
+                "/mnt/t64/database/hsa/chm13/chm13.fa",
+                "-t",
+                "/mnt/t64/database/hsa/chm13/chm13.gtf",
+                "-u",
+                "0",
+                "-w",
+                "-o",
+                "/home/rensc/software/temp/tests/reference/chm13",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Python: rpf_Check.py",
             "type": "debugpy",
             "request": "launch",

@@ -40,14 +40,18 @@ class GenePred(object):
         self.coding = args.coding
         self.longest = args.longest
         self.utr = args.utr
+
         # genome file
         self.fasta = args.genome
         self.chroms_dict = OrderedDict()
         self.mrna_seq = OrderedDict()
+
         # output file
         self.out_prefix = args.output
+        self.whole = args.whole
         self.gp_file = self.out_prefix + '.genepred'
         self.gtf_new = self.out_prefix + '.norm.gtf'
+        self.whole_file = self.out_prefix + '.whole.txt'
         self.txt_file = self.out_prefix + '.norm.txt'
         self.seq_file = self.out_prefix + '.norm.fa'
 
@@ -101,10 +105,12 @@ class GenePred(object):
         cds_list = []
         utr3_list = []
         print('Import gtf annotation.', flush=True)
+
         for idx, rows in self.gp_df.iterrows():
 
             if idx % 1000 == 0:
                 print('rows: ' + str(idx), flush=True)
+
             exonStarts = np.array(rows['exonStarts'].split(',')[:-1], dtype='int')
             exonEnds = np.array(rows['exonEnds'].split(',')[:-1], dtype='int')
 
@@ -118,13 +124,14 @@ class GenePred(object):
 
             elif rows['exonCount'] == 1:
                 if rows.strand == '+':
-                    utr5_list.append(abs(cdsStart - exonStarts))
-                    cds_list.append(abs(cdsEnd - cdsStart))
-                    utr3_list.append(abs(exonEnds - cdsEnd))
+                    utr5_list.append(int(abs(cdsStart - exonStarts)))
+                    cds_list.append(int(abs(cdsEnd - cdsStart)))
+                    utr3_list.append(int(abs(exonEnds - cdsEnd)))
+
                 elif rows.strand == '-':
-                    utr5_list.append(abs(exonEnds - cdsEnd))
-                    cds_list.append(abs(cdsEnd - cdsStart))
-                    utr3_list.append(abs(cdsStart - exonStarts))
+                    utr5_list.append(int(abs(exonEnds - cdsEnd)))
+                    cds_list.append(int(abs(cdsEnd - cdsStart)))
+                    utr3_list.append(int(abs(cdsStart - exonStarts)))
 
             elif rows['exonCount'] > 1:
                 if rows.strand == '+':
@@ -172,18 +179,65 @@ class GenePred(object):
             else:
                 print('Error: gene range was wrong at :' + rows.name + '\n', flush=True)
                 continue
-            
+        
+        print('rows: ' + str(idx), flush=True)
+
         self.gp_df['utr5_length'] = utr5_list
         self.gp_df['cds_length'] = cds_list
         self.gp_df['utr3_length'] = utr3_list
 
+    def get_rep_transcript_bak(self):
+
+        print('Filter representative transcripts.', flush=True)
+
+        counter = 0
+        def add_true_flag(group):
+
+            nonlocal counter
+            counter += 1
+            if counter % 500 == 0:
+                print('Representative gene: ' + str(counter), flush=True)
+
+            if len(group) == 1:
+                group['rep_transcript'] = True
+                return group
+            
+            else:
+                max_cds_length = group['cds_length'].max()
+                max_utr5_cds_utr3 = group.loc[group['cds_length'] == max_cds_length, ['utr5_length', 'cds_length', 'utr3_length']].sum(axis=1).max()
+
+                max_cds_index = group.loc[group['cds_length'] == max_cds_length].index
+                max_utr5_cds_utr3_index = group.loc[group['utr5_length'] + group['cds_length'] + group['utr3_length'] == max_utr5_cds_utr3].index
+
+                if len(max_cds_index) == 1:
+                    group.loc[max_cds_index, 'rep_transcript'] = True
+                elif len(max_utr5_cds_utr3_index) == 1:
+                    group.loc[max_utr5_cds_utr3_index, 'rep_transcript'] = True
+                else:
+                    group.loc[max_cds_index[0], 'rep_transcript'] = True
+                return group
+
+        self.gp_df['rep_transcript'] = False
+        self.gp_df = self.gp_df.groupby('name2').apply(add_true_flag)
+        print('Representative gene: ' + str(counter), flush=True)
+
+        # print(self.gp_df)
+
     def get_rep_transcript(self):
 
         print('Filter representative transcripts.', flush=True)
-        gp_df_max = self.gp_df.groupby(['name2'])[['name', 'cds_length']].max()
-        id_dict = dict(zip(gp_df_max.name.values, gp_df_max.name.values))
-        flags = self.gp_df.loc[:, 'name'].apply(lambda x: 'True' if x in id_dict else 'False')
-        self.gp_df.loc[:, 'rep_transcript'] = flags
+
+        self.gp_df['gene_length'] = self.gp_df['cds_length'] + self.gp_df['utr5_length'] + self.gp_df['utr3_length']
+        self.gp_df = self.gp_df.sort_values(by=['name2', 'cds_length', 'gene_length', 'utr5_length', 'utr3_length'], 
+                                            ascending=[False, False, False, False, False])
+
+        self.gp_df.reset_index(drop=True, inplace=True)
+        self.gp_df['rep_transcript'] = False
+        self.gp_df.loc[self.gp_df.groupby('name2').head(1).index, 'rep_transcript'] = True
+        self.gp_df.sort_values(by=['chrom', 'txStart', 'name2', 'rep_transcript'], 
+                               ascending=[True, True, True, False],
+                               inplace=True)
+        self.gp_df.reset_index(drop=True, inplace=True)
 
     def add_utr(self):
         exonStarts_list, exonEnds_list = [], []
@@ -193,6 +247,7 @@ class GenePred(object):
         self.gp_df.loc[:, 'modified'] = 'False'
         if self.utr == 0:
             pass
+        
         else:
             print('Add pseudo utr.', flush=True)
 
@@ -291,8 +346,12 @@ class GenePred(object):
             self.mrna_seq[rows['name']] = tmp_seq
 
     def write_txt(self):
+        if self.whole:
+            self.gp_df.to_csv(self.whole_file, sep='\t', header=True, index=None)
+
         if self.coding:
             self.gp_df = self.gp_df.loc[self.gp_df['cds_length'] != 0, ]
+
         if self.longest:
             self.gp_df = self.gp_df.loc[self.gp_df['rep_transcript'] == 'True', ]
 
@@ -307,12 +366,11 @@ class GenePred(object):
         txt_columns = ['chrom', 'name2', 'name', 'txStart', 'txEnd', 'utr5_length', 'cds_length', 'utr3_length',
                        'strand', 'rep_transcript', 'modified']
         txt_df = self.gp_df.loc[:, txt_columns].copy()
-        txt_df.insert(loc=2, column='gene_name', value='')
-        txt_df.columns = ['chromosome', 'gene_id', 'gene_name', 'transcript_id', 'start', 'end', 'utr5_length',
+
+        txt_df.columns = ['chromosome', 'gene_id', 'transcript_id', 'start', 'end', 'utr5_length',
                           'cds_length', 'utr3_length', 'strand', 'rep_transcript', 'modified']
-        txt_df = txt_df.drop(columns='gene_name')
-        txt_df.loc[:, ['utr5_length', 'cds_length', 'utr3_length']] = txt_df.loc[:, ['utr5_length', 'cds_length',
-                                                                                     'utr3_length']].astype(int)
+        
+        txt_df.loc[:, ['utr5_length', 'cds_length', 'utr3_length']] = txt_df.loc[:, ['utr5_length', 'cds_length', 'utr3_length']].astype(int)
         txt_df = txt_df.loc[txt_df['cds_length'] != 0, ]
         txt_df.to_csv(self.txt_file, sep='\t', header=True, index=None)
 
