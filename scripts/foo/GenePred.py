@@ -445,7 +445,7 @@ class GenePred(object):
 
             self.mrna_seq[rows['name']] = tmp_rna_seq
         
-            self.cds_seq[rows['name']] = tmp_rna_seq[rows['utr5_length']: rows['utr5_length'] + rows['cds_length'] + 1]
+            self.cds_seq[rows['name']] = tmp_rna_seq[rows['utr5_length']: rows['utr5_length'] + rows['cds_length']]
 
     def write_txt(self):
         '''

@@ -15,10 +15,6 @@
 import pandas as pd
 import polars as pl
 import numpy as np
-import random
-from collections import OrderedDict
-from Bio import SeqIO
-import argparse
 from . import RPFs
 
 
@@ -155,5 +151,6 @@ class Shuffle(object):
                     self.output --> output file name
         @Return   : None
         '''
+        
         self.shuffle_rpf = pl.DataFrame(self.shuffle_rpf)
         self.shuffle_rpf.write_csv(self.output, separator='\t')

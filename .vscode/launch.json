@@ -7,12 +7,14 @@
             "program": "${workspaceRoot}/scripts/rpf_Shuffle.py",
             "args": [
                 "-r",
-                "/home/rensc/software/temp/tests/density/usda_rpf_retrieve.txt",
+                "/mnt/t64/rensc/herr/hsa/pc-b5-20240113/ribo/ribo/step05-merge_2/hsa_rpf_merged.txt",
+                // "/home/rensc/software/temp/tests/density/usda_rpf_retrieve.txt",
                 "-s",
                 "0",
-                "-i",
+                // "-i",
                 "-o",
-                "/home/rensc/software/temp/tests/ncr",
+                "/mnt/t64/rensc/herr/hsa/pc-b5-20240113/ribo/ribo/test/hsa_2"
+                // "/home/rensc/software/temp/tests/ncr",
             ],
             "console": "integratedTerminal",
             "justMyCode": true

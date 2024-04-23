@@ -104,7 +104,6 @@ class Metaplot(object):
         self.tis_meta['Sample'] = now_sp
         self.tis_meta['Meta'] = "TIS"
         self.tis_meta = self.tis_meta.loc[:, ['Sample', 'Meta', 'Nucleotide', 'Codon', 'Frame', 'Density']]
-        self.tis_meta.to_csv(out_txt, sep='\t', index=False)
 
         # output the tts meta
         self.tts_meta = pd.melt(self.tts_meta, id_vars='Codon', var_name='Sample', value_name='Density')
@@ -118,16 +117,12 @@ class Metaplot(object):
         tis_tts_meta = pd.concat([self.tis_meta, self.tts_meta], axis=0)
         tis_tts_meta.to_csv(out_txt, sep='\t', index=False)
 
-        # merge all tis and tts meta
-        if self.merge_meta is None:
-            self.merge_meta = pd.concat([self.tis_meta, self.tts_meta], axis=0)
-        else:
-            self.merge_meta = pd.concat([self.merge_meta, self.tis_meta, self.tts_meta], axis=0)
 
     def output_merge_meta(self):
         # output the merge meta
         out_txt = self.output + "_tis_tts_metaplot.txt"
         self.merge_meta.to_csv(out_txt, sep='\t', index=False)
+
 
     def read_rpf(self):
         '''
@@ -180,7 +175,12 @@ class Metaplot(object):
             self.output_meta(now_sp)
             self.sample_dict[now_sp] = [self.tis_meta, self.tts_meta, len(self.high_gene), now_sp_index]
 
-        self.output_merge_meta()
+            # merge all tis and tts meta
+            if self.merge_meta is None:
+                self.merge_meta = pd.concat([self.tis_meta, self.tts_meta], axis=0)
+            else:
+                self.merge_meta = pd.concat([self.merge_meta, self.tis_meta, self.tts_meta], axis=0)
+
 
     def draw_bar_metaplot(self):
         for sample_name, mess in self.sample_dict.items():
