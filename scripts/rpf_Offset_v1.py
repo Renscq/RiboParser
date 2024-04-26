@@ -5,14 +5,14 @@
 
 
 from foo import ArgsParser
-from foo.Offset_mono import *
+from foo.Offset_mono_v1 import *
 
 
 def main():
     ArgsParser.now_time()
     sys.stdout.writelines('Detect the p-site offset.\n')
     sys.stdout.writelines('Step1: Checking the input Arguments.\n')
-    args = ArgsParser.offset_args_parser()
+    args = ArgsParser.offset1_args_parser()
     offset_attr = Offset(args)
 
     sys.stdout.writelines('Step2: Import the transcripts annotation.\n')

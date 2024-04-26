@@ -69,7 +69,6 @@ class Offset(object):
         self.length_dict = {}
 
         # arguments for bam file parsing
-        self.silence = args.silence
         self.sample_file = args.bam
         self.sample_format = os.path.splitext(args.bam)[1]
 
@@ -80,7 +79,8 @@ class Offset(object):
         self.bam_file_list = None
         self.sample_dict = None
 
-        self.peak_length = args.peak_length
+        self.exp_peak = args.exp_peak
+        self.exp_offset = args.exp_offset
         self.peak_reads = 0
 
         self.output_prefix = args.output
@@ -131,10 +131,11 @@ class Offset(object):
                 print(line.reference_name + ': not in reference file.')
 
         peak_length, self.peak_reads = max(self.length_dict.items(), key=lambda length: length[1])
-        if self.peak_length:
-            self.peak_length -= 1
+
+        if self.exp_peak:
+            self.exp_peak -= 1
         else:
-            self.peak_length = peak_length - 1
+            self.exp_peak = peak_length - 1
 
         self.pysam_input.close()
 
@@ -323,8 +324,8 @@ class Offset(object):
         for length in range(self.min_length, self.max_length + 1):
             # shift 1 nt for the both 5/3 reads end (5end + 3end = 2)
             # Empirical value: 2nt for Eukaryotes, 1nt for prokaryotes
-            shift_nt = (length - self.peak_length) // self.shift_nt
-            candidate_offset = [i for i in range(8 + shift_nt, 15 + shift_nt + 1)]
+            shift_nt = (length - self.exp_peak) // self.shift_nt
+            candidate_offset = [i for i in range(8 + shift_nt, 16 + shift_nt + 1)]
 
             # compare the max rpfs at same offset of 5end and 3end
             max_offset_site = offset_rpfs[length].idxmax()
@@ -374,8 +375,8 @@ class Offset(object):
         for length in range(self.min_length, self.max_length + 1):
             # shift 1 nt for the both 5/3 reads end (5end + 3end = 2)
             # Empirical value: 2nt for Eukaryotes, 1nt for prokaryotes
-            shift_nt = (length - self.peak_length) // self.shift_nt
-            candidate_offset = [i for i in range(8 + shift_nt, 15 + shift_nt + 1)]
+            shift_nt = (length - self.exp_peak) // self.shift_nt
+            candidate_offset = [i for i in range(8 + shift_nt, 16 + shift_nt + 1)]
 
             # compare the max rpfs at same offset of 5end and 3end
             max_offset_site = offset_rpfs[length].idxmax()
@@ -442,7 +443,7 @@ class Offset(object):
         '''
 
         for length in range(self.min_length, self.max_length + 1):
-            shift_nt = (length - self.peak_length) // self.shift_nt
+            shift_nt = (length - self.exp_peak) // self.shift_nt
             if shift_nt < -3:
                 shift_nt = -3
             elif shift_nt > 6:
@@ -450,7 +451,9 @@ class Offset(object):
             else:
                 pass
 
-            left_offset1, left_offset2, left_offset3 = 11 + shift_nt, 12 + shift_nt, 13 + shift_nt
+            left_offset1 = self.exp_offset + shift_nt
+            left_offset2 = self.exp_offset + shift_nt + 1
+            left_offset3 = self.exp_offset + shift_nt + 2
 
             self.frame_offset_len[length] = [left_offset1, left_offset2, left_offset3]
             self.frame_offset[length] = [0, 0, 0]
@@ -529,7 +532,7 @@ class Offset(object):
         '''
 
         # adjust the frame shift of reads shorter than peak length
-        for length in range(self.peak_length, self.min_length, -1):
+        for length in range(self.exp_peak, self.min_length, -1):
             psite1 = self.merge_frame_offset.loc[self.merge_frame_offset['length'] == length, 'p_site'].reset_index(drop=True)[0]
             psite2 = self.merge_frame_offset.loc[self.merge_frame_offset['length'] == length - 1, 'p_site'].reset_index(drop=True)[0]
 
@@ -541,7 +544,7 @@ class Offset(object):
                 continue
 
         # adjust the frame shift of reads longer than peak length
-        for length in range(self.min_length, self.peak_length, 1):
+        for length in range(self.min_length, self.exp_peak, 1):
             psite1 = self.merge_frame_offset.loc[self.merge_frame_offset['length'] == length, 'length'].reset_index(drop=True)[0]
             psite2 = self.merge_frame_offset.loc[self.merge_frame_offset['length'] == length + 1, 'length'].reset_index(drop=True)[0]
             
