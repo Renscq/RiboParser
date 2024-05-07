@@ -79,6 +79,7 @@ class SeRP(object):
         self.peak_seq_file = self.peak_out + '_peaks_sequence.txt'
         # self.peak_rpm_file = self.peak_out + '_peaks_rpm.txt'
         self.peak_ratio_file = self.peak_out + '_peaks_ratio.txt'
+        self.enrich_ratio_file = self.peak_out + '_enrich_ratio.txt'
 
         # self.peak_merge = pd.DataFrame()
         self.peak_merge = []
@@ -90,6 +91,7 @@ class SeRP(object):
 
         # output scripts and figure
         self.figure_out = args.fig
+        self.enrich_out = []
         self.matlab_merge = OrderedDict()
         self.fig_merge = OrderedDict()
         self.peak_scripts_file = self.peak_out + '_peaks_scripts.m'
@@ -890,6 +892,7 @@ class SeRP(object):
                       peak_left_start, peak_right_end, max_peak_enrich,
                       max_peak_site, mean_peak_enrich, ck_rpm, ip_rpm, ttest_results, peak_results, utr5_region,
                       cds_region, utr3_region):
+        
         for peak_num, peak_dict in peak.items():
             peak_len = list(peak_dict.keys())[0]
             peak_start = peak[peak_num][peak_len][0]
@@ -1011,6 +1014,7 @@ class SeRP(object):
 
             # filter the correlation of the ck replicates： default 0.5
             ck_corr_pairs, total_pairs = self.corr_calc(ck_gene_rpf_corr, ck_name)
+
             if ck_corr_pairs < total_pairs:
                 self.matlab_none_peak_scripts(scripts_none_peak, mrna, gene_ratio_smooth, cds_region)
                 peak_tmp = '\t'.join([mrna, self.gene_dict[mrna],
@@ -1019,6 +1023,7 @@ class SeRP(object):
                                       ck_min_corr, ip_min_corr, 'Poor repeatability of ck samples',
                                       '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-',
                                       '-', '-'])
+                
                 # self.peak_merge = self.peak_merge.append(pd.Series(peak_tmp.split('\t')), ignore_index=True)
                 self.peak_merge.append(peak_tmp.split('\t'))
                 peak_results.writelines('\t'.join(peak_tmp.split('\t')) + '\n')
@@ -1026,6 +1031,7 @@ class SeRP(object):
 
             # filter the correlation of the ip replicates： default 0.5
             ip_corr_pairs, total_pairs = self.corr_calc(ip_gene_rpf_corr, ip_name)
+
             if ip_corr_pairs < total_pairs:
                 self.matlab_none_peak_scripts(scripts_none_peak, mrna, gene_ratio_smooth, cds_region)
                 peak_tmp = '\t'.join([mrna, self.gene_dict[mrna],
@@ -1034,6 +1040,7 @@ class SeRP(object):
                                       ck_min_corr, ip_min_corr, 'Poor repeatability of ip samples',
                                       '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-',
                                       '-', '-'])
+                
                 # self.peak_merge = self.peak_merge.append(pd.Series(peak_tmp.split('\t')), ignore_index=True)
                 self.peak_merge.append(peak_tmp.split('\t'))
                 peak_results.writelines('\t'.join(peak_tmp.split('\t')) + '\n')
@@ -1102,7 +1109,11 @@ class SeRP(object):
                 # Output the demo figure
                 if self.figure_out:
                     self.draw_figure(mrna, gene_ratio_smooth, collision_ratio, peak_ratio, cds_region)
-        
+                
+                collision_ratio.rename(columns={'enrich': 'collision'}, inplace=True)
+                peak_ratio.rename(columns={'enrich': 'peak'}, inplace=True)
+                self.enrich_out.append(pd.concat([gene_rpf, gene_ratio_smooth, collision_ratio, peak_ratio], axis=1).reset_index(drop=True))
+
         self.peak_merge = pd.DataFrame(self.peak_merge)
         self.peak_merge.columns = self.title
 
@@ -1117,18 +1128,18 @@ class SeRP(object):
         # save the peak rpm
         split_line = pd.DataFrame(["##############################################"])
         peak_rpm = open(self.peak_rpm_file, 'w')
-        for mrna, ratio in self.all_ratio.items():
-            ratio.index.name = mrna
-            split_line.to_csv(self.peak_ratio_file, mode='a+', index=False, header=False)
-            ratio.to_csv(self.peak_ratio_file, mode='a+', index=True, header=True)
+        # for mrna, ratio in self.all_ratio.items():
+        #     ratio.index.name = mrna
+        #     split_line.to_csv(self.peak_ratio_file, mode='a+', index=False, header=False)
+        #     ratio.to_csv(self.peak_ratio_file, mode='a+', index=True, header=True)
 
     # define the function to output the original ratio data
     def output_ratio(self):
         split_line = pd.DataFrame(["##############################################"])
         for mrna, ratio in self.all_ratio.items():
             ratio.index.name = mrna
-            split_line.to_csv(self.peak_ratio_file, mode='a+', index=False, header=False)
-            ratio.to_csv(self.peak_ratio_file, mode='a+', index=True, header=True)
+            split_line.to_csv(self.enrich_ratio_file, mode='a+', index=False, header=False)
+            ratio.to_csv(self.enrich_ratio_file, mode='a+', index=True, header=True)
 
     # define the function to output the peak message
     def output_peak(self):
@@ -1231,7 +1242,11 @@ class SeRP(object):
         # else:
         #     pass
 
-        # save the ratio of each gene
+        # output the significant peaks enrichment ratio to self.peak_ratio_file
+        peak_ratio_df = pd.concat(self.enrich_out, axis=0)
+        peak_ratio_df.to_csv(self.peak_ratio_file, sep='\t', index=False, header=True)
+
+        # save all the enrichment ratio of each gene
         if self.ratio_out:
             self.output_ratio()
         else:

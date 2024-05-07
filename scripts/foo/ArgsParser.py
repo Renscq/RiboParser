@@ -217,6 +217,8 @@ def offset1_args_parser():
     parser.add_argument('-s', dest="shift", required=False, type=int, default=2,
                         help="psite shift for different RPFs length."
                              "Empirical value: 2nt for Eukaryotes, 1nt for prokaryotes. (default: %(default)s nt).")
+    parser.add_argument('--silence', dest="silence", required=False, action='store_true', default=True,
+                        help="discard the warning information. (default: %(default)s).")
     parser.add_argument('-d', dest="detail", action='store_true', required=False, default=False,
                         help="output the details of offset (default: %(default)s).")
     args = parser.parse_args()
