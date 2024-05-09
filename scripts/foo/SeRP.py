@@ -68,6 +68,9 @@ class SeRP(object):
         self.width = args.width
         self.collision = args.collision
 
+        self.upstream = args.upstream
+        self.downstream = args.downstream
+        
         # output peak detection files
         self.all = args.all
         self.peak_out = args.output
@@ -1205,10 +1208,10 @@ class SeRP(object):
             gene_name = self.gene_dict[transcripts]
             peak_name = rows['name']
 
-            up_start = rows['peak_start'] - 10
+            up_start = rows['peak_start'] - self.upstream
             peak_start = rows['peak_start']
             peak_end = rows['peak_end']
-            down_end = rows['peak_end'] + 10
+            down_end = rows['peak_end'] + self.downstream
 
             gene_rpf = rpf_seq_group.get_group(transcripts)
 
@@ -1231,7 +1234,7 @@ class SeRP(object):
         self.peak_seq = pd.DataFrame(peak_seq_list, 
                                      columns=['transcripts', 'gene_name', 'peak_name',
                                               'peak_start', 'peak_end', 'max_site', 
-                                              'upstream_seq', 'peak_seq', 'downstream_seq',
+                                              'upstream_nt', 'peak_nt', 'downstream_nt',
                                               'upstream_aa', 'peak_aa', 'downstream_aa'])
         
         self.peak_seq.to_csv(self.peak_seq_file, sep='\t', header=True, index=False)

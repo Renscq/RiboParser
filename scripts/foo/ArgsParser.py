@@ -1094,14 +1094,12 @@ def serp_peak_args_parser():
         to zero and, again, to a positive number). Therefore, gaps in the peak
         are allowed. By default, the gaps there can be no more than 2 consecutive
         amino acids in a peak.''')
-    peak_group.add_argument("-p", dest="proportion", required=False, type=float,
-                            default=0.2,
+    peak_group.add_argument("-p", dest="proportion", required=False, type=float, default=0.2,
                             help='''specify the proportion of gap in each peak (default %(default)s).
         Data with too much noise has low credibility, so it is necessary to
         add a limit to the gap proportion in each peak. By default, the total gaps
         length within a peak cannot exceed 20%%.''')
-    peak_group.add_argument("--back", dest="background", required=False, type=int,
-                            default=0,
+    peak_group.add_argument("--back", dest="background", required=False, type=int, default=0,
                             help='''use the 5 prime AA to filter the enrichment fold (default %(default)s codon,
         not applicable). Two modes are provided: 
         (1): [30](or other number > 0) Some proteins that bind to the nascent polypeptide 
@@ -1109,36 +1107,34 @@ def serp_peak_args_parser():
         the RPFs of the unbound area should be smaller than the RPFs of the bound area. 
         (2): [0] However, some proteins only affect the elongation of the ribosome, so 
         the peak may exist in any location.''')
-    peak_group.add_argument("--bf", dest="backFold", required=False, action='store_true',
-                            default=True,
+    peak_group.add_argument("--bf", dest="backFold", required=False, action='store_true', default=True,
                             help='''specify the fold of background (default %(default)s).
         Enrichment after background region need greater than before (HSP70 binding model). 
         backFold used to filter the strong binding peak.
         ''')
-
+    peak_group.add_argument("--up", dest="upstream", required=False, type=int, default=10,
+                            help='''retrieve the upstream sequence of binding peaks, (default %(default)s codon.''')
+    peak_group.add_argument("--down", dest="downstream", required=False, type=int, default=10,
+                            help='''retrieve the downstream sequence of binding peaks, (default %(default)s codon.''')
+    
     # arguments for output figures, ratio, peak annotation
     output_group = parser.add_argument_group('Output files arguments')
-    output_group.add_argument("-o", dest="output", required=False, type=str,
-                              default='results',
+    output_group.add_argument("-o", dest="output", required=False, type=str, default='results',
                               help='''prefix of output file name (default %(default)s_ratio.txt).
         This prefix will be used as the output of Peak/Ratio/Matlab Script/Bed files.''')
-    output_group.add_argument("--all", dest="all", required=False, action='store_true',
-                              default=False,
+    output_group.add_argument("--all", dest="all", required=False, action='store_true', default=False,
                               help='''output all the peak region. If this option on, all peak 
         regions include overlapped items in same gene are retained. Instead, 
         only the optimal peak for non-overlapping regions is output. (default %(default)s)''')
-    output_group.add_argument("--rpm", dest="rpm", required=False, action='store_true',
-                              default=False,
+    output_group.add_argument("--rpm", dest="rpm", required=False, action='store_true', default=False,
                               help="output the rpm of each peak. (default %(default)s)")
-    output_group.add_argument("--ratio", dest="ratio", required=False, action='store_true',
-                              default=False,
+    output_group.add_argument("--ratio", dest="ratio", required=False, action='store_true', default=False,
                               help="output the original ratio. (default %(default)s)")
     # output_group.add_argument(
     #     "--script", dest="script", required=False, action='store_true', default=True,
     #     help="output the MATLAB scripts for each figure. (default %(default)s)"
     # )
-    output_group.add_argument("--fig", dest="fig", required=False, action='store_true',
-                              default=False,
+    output_group.add_argument("--fig", dest="fig", required=False, action='store_true', default=False,
                               help="draw the demo graph of peak scan results. (default %(default)s)."
                                    "This step may takes a lot of time.")
 
