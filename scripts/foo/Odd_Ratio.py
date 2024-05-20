@@ -367,17 +367,16 @@ class OddRatio(object):
         codon_odd_ratio.reset_index(inplace=True)
         codon_odd_ratio.columns = codon_odd_num_column
 
-        # sig oddratio proportion
-        codon_odd_ratio_prop = codon_odd_ratio.loc[:, ['control_number', 'treat_number']].div(codon_odd_ratio['codon_sum'], axis=0) * 100
-        codon_odd_ratio_prop.columns = ['control_proportion', 'treat_proportion']
-
-
         # filter the stop codon
         if self.stop:
             codon_odd_ratio = codon_odd_ratio.loc[~codon_odd_ratio['Codon'].isin(["TGA", "TAG", "TAA"]), :]
-            codon_odd_ratio_prop = codon_odd_ratio_prop.loc[~codon_odd_ratio_prop['Codon'].isin(["TGA", "TAG", "TAA"]), :]
+            # codon_odd_ratio_prop = codon_odd_ratio_prop.loc[~codon_odd_ratio_prop['Codon'].isin(["TGA", "TAG", "TAA"]), :]
         else:
             pass
+
+        # sig oddratio proportion
+        codon_odd_ratio_prop = codon_odd_ratio.loc[:, ['control_number', 'treat_number']].div(codon_odd_ratio['codon_sum'], axis=0) * 100
+        codon_odd_ratio_prop.columns = ['control_proportion', 'treat_proportion']
         
         # calculate the relative odd ratio
         codon_odd_ratio_num_rel = self.scale_method(self.scale, codon_odd_ratio.loc[:, ['control_number', 'treat_number']])

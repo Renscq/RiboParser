@@ -1,24 +1,12 @@
 #!/usr/bin/env python
-# -*- encoding: utf-8 -*-
-'''
-@Project      : riboParser
-@Script       : fq_split.py
-@Environment  : python 3.8.5
-@Version      : 1.0
-@Author       : Rensc 
-@Time         : 2024/05/14 11:07:12
-@E-mail       : rensc0718@163.com
-@License      : (C)Copyright 2023-2025, Ren Shuchao
-'''
-
-
-# import pandas as pd
-# import polars as pl
-# import numpy as np
-# from collections import OrderedDict
-# from Bio import SeqIO
-# import argparse
-
+# -*- coding: utf-8 -*-
+# @time    : 2020/8/21 18:49
+# @Project : py-scripts
+# @Script  : fq_cutting.py
+# @Version : python 3.8.5
+# @product : PyCharm
+# @Author  : Rensc
+# @E-mail  : rensc0718@163.com
 
 
 import argparse
@@ -32,7 +20,7 @@ from argparse import RawTextHelpFormatter
 # get arguments and define the scripts usage
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="This script is used to split the fastq file with UMI-adapter file.",
+        description="This script is used to cut fastq file to many small files.",
         formatter_class=RawTextHelpFormatter,
     )
     parser.add_argument(
@@ -42,13 +30,9 @@ def parse_args():
         "-i", metavar="input", required=True, type=str, help="input fastq file"
     )
     parser.add_argument(
-        "-a", metavar="adapter", required=True, type=str, help="input adapter table file, ID for output fastq file, Adapter for retrieve."
-    )
-    parser.add_argument(
         "-o", metavar="output", required=True, type=str, help="prefix of output file"
     )
-    # adapter like this
-    
+
     args = parser.parse_args()
     return args
 
@@ -56,6 +40,7 @@ def parse_args():
 # output splitd sequences
 def fqsplit(fq_input, fq_output):
     r1_name = fq_output + ".R1.fq"
+    r2_name = fq_output + ".R2.fq"
 
     with open(r1_name, 'w') as r1_out:
         with open(r2_name, 'w') as r2_out:

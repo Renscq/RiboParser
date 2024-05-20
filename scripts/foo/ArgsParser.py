@@ -1113,9 +1113,9 @@ def serp_peak_args_parser():
         backFold used to filter the strong binding peak.
         ''')
     peak_group.add_argument("--up", dest="upstream", required=False, type=int, default=10,
-                            help='''retrieve the upstream sequence of binding peaks, (default %(default)s codon.''')
+                            help='''retrieve the upstream sequence of binding peaks, (default %(default)s codon.)''')
     peak_group.add_argument("--down", dest="downstream", required=False, type=int, default=10,
-                            help='''retrieve the downstream sequence of binding peaks, (default %(default)s codon.''')
+                            help='''retrieve the downstream sequence of binding peaks, (default %(default)s codon.)''')
     
     # arguments for output figures, ratio, peak annotation
     output_group = parser.add_argument_group('Output files arguments')

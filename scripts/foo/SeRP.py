@@ -70,7 +70,7 @@ class SeRP(object):
 
         self.upstream = args.upstream
         self.downstream = args.downstream
-        
+
         # output peak detection files
         self.all = args.all
         self.peak_out = args.output
@@ -1133,16 +1133,16 @@ class SeRP(object):
         peak_rpm = open(self.peak_rpm_file, 'w')
         # for mrna, ratio in self.all_ratio.items():
         #     ratio.index.name = mrna
-        #     split_line.to_csv(self.peak_ratio_file, mode='a+', index=False, header=False)
-        #     ratio.to_csv(self.peak_ratio_file, mode='a+', index=True, header=True)
+        #     split_line.to_csv(self.peak_ratio_file, mode='a+', header=False, index=False)
+        #     ratio.to_csv(self.peak_ratio_file, mode='a+', header=True, index=True)
 
     # define the function to output the original ratio data
     def output_ratio(self):
         split_line = pd.DataFrame(["##############################################"])
         for mrna, ratio in self.all_ratio.items():
             ratio.index.name = mrna
-            split_line.to_csv(self.enrich_ratio_file, mode='a+', index=False, header=False)
-            ratio.to_csv(self.enrich_ratio_file, mode='a+', index=True, header=True)
+            split_line.to_csv(self.enrich_ratio_file, mode='a+', header=False, index=False)
+            ratio.to_csv(self.enrich_ratio_file, mode='a+', sep = '\t', header=True, index=True)
 
     # define the function to output the peak message
     def output_peak(self):
@@ -1191,7 +1191,7 @@ class SeRP(object):
         peak_bed.loc[:, 'end'] = peak_bed.loc[:, 'peak_end'] * 3 + 2
 
         self.bed_merge = peak_bed.loc[:, ['transcripts', 'start', 'end', 'name', 'mean_fold', 'strand']]
-        self.bed_merge.to_csv(self.peak_bed_file, sep='\t', index=False, header=True)
+        self.bed_merge.to_csv(self.peak_bed_file, sep='\t', header=True, index=False)
         
 
         # save the results in txt format contains the peak sequences
@@ -1247,7 +1247,7 @@ class SeRP(object):
 
         # output the significant peaks enrichment ratio to self.peak_ratio_file
         peak_ratio_df = pd.concat(self.enrich_out, axis=0)
-        peak_ratio_df.to_csv(self.peak_ratio_file, sep='\t', index=False, header=True)
+        peak_ratio_df.to_csv(self.peak_ratio_file, sep='\t', header=True, index=False)
 
         # save all the enrichment ratio of each gene
         if self.ratio_out:
