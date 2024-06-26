@@ -109,8 +109,8 @@ class Occupancy(object):
     
     def codon_occupancy(self):
         # calc the average density of each gene
-        ave_rpf = self.high_rpf.replace(0, np.nan).groupby('name')[self.sample_name].mean()
-        # ave_rpf2 = self.high_rpf.groupby('name')[self.sample_name].mean()
+        # ave_rpf = self.high_rpf.replace(0, np.nan).groupby('name')[self.sample_name].mean()
+        ave_rpf = self.high_rpf.groupby('name')[self.sample_name].mean()
 
         # calculate the average density of each codon
         high_rpf_group = self.high_rpf.groupby('name')
@@ -124,7 +124,9 @@ class Occupancy(object):
 
             # prepare the gene df
             temp_rpfs = rpfs.loc[:, self.sample_name].copy()
-            temp_ave_dst = np.divide(temp_rpfs, ave_rpf.loc[gene].to_list(), where=ave_rpf.loc[gene] != 0)
+            # temp_ave_dst = np.divide(temp_rpfs, ave_rpf.loc[gene].to_list(), where=ave_rpf.loc[gene] != 0)
+            # where is discarded in the new version of numpy
+            temp_ave_dst = np.divide(temp_rpfs, ave_rpf.loc[gene].to_list())
             ave_dst_list.append(temp_ave_dst)
 
         print('Row: {rows}, {gene}.'.format(rows=now_num, gene=gene), flush=True)

@@ -343,9 +343,9 @@
             "program": "${workspaceRoot}/scripts/rpf_Occupancy.py",
             "args": [
                 "-r",
-                "/home/rensc/software/riboParser/tests/density/usda_rpf_retrieve.txt",
+                "/home/rensc/software/temp/tests/density/usda_rpf_retrieve.txt",
                 "-o",
-                "/home/rensc/software/riboParser/tests/occupancy/usda",
+                "/home/rensc/software/temp/tests/occupancy/usda",
                 "-m",
                 "50",
                 "-f",
