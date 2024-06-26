@@ -109,14 +109,17 @@ class MetaCodon(object):
             self.gene_rpf_sum = self.high_rpf.loc[:, ["name"] + self.sample_name].groupby("name")[self.sample_name].sum()
 
         if self.scale:
+            # merge the gene expression with rpf density
             self.gene_rpf_sum = self.gene_rpf_sum.add_suffix("_sum")
             self.high_rpf = pd.merge(self.high_rpf, self.gene_rpf_sum, on = "name")
 
+            # create the rpm dataframe and rpm_sum dataframe
             np.seterr(divide='ignore', invalid='ignore')
             rpm = self.high_rpf[self.sample_name]
             rpm_sum = self.high_rpf[self.gene_rpf_sum.columns]
             rpm_sum.columns = self.sample_name
             
+            # scale the rpf density with each gene expression
             self.high_rpf[self.sample_name] = np.divide(rpm, rpm_sum)
             self.high_rpf = self.high_rpf.drop(columns = self.gene_rpf_sum.columns)
 
@@ -219,7 +222,7 @@ class MetaCodon(object):
 
         '''
 
-        # retrieve the codon in upstream/downstream window [-20, 0, 20]
+        # retrieve the codon index and exclude the codon site out of range
         codon_idx = (self.high_rpf['codon'] == codon) & (self.high_rpf['from_tis'] >= self.around) & (self.high_rpf['from_tts'] <= -self.around)
         codon_idx_true = codon_idx[codon_idx == True]
         site_num = sum(codon_idx)
@@ -240,7 +243,7 @@ class MetaCodon(object):
             return
 
         # delete the codon site out of range
-        uniq_codon_idx = self.delete_out_of_range_site(uniq_codon_idx)
+        # uniq_codon_idx = self.delete_out_of_range_site(uniq_codon_idx)
 
         # exit if none fitted results
         if len(uniq_codon_idx) == 0:
@@ -249,7 +252,8 @@ class MetaCodon(object):
         # retrieve the codon density codon by codon
         density_df = []
         sequence_df = []
-
+        
+        # retrieve the codon in upstream/downstream window [-20, 0, 20]
         for posi in range(-self.around, self.around + 1):
             idx_tmp = uniq_codon_idx + posi
             tmp_dst = self.high_rpf.loc[idx_tmp, self.sample_name].mean()
@@ -331,7 +335,7 @@ class MetaCodon(object):
             return
 
         # delete the codon site out of range
-        uniq_codon_idx = self.delete_out_of_range_site(uniq_codon_idx)
+        # uniq_codon_idx = self.delete_out_of_range_site(uniq_codon_idx)
         
         # exit if none fitted results
         if len(uniq_codon_idx) == 0:

@@ -12,15 +12,6 @@
 '''
 
 
-# import pandas as pd
-# import polars as pl
-# import numpy as np
-# from collections import OrderedDict
-# from Bio import SeqIO
-# import argparse
-
-
-
 import argparse
 import gc
 import time

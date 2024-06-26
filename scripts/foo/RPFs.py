@@ -39,7 +39,10 @@ def get_frame_rpf(raw_rpf, sample_name, frame):
         for now_sp in sample_name:
             print('Import the density file {file_name}.'.format(file_name=now_sp), flush=True)
             now_sp_index = [now_sp + '_f0', now_sp + '_f1', now_sp + '_f2']
-            merged_rpf = merged_rpf.with_columns(raw_rpf[now_sp_index].sum(axis=1)).rename({now_sp_index[0]: now_sp})
+            
+            # merged_rpf = merged_rpf.with_columns(raw_rpf[now_sp_index].sum(axis=1)).rename({now_sp_index[0]: now_sp})
+            # report a bug in polars, the sum function is not working.
+            merged_rpf = merged_rpf.with_columns(raw_rpf[:, now_sp_index[0]] + raw_rpf[:, now_sp_index[1]] + raw_rpf[:, now_sp_index[2]]).rename({now_sp_index[0]: now_sp})
             
     elif frame == '0':
         for now_sp in sample_name:

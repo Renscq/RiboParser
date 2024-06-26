@@ -575,8 +575,8 @@ def meta_codon_plot_args_parser():
                         help="scale the window density with gene density. (default: %(default)s).")
     parser.add_argument('--smooth', dest="smooth", required=False, default=None, type=str,
                         help="smooth the window density [eg, 3,1]. (default: %(default)s).")
-    # parser.add_argument('--thread', dest="thread", type=int, required=False, default=1,
-    #                     help="the number of threads (default: %(default)s).")
+    parser.add_argument('--thread', dest="thread", type=int, required=False, default=1,
+                        help="the number of threads (default: %(default)s).")
     parser.add_argument('--fig', dest="fig", required=False, action='store_true', default=False,
                         help="output the figure. (default: %(default)s).")
     args = parser.parse_args()

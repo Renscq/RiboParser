@@ -1,6 +1,14 @@
 {
     "configurations": [
         {
+            "name": "Python: get_negative_ppi.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceRoot}/temp/get_negative_ppi.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Python: rpf_Shuffle.py",
             "type": "debugpy",
             "request": "launch",
@@ -459,7 +467,7 @@
             "program": "${workspaceRoot}/scripts/rpf_Periodicity.py",
             "args": [
                 "-r",
-                "/home/rensc/software/riboParser/tests/density/usda_rpf_retrieve.txt",
+                "/home/rensc/software/temp/tests/density/usda_rpf_retrieve.txt",
                 "-t",
                 "/mnt/t64/database/usda110/norm/usda110.norm.txt",
                 "-o",
@@ -732,11 +740,11 @@
             "program": "${workspaceRoot}/scripts/rpf_Meta_Codon.py",
             "args": [
                 "-r",
-                "/home/rensc/software/riboParser/tests/density/usda_rpf_retrieve.txt",
+                "/home/rensc/software/temp/tests/density/usda_rpf_retrieve.txt",
                 "-c",
                 "/home/rensc/scripts/qsub/codon.txt",
                 "-o",
-                "/home/rensc/t64/temp/test_odr/usda",
+                "/home/rensc/software/temp/tests/metacodon/usda",
                 "--thread",
                 "16",
                 "-a",
@@ -832,22 +840,27 @@
             "program": "${workspaceRoot}/scripts/rpf_Density.py",
             "args": [
                 "-b",
-                "/mnt/t64/rensc/1404/ribo-2024-02-13/mrna/mrna/step01-qc/m_KO_1.bam",
+                "/mnt/t64/rensc/serp/hvo/ribo2/step01-qc/SRR10294592.bam",
+                // "/mnt/t64/rensc/1404/ribo-2024-02-13/mrna/mrna/step01-qc/m_KO_1.bam",
                 // "/mnt/t64/rensc/herr/hsa/pc-b4-20230731/ribo/test/R_PC_NC_1.bam",
                 "-p",
-                "/mnt/t64/rensc/1404/ribo-2024-02-13/mrna/mrna/step04-density2/psite.txt",
+                "/mnt/t64/rensc/serp/hvo/ribo2/step03-offset/SRR10294592_frame_offset.txt",
+                // "/mnt/t64/rensc/1404/ribo-2024-02-13/mrna/mrna/step04-density2/psite.txt",
                 // "/mnt/t64/rensc/herr/hsa/pc-b4-20230731/ribo/ribo/merge/step03-offset/R_PC_NC_1_0_frame_offset.txt",
                 "-t",
-                "/mnt/t64/database/ncr/ensb/norm/NC12.norm.txt",
+                "/mnt/t64/database/hvo/ncbi/norm/hvo.norm.txt",
+                // "/mnt/t64/database/ncr/ensb/norm/NC12.norm.txt",
                 // "/mnt/t64/database/hsa/chm13/norm/chm13.norm.txt",
                 "-s",
-                "/mnt/t64/database/ncr/ensb/norm/NC12.norm.fa",
+                "/mnt/t64/database/hvo/ncbi/norm/hvo.norm.rna.fa",
+                // "/mnt/t64/database/ncr/ensb/norm/NC12.norm.fa",
                 // "/mnt/t64/database/hsa/chm13/norm/chm13.norm.fa",
                 "-l",
                 "--thread",
                 "12",
                 "-o",
-                "/mnt/t64/rensc/1404/ribo-2024-02-13/mrna/mrna/step04-density2/"
+                "/mnt/t64/rensc/serp/hvo/ribo2/step04-density/SRR10294592",
+                // "/mnt/t64/rensc/1404/ribo-2024-02-13/mrna/mrna/step04-density2/"
                 // "/mnt/t64/rensc/herr/hsa/pc-b4-20230731/ribo/test/R_PC_NC_1"
             ],
             "console": "integratedTerminal",
