@@ -43,7 +43,7 @@ def merge_rpf(sp_dict, output_prefix):
     total_rpf = total_rpf.with_columns(total_rpf['codon'].str.to_uppercase())
     total_rpf = total_rpf.filter(~total_rpf['codon'].str.contains('N'))
 
-    total_rpf.write_csv(output_name, separator = '\t', has_header = True)
+    total_rpf.write_csv(output_name, separator = '\t', include_header = True)
 
 
 def main():

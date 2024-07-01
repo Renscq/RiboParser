@@ -377,7 +377,7 @@ class CodonSelectiveTime(object):
         '''
 
         if initiate_rate:
-            high_rna = self.high_rna.with_column(
+            high_rna = self.high_rna.with_columns(
                 self.high_rna[rna_sample] * self.high_rna['name'].apply(
                     lambda x: self.gene_table[rpf_sample][x].initiate_rate if x in self.gene_table[rpf_sample].keys() else 1))
         else:
@@ -452,7 +452,7 @@ class CodonSelectiveTime(object):
                 
                 self.gene_table[rpf_sample][gene].initiate_rate = self.gene_table[rpf_sample][gene].elongate_rate * self.gene_table[rpf_sample][gene].density
 
-            # self.high_rna = self.high_rna.with_column(
+            # self.high_rna = self.high_rna.with_columns(
             #     self.high_rna[self.rna_sample] * self.high_rna['name'].apply(
             #     lambda x: self.gene_table[x].initiate_rate if x in self.gene_table.keys() else 1))
 

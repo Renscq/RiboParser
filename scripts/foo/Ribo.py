@@ -479,4 +479,4 @@ class Ribo(object):
     def output_density(self):
         
         total_reads_pl = pl.DataFrame(self.total_rpf_df)
-        total_reads_pl.write_csv(self.output + "_rpf.txt", separator = '\t', has_header=True)
+        total_reads_pl.write_csv(self.output + "_rpf.txt", separator = '\t', include_header = True)
