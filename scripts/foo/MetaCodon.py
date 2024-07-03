@@ -254,7 +254,8 @@ class MetaCodon(object):
         sequence_df = []
         
         # retrieve the codon in upstream/downstream window [-20, 0, 20]
-        for posi in range(-self.around, self.around + 1):
+        # for posi in range(-self.around, self.around + 1): # this is wrong, should be -21, -1, 19
+        for posi in range(-self.around - 1, self.around):
             idx_tmp = uniq_codon_idx.index + posi
             tmp_dst = self.high_rpf.loc[idx_tmp, self.sample_name].mean()
             density_df.append(tmp_dst)
