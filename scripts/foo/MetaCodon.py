@@ -84,7 +84,7 @@ class MetaCodon(object):
         '''
         # raw_rpf, sample_name, sample_num, merged_rpf, total_rpf_num, gene_rpf_sum, high_gene, high_rpf
         rpf_results = RPFs.import_rpf(rpf_file=self.ribo,
-                                      sites='P',
+                                      sites='A',
                                       frame=self.frame,
                                       sample_num=None,
                                       sample_name=None,
@@ -223,7 +223,7 @@ class MetaCodon(object):
         '''
 
         # retrieve the codon index and exclude the codon site out of range
-        codon_idx = (self.high_rpf['codon'] == codon) & (self.high_rpf['from_tis'] >= self.around) & (self.high_rpf['from_tts'] <= -self.around)
+        codon_idx = (self.high_rpf['codon'] == codon) & (self.high_rpf['from_tis'] > self.around) & (self.high_rpf['from_tts'] < -self.around)
         codon_idx_true = codon_idx[codon_idx == True]
         site_num = sum(codon_idx)
         
@@ -255,7 +255,7 @@ class MetaCodon(object):
         
         # retrieve the codon in upstream/downstream window [-20, 0, 20]
         # for posi in range(-self.around, self.around + 1): # this is wrong, should be -21, -1, 19
-        for posi in range(-self.around - 1, self.around):
+        for posi in range(-self.around, self.around + 1):
             idx_tmp = uniq_codon_idx.index + posi
             tmp_dst = self.high_rpf.loc[idx_tmp, self.sample_name].mean()
             density_df.append(tmp_dst)
@@ -269,6 +269,9 @@ class MetaCodon(object):
         density_merge = pd.concat(density_df, axis = 1).T
         density_merge = self.scale_density(density_merge)
         density_merge.index = np.arange(-self.around, self.around + 1)
+        density_merge.insert(loc=0, column='Frame', value=self.frame)
+        density_merge.insert(loc=0, column='Nucleotide', value=(density_merge.index * 3 + self.frame))
+
         self.density_df[codon] = [site_num, uniq_site_num, density_merge]
 
         # merge meta sequences
@@ -308,7 +311,7 @@ class MetaCodon(object):
         for f0 in range(0, len(codon), 3):
             single_codon = codon[f0:f0 + 3]
 
-            idx = (self.high_rpf['codon'] == single_codon) & (self.high_rpf['from_tis'] >= self.around) & (self.high_rpf['from_tts'] <= -self.around)
+            idx = (self.high_rpf['codon'] == single_codon) & (self.high_rpf['from_tis'] > self.around) & (self.high_rpf['from_tts'] < -self.around)
             idx = idx.shift(shift_codon, fill_value=False)
             shift_codon -= 1
 
@@ -362,6 +365,9 @@ class MetaCodon(object):
         density_merge = self.scale_density(density_merge)
 
         density_merge.index = np.arange(-self.around, self.around + codon_num)
+        density_merge.insert(loc=0, column='Frame', value=self.frame)
+        density_merge.insert(loc=0, column='Nucleotide', value=(density_merge.index * 3 + self.frame))
+
         self.density_df[codon] = [site_num, uniq_site_num, density_merge]
 
         sequence_merge = pd.concat(sequence_df, axis=1)
@@ -388,12 +394,13 @@ class MetaCodon(object):
 
     def output_meta_codon_density(self):
         for codon, mess in self.density_df.items():
-            mess[2].index.name = 'Position'
+            mess[2].index.name = 'Codon'
             mess[2].to_csv(self.output + '_' + codon + '_' + str(mess[0]) + '_' + str(mess[1]) + '_meta_density.txt', sep='\t', index=True)
+            mess[2] = mess[2].drop(columns = ['Nucleotide', 'Frame'])
     
     def output_meta_codon_seq(self):
         for codon, mess in self.sequence_df.items():
-            mess[2].index.name = 'Position'
+            mess[2].index.name = 'Codon'
             mess[2].to_csv(self.output + '_' + codon + '_' + str(mess[0]) + '_' + str(mess[1]) + '_meta_sequence.txt', sep='\t', index=True)
     
     def draw_meta_codon(self):
@@ -404,8 +411,8 @@ class MetaCodon(object):
                 out_pdf = self.output + '_' + codon + '.pdf'
                 out_png = self.output + '_' + codon + '.png'
 
-                if self.scale:
-                    mess[2] = mess[2]/mess[2].mean()
+                # if self.scale:
+                #     mess[2] = mess[2]/mess[2].mean()
 
                 matplotlib.use('AGG')
                 fig, ax = plt.subplots(figsize=(8, 5), dpi=300)
@@ -421,19 +428,19 @@ class MetaCodon(object):
                         ncol=1)
 
                 ax.set_title(codon + '(' + str(mess[0]) + ', ' + str(mess[1]) + ')')
-                ax.set_xlabel('distance from codon')
+                ax.set_xlabel('Distance from codon')
 
                 # set the ylabel
                 if self.norm:
                     if self.scale:
-                        ax.set_ylabel('scaled mean RPM density')
+                        ax.set_ylabel('Scaled mean RPM density')
                     else:
-                        ax.set_ylabel('mean RPM density')
+                        ax.set_ylabel('Mean RPM density')
                 else:
                     if self.scale:
-                        ax.set_ylabel('scaled mean RPFs density')
+                        ax.set_ylabel('Scaled mean RPFs density')
                     else:
-                        ax.set_ylabel('mean RPFs density')
+                        ax.set_ylabel('Mean RPFs density')
 
                 plt.tight_layout()
                 # plt.show()

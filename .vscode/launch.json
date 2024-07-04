@@ -741,6 +741,7 @@
             "args": [
                 "-r",
                 "/home/rensc/software/temp/tests/density/usda_rpf_retrieve.txt",
+                // "/mnt/t64/rensc/serp/GSE67387/ribo/ribo/step05-merge/sce_rpf_merged.txt",
                 "-c",
                 "/home/rensc/scripts/qsub/codon.txt",
                 "-o",
