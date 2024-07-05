@@ -270,7 +270,12 @@ class MetaCodon(object):
         density_merge = self.scale_density(density_merge)
         density_merge.index = np.arange(-self.around, self.around + 1)
         density_merge.insert(loc=0, column='Frame', value=self.frame)
-        density_merge.insert(loc=0, column='Nucleotide', value=(density_merge.index * 3 + self.frame))
+        if self.frame == 'all':
+            nt_index = density_merge.index * 3
+            density_merge.insert(loc=0, column='Nucleotide', value=nt_index)
+        else:
+            nt_index = density_merge.index * 3 + int(self.frame)
+            density_merge.insert(loc=0, column='Nucleotide', value=nt_index)
 
         self.density_df[codon] = [site_num, uniq_site_num, density_merge]
 
@@ -366,7 +371,12 @@ class MetaCodon(object):
 
         density_merge.index = np.arange(-self.around, self.around + codon_num)
         density_merge.insert(loc=0, column='Frame', value=self.frame)
-        density_merge.insert(loc=0, column='Nucleotide', value=(density_merge.index * 3 + self.frame))
+        if self.frame == 'all':
+            nt_index = density_merge.index * 3
+            density_merge.insert(loc=0, column='Nucleotide', value=nt_index)
+        else:
+            nt_index = density_merge.index * 3 + int(self.frame)
+            density_merge.insert(loc=0, column='Nucleotide', value=nt_index)
 
         self.density_df[codon] = [site_num, uniq_site_num, density_merge]
 

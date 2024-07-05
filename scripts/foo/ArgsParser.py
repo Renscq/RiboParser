@@ -557,7 +557,7 @@ def meta_codon_plot_args_parser():
     input_group.add_argument('-o', dest="output", required=True, type=str, help="the prefix of output file.")
 
     # arguments for the ribo-seq parsing
-    parser.add_argument('-f', dest="frame", choices=['0', '1', '2', 'all'], required=False, type=str, default='all',
+    parser.add_argument('-f', dest="frame", choices=['0', '1', '2'], required=False, type=str, default='all',
                         help="set the reading frame for occupancy calculation. (default: %(default)s).")
     parser.add_argument('-a', dest="around", required=False, type=int, default=20,
                         help="retrieve length of codon upstream and downstream. (default: %(default)s).")

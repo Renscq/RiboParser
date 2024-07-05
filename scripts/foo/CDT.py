@@ -8,6 +8,7 @@ import sys
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 import seaborn as sns
 from . import RPFs
 
@@ -193,7 +194,7 @@ class CodonDecodingTime(object):
             rpf_sum = rpf.groupby('codon')[self.rpf_sample].sum()
             rpf_norm = rpf_sum.div(self.rna_gene_rpkm.loc[gene].to_list(), axis=1)
 
-            rpf[self.rpf_sample] = rpf[self.rpf_sample].applymap(lambda x: 1 if x != 0 else 0)
+            rpf[self.rpf_sample] = rpf[self.rpf_sample].map(lambda x: 1 if x != 0 else 0)
             codon_sum = rpf.groupby('codon')[self.rpf_sample].sum()
 
             rpf_sum.columns = self.count_column
@@ -203,6 +204,15 @@ class CodonDecodingTime(object):
             rpf_norm_list.append(temp_rpf_norm)
 
         self.rpf_norm_dst = pd.concat(rpf_norm_list, axis=0)
+                
+        # check the stop codon
+        if self.stop:
+            # if cdt table contains the TAA TAG TGA, remove them
+            self.rpf_norm_dst = self.rpf_norm_dst.drop(['TAA', 'TAG', 'TGA'], errors='ignore')
+
+        # drop the na and inf values
+        self.rpf_norm_dst.replace([np.inf, -np.inf], np.nan, inplace=True)
+
         self.rpf_norm_dst.reset_index('codon', inplace=True)
 
     def codon_decoding_time(self):
@@ -215,14 +225,9 @@ class CodonDecodingTime(object):
                     step3 --> calculate relative cdt
                     step4 --> output the cdt table
         '''
-        
+
         # merge average density and calculate cdt
         sum_rpf_norm = self.rpf_norm_dst.groupby('codon').sum()
-
-        # check the stop codon
-        if self.stop:
-            # if cdt table contains the TAA TAG TGA, remove them
-            sum_rpf_norm = sum_rpf_norm.drop(['TAA', 'TAG', 'TGA'], errors='ignore')
 
         # calculate the absolute cdt
         cdt = sum_rpf_norm[self.count_column] / sum_rpf_norm[self.rpf_sample].rename(columns=dict(zip(self.rpf_sample, self.count_column)))

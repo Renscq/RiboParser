@@ -94,7 +94,7 @@ class Metaplot(object):
         self.total_rpf_num_frame.index = self.high_rpf.iloc[:, 6::].columns
 
         if self.norm:
-            self.high_rpf.iloc[:, 6::] = self.high_rpf.iloc[:, 6::] * 1e7 / self.total_rpf_num_frame
+            self.high_rpf.iloc[:, 6::] = self.high_rpf.iloc[:, 6::] * 1e6 / self.total_rpf_num_frame
 
     def length_filter(self):
         '''
