@@ -145,9 +145,11 @@ class Offset(object):
 
         # build the offset table
         for number in range(self.min_length, self.max_length + 1):
-            self.tis_offset["tis_5end"][number] = OrderedDict({-i: 0 for i in range(self.max_length + 1, 0, -1)})
+            # self.tis_offset["tis_5end"][number] = OrderedDict({-i: 0 for i in range(self.max_length + 1, 0, -1)})
+            self.tis_offset["tis_5end"][number] = OrderedDict({-i: 0 for i in range(self.max_length, -1, -1)})
             self.tis_offset["tis_3end"][number] = OrderedDict({i: 0 for i in range(self.max_length + 1)})
-            self.tis_offset["tts_5end"][number] = OrderedDict({-i: 0 for i in range(self.max_length + 1, 0, -1)})
+            # self.tis_offset["tts_5end"][number] = OrderedDict({-i: 0 for i in range(self.max_length + 1, 0, -1)})
+            self.tis_offset["tts_5end"][number] = OrderedDict({-i: 0 for i in range(self.max_length, -1, -1)})
             self.tis_offset["tts_3end"][number] = OrderedDict({i: 0 for i in range(self.max_length + 1)})
 
         for mrna, mrna_attr in self.mrna_dict.items():
