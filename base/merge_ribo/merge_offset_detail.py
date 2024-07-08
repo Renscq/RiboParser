@@ -112,12 +112,12 @@ def process_offset_dict(offset_dict):
         if offset_5end_merge.empty:
             offset_5end_merge = offset_5end
         else:
-            offset_5end_merge = pd.concat([offset_5end, offset_df], axis=0)
+            offset_5end_merge = pd.concat([offset_5end_merge, offset_5end], axis=0)
 
         if offset_3end_merge.empty:
             offset_3end_merge = offset_3end
         else:
-            offset_3end_merge = pd.concat([offset_3end, offset_df], axis=0)
+            offset_3end_merge = pd.concat([offset_3end_merge, offset_5end], axis=0)
 
     return offset_5end_merge, offset_3end_merge
 
