@@ -171,7 +171,10 @@ class Coverage(object):
         
         for idx, gene in rpm.groupby('name'):
             gene.loc[:, 'Bins'] = pd.cut(gene.index, bins, labels=range(bins))
-            region_dict[idx] = gene.groupby('Bins')[self.sample_name].mean()
+            # region_dict[idx] = gene.groupby('Bins')[self.sample_name].mean()
+            # FutureWarning: The default of observed=False is deprecated and will be changed to True in a future version of pandas. 
+            # Pass observed=False to retain current behavior or observed=True to adopt the future default and silence this warning.
+            region_dict[idx] = gene.groupby('Bins', observed=True)[self.sample_name].mean()
         
         region_df = pd.concat(region_dict, axis=0)
         region_df.reset_index(inplace=True)
