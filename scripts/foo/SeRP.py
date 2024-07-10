@@ -178,7 +178,7 @@ class SeRP(object):
         col_index = ['name', 'from_tis', 'region']
 
         # import the data with polars
-        all_rpf = pl.read_csv(self.rpf_file, sep='\t')
+        all_rpf = pl.read_csv(self.rpf_file, separator='\t')
         # all_rpf = pd.read_csv(self.rpf_file, sep='\t', header=0, names=None)
         all_rpf = all_rpf.to_pandas()
 

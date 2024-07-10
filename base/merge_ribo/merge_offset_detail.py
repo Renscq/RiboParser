@@ -67,6 +67,8 @@ def import_offset_files(offset_list):
             exit()
 
         offset_site = offset_model.replace('_3end', '').replace('_5end', '').upper()
+        # if offset_model.replace('tis_', '').replace('tts_', '') == '3end': offset_end = '3end', else: offset_end = '5end'
+        offset_end = "3p-end" if offset_model.replace('tis_', '').replace('tts_', '') == '3end' else "5p-end"
 
         # import the offset file
         file_prefix = file_name.replace('_3end', '').replace('_5end', '').replace('_tis', '').replace('_tts', '')
@@ -81,8 +83,13 @@ def import_offset_files(offset_list):
             
         offset_dict[file_prefix][offset_model].index.name = 'Length'
         offset_dict[file_prefix][offset_model].reset_index(inplace=True)
+        offset_dict[file_prefix][offset_model].insert(0, 'End', offset_end)
         offset_dict[file_prefix][offset_model].insert(0, 'Site', offset_site)
         offset_dict[file_prefix][offset_model].insert(0, 'Sample', file_prefix)
+
+        # convert the table too the long table
+        offset_dict[file_prefix][offset_model] = offset_dict[file_prefix][offset_model].melt(id_vars=['Sample', 'Length', 'Site', 'End'], var_name='Offset', value_name='Count')
+
 
     return offset_dict
 
@@ -119,19 +126,21 @@ def process_offset_dict(offset_dict):
         else:
             offset_3end_merge = pd.concat([offset_3end_merge, offset_3end], axis=0)
 
-    return offset_5end_merge, offset_3end_merge
+    offset_merged = pd.concat([offset_5end_merge, offset_3end_merge], axis=0)
+
+    return offset_merged
 
 
-def output_table(offset_5end_merge, offset_3end_merge, output_file):
+
+def output_table(offset_merged, output_file):
     '''
     @Message  : function for output.
     @Input    : result_dict --> dataframe contain the reads offset
     @Return   : output --> description
     @Flow     : step1 --> output the dataframe to txt file
     '''
-
-    offset_5end_merge.to_csv(output_file + '_offset_5end.txt', sep='\t', index=False)
-    offset_3end_merge.to_csv(output_file + '_offset_3end.txt', sep='\t', index=False)
+    
+    offset_merged.to_csv(output_file + '_offset_end.txt', sep='\t', index=False)
 
 
 def main():
@@ -141,10 +150,10 @@ def main():
 
     print('Step2: import the end of offset file.', flush=True)
     offset_dict = import_offset_files(args.list)
-    offset_5end_merge, offset_3end_merge = process_offset_dict(offset_dict)
+    offset_merged = process_offset_dict(offset_dict)
 
     print('Step3: output the end of offset table.', flush=True)
-    output_table(offset_5end_merge, offset_3end_merge, args.output)
+    output_table(offset_merged, args.output)
 
     print('All done.', flush=True)
 
