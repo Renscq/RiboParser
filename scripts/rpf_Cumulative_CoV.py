@@ -33,6 +33,9 @@ def main():
     print('Step4: Calculate the cumulative CoV.\n', flush=True)
     rpfs.calc_cov()
 
+    print('Step5: Output the cumulative CoV meta table.\n', flush=True)
+    rpfs.merge_cov_table()
+
     print('Step5: Output the cumulative CoV table.\n', flush=True)
     rpfs.output_rpf_table()
 

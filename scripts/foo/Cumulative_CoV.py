@@ -35,7 +35,10 @@ class CumulativeCoV(object):
 
         # parameters for rpfs filter
         self.rpf_num = args.min
+        self.trim = args.trim
+
         self.norm = args.normal
+        self.zero = args.zero
 
         # format rpf table
         self.split = args.split
@@ -101,6 +104,10 @@ class CumulativeCoV(object):
             pass
 
         self.high_rpf = self.high_rpf[self.high_rpf['region'] == 'cds']
+
+        # set the cds start position to 1
+        if self.zero:
+            self.high_rpf['now_nt'] = self.high_rpf.groupby('name')['now_nt'].transform(lambda x: x - x.min() + 1)
 
 
     def melt_rpf_table(self):
@@ -207,6 +214,34 @@ class CumulativeCoV(object):
         gene_cov = gene_cov.reset_index()
 
         self.gene_rpf[self.sample_name] = gene_cov[self.sample_name]
+
+
+    def merge_cov_table(self):
+        '''
+        @Message  : merge the coefficient of variation table
+        @Input    : self.gene_rpf --> rpf table
+                    self.gene_cov --> coefficient of variation table
+        '''
+        # delete the gene with max(now_nt) < self.trim
+        gene_rpf_list = self.gene_rpf[self.gene_rpf['now_nt'] > self.trim]['name'].unique().tolist()
+
+        # trim the now_nt < self.trim
+        gene_rpf_trim = self.gene_rpf[self.gene_rpf['name'].isin(gene_rpf_list)]
+        gene_rpf_trim = gene_rpf_trim[self.gene_rpf['now_nt'] <= self.trim]
+        gene_rpf_trim = gene_rpf_trim[['now_nt'] + self.sample_name]
+
+        gene_rpf_meta = gene_rpf_trim.groupby('now_nt').mean().reset_index()
+        gene_rpf_meta = pd.melt(gene_rpf_meta, id_vars='now_nt', value_vars=self.sample_name, 
+                                var_name='Sample', value_name='Density')
+
+        gene_rpf_meta['Frame'] = gene_rpf_meta['now_nt'].apply(lambda x: (x - 1) % 3 )
+        gene_rpf_meta['Codon'] = gene_rpf_meta['now_nt'].apply(lambda x: (x - 1) // 3 + 1)
+        gene_rpf_meta['Nucleotide'] = gene_rpf_meta['now_nt']
+        gene_rpf_meta['Meta'] = "TIS"
+        
+        gene_rpf_meta = gene_rpf_meta[['Sample', 'Meta', 'Nucleotide', 'Codon', 'Frame', 'Density']]
+
+        gene_rpf_meta.to_csv(self.out + "_meta" + str(self.trim) + "_cumulative_CoV.txt", sep="\t", index=False)
 
 
     def output_rpf_table(self):

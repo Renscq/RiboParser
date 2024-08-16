@@ -857,9 +857,15 @@ def cumulative_cov_args_parser():
                         help="retain transcript with more than minimum RPFs (default: %(default)s).")
     parser.add_argument('-n', dest="normal", action='store_true', required=False, default=False,
                         help="normalize the RPFs count to RPM (default: %(default)s).")
+    
+    parser.add_argument('-t', dest="trim", required=False, type=int, default=50,
+                        help="trim transcript with specific length (default: %(default)s nt).")
+    
     parser.add_argument('-s', dest="split", action='store_true', required=False, default=False,
                         help="split gene rpf to each TXT file (default: %(default)s).")
-
+    parser.add_argument('-z', dest="zero", action='store_true', required=False, default=False,
+                        help="set the start site to zero (default: %(default)s).")
+    
     args = parser.parse_args()
     file_check(args.rpf)
     args_print(args)
