@@ -840,6 +840,32 @@ def rpf_cov_args_parser():
     return args
 
 
+def cumulative_cov_args_parser():
+    parser = argparse.ArgumentParser(description="This script is used to calculate the cumulative CoV.")
+
+    # arguments for the required arguments
+    input_group = parser.add_argument_group('Required arguments')
+    input_group.add_argument('-r', dest="rpf", required=True, type=str,
+                             help="the name of input RPFs density file in TXT format.")
+    input_group.add_argument('-o', dest="output", required=False, type=str, 
+                             help="prefix of output file name (default: filename + '_cumulative_CoV.txt'.")
+
+    # arguments for the ribo-seq parsing
+    parser.add_argument('-l', dest="list", required=False, type=str,
+                        help="the list of input genes for transcript id.")
+    parser.add_argument('-m', dest="min", required=False, type=int, default=0,
+                        help="retain transcript with more than minimum RPFs (default: %(default)s).")
+    parser.add_argument('-n', dest="normal", action='store_true', required=False, default=False,
+                        help="normalize the RPFs count to RPM (default: %(default)s).")
+    parser.add_argument('-s', dest="split", action='store_true', required=False, default=False,
+                        help="split gene rpf to each TXT file (default: %(default)s).")
+
+    args = parser.parse_args()
+    file_check(args.rpf)
+    args_print(args)
+
+    return args
+
 
 def rpf_odd_ratio_args_parser():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
