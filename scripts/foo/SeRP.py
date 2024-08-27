@@ -953,7 +953,8 @@ class SeRP(object):
             # get the gene rpf
             # gene_rpf = pd.DataFrame(self.all_rpf_dict[mrna], columns=col_index + self.ck_name + self.ip_name)
             gene_rpf = self.all_rpf_dict[mrna]
-            gene_rpf = gene_rpf.apply(pd.to_numeric, errors='ignore')
+            # gene_rpf = gene_rpf.apply(pd.to_numeric, errors='ignore')
+            gene_rpf = gene_rpf.apply(pd.to_numeric)
             gene_rpf.index = gene_rpf.from_tis
 
             # normalise the data to rpm
