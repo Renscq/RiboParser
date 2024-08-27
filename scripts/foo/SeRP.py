@@ -79,6 +79,7 @@ class SeRP(object):
         self.peak_log_file = self.peak_out + '_peaks.log'
         self.peak_txt_file = self.peak_out + '_peaks.txt'
         self.peak_bed_file = self.peak_out + '_peaks.bed'
+        self.peak_sig_bed_file = self.peak_out + '_sig_peaks.bed'
         self.peak_seq_file = self.peak_out + '_peaks_sequence.txt'
         # self.peak_rpm_file = self.peak_out + '_peaks_rpm.txt'
         self.peak_ratio_file = self.peak_out + '_peaks_ratio.txt'
@@ -237,6 +238,14 @@ class SeRP(object):
                          'ip_peak_rpm', 'P_Value', 'BHFDR', 'Peak_loci']
         self.title.extend(rpf_names + rpm_names + results_title)
 
+    @staticmethod
+    def safe_to_numeric(series):
+        try:
+            return pd.to_numeric(series)
+        except ValueError:
+            # ignore the error, and return the original series
+            return series
+    
     # define the format of rpf output list,
     def make_rpf_list(self, gene_rpf):
         gene_rpf_sum = gene_rpf[self.ck_name + self.ip_name].sum().tolist()
@@ -247,26 +256,54 @@ class SeRP(object):
         return gene_rpf_sum, raw_gene_rpm, raw_gene_rpm_sum
 
     # define the function for different protein binding modes.
-    def flt_background_value(self, ip_name, raw_gene_rpm, cds_region):
+    def flt_background_max_value(self, ip_name, raw_gene_rpm, cds_region):
         # condition 1: bound to ribosome
         if self.background == 0:
             return True
         # condition 2: bound to nascent polypeptides
         elif self.background == 30:
+
             max_back_value = raw_gene_rpm.loc[0:self.background - 1].max()
             # Exclude outliers of stop codon, "cds_region[-1]-1"
             max_bound_value = raw_gene_rpm.loc[self.background:cds_region[-1] - 1].max()
+
             # filter the strong binding score
             if self.backFold:
                 delta_value = max_bound_value - max_back_value * self.enrich
             else:
                 delta_value = max_bound_value - max_back_value * self.collision
-            # flag-ip samples after background need 2 fold change higher than
+
+            # flag-ip samples after background need 2 fold change higher than mock-ip
             if any(delta_value[ip_name] < 0):
                 return False
             else:
                 return True
 
+    # define the function for different protein binding modes.
+    def flt_background_mean_value(self, ip_name, raw_gene_rpm, cds_region):
+        # condition 1: bound to ribosome
+        if self.background == 0:
+            return True
+        
+        # condition 2: bound to nascent polypeptides
+        elif self.background == 30:
+            
+            mean_back_value = raw_gene_rpm.loc[0:self.background - 1].mean()
+            # Exclude outliers of stop codon, "cds_region[-1]-1"
+            mean_bound_value = raw_gene_rpm.loc[self.background:cds_region[-1] - 1].mean()
+
+            # filter the strong binding score
+            if self.backFold:
+                delta_value = mean_bound_value - mean_back_value * self.enrich
+            else:
+                delta_value = mean_bound_value - mean_back_value * self.collision
+
+            # flag-ip samples after background need 2 fold change higher than mock-ip
+            if any(delta_value[ip_name] < 0):
+                return False
+            else:
+                return True
+            
     # define the function to calculate the correlation between the replicates
     def corr_calc(self, sp_gene_rpf_corr, sp_name):
         sp_corr_pairs = 0
@@ -294,10 +331,14 @@ class SeRP(object):
         for sample in ck_name:
             # condition 1: fill the missing values with mean RPFs of total genes
             if self.fill == 0:
-                gene_rpm[sample].loc[gene_rpm[sample] == 0] = self.mean_aa_rpm[sample]
+                # gene_rpm[sample].loc[gene_rpm[sample] == 0] = self.mean_aa_rpm[sample]
+                gene_rpm.loc[gene_rpm[sample] == 0, sample] = self.mean_aa_rpm[sample]
+
             # condition 2: fill the missing values with mean RPFs of currently gene cds
             elif self.fill == -1:
-                gene_rpm[sample].loc[gene_rpm[sample] == 0] = gene_rpm_mean[sample]
+                # gene_rpm[sample].loc[gene_rpm[sample] == 0] = gene_rpm_mean[sample]
+                gene_rpm.loc[gene_rpm[sample] == 0, sample] = gene_rpm_mean[sample]
+
             # condition 3: fill the missing values with mean RPFs of specific region
             else:
                 # Get the background mean value of the specific region
@@ -306,18 +347,27 @@ class SeRP(object):
                 gene_background_mean = gene_background.mean()
                 # If two-thirds of the specific region is covered by RPF.
                 if counter_aa >= self.fill * 2 / 3:
-                    gene_rpm[sample].loc[gene_rpm[sample] == 0] = gene_background_mean
+                    # gene_rpm[sample].loc[gene_rpm[sample] == 0] = gene_background_mean
+                    gene_rpm.loc[gene_rpm[sample] == 0, sample] = gene_background_mean
+
                 # If half of the specific region is covered by RPF, and gene_rpm_mean <= gene_background_mean
                 elif counter_aa >= self.fill / 2 and gene_rpm_mean[sample] <= gene_background_mean:
-                    gene_rpm[sample].loc[gene_rpm[sample] == 0] = gene_background_mean
+                    # gene_rpm[sample].loc[gene_rpm[sample] == 0] = gene_background_mean
+                    gene_rpm.loc[gene_rpm[sample] == 0, sample] = gene_background_mean
+
                 # if the specific region is noisy, use gene_rpm_mean instead
                 elif counter_aa >= self.fill / 2 and gene_rpm_mean[sample] > gene_background_mean:
-                    gene_rpm[sample].loc[gene_rpm[sample] == 0] = gene_rpm_mean[sample]
+                    # gene_rpm[sample].loc[gene_rpm[sample] == 0] = gene_rpm_mean[sample]
+                    gene_rpm.loc[gene_rpm[sample] == 0, sample] = gene_rpm_mean[sample]
+
                 # if the specific region is noisy, use gene_rpm_mean instead
                 elif counter_aa < self.fill / 2:
-                    gene_rpm[sample].loc[gene_rpm[sample] == 0] = gene_rpm_mean[sample]
+                    # gene_rpm[sample].loc[gene_rpm[sample] == 0] = gene_rpm_mean[sample]
+                    gene_rpm.loc[gene_rpm[sample] == 0, sample] = gene_rpm_mean[sample]
+
                 else:
-                    gene_rpm[sample].loc[gene_rpm[sample] == 0] = self.mean_aa_rpm[sample]
+                    # gene_rpm[sample].loc[gene_rpm[sample] == 0] = self.mean_aa_rpm[sample]
+                    gene_rpm.loc[gene_rpm[sample] == 0, sample] = self.mean_aa_rpm[sample]
 
         return gene_rpm
 
@@ -431,10 +481,13 @@ class SeRP(object):
             peak_list = list(peak_dict.values())[0]
             gene_ratio_list = gene_ratio_smooth.loc[peak_list]
 
-            max_enrich = round(gene_ratio_list.max()[0], 4)
+            # max_enrich = round(gene_ratio_list.max()[0], 4)
+            max_enrich = round(gene_ratio_list.max().iloc[0], 4)
             max_peak_enrich.append(max_enrich)
 
-            max_site = str(gene_ratio_list.idxmax()[0])
+            # max_site = str(gene_ratio_list.idxmax()[0])
+            max_site = str(gene_ratio_list.idxmax().iloc[0])
+
             max_peak_site.append(max_site)
 
             mean_enrich = str(round(gene_ratio_list.mean().enrich, 4))
@@ -783,7 +836,7 @@ class SeRP(object):
         scripts_out.writelines(''.join("xlim([%s(1,1) %s(1,end)]);" % (mrna_name, mrna_name)) + '\n')
         # scripts_out.writelines(''.join("%%ylim([%s %s]);" % (math.floor(ylim_down), math.ceil(ylim_up))) + '\n')
         scripts_out.writelines(''.join("box on;") + '\n')
-        scripts_out.writelines(''.join("legend({'unbound'}, 'location', 'EO');") + '\n')
+        scripts_out.writelines(''.join("legend({'un-bound'}, 'location', 'EO');") + '\n')
         scripts_out.writelines(''.join("xlabel('AA position on mRNA');") + '\n')
         scripts_out.writelines(''.join("ylabel('Enrichment [a.u]');") + '\n')
         scripts_out.writelines(''.join("title('%s (%s)');" % (title_name, self.gene_dict[mrna])) + '\n')
@@ -838,7 +891,7 @@ class SeRP(object):
         scripts_out.writelines(''.join("xlim([%s(1,1) %s(1,end)]);" % (mrna_name, mrna_name)) + '\n')
         # scripts_out.writelines(''.join("%%ylim([%f %f]);" % (math.floor(ylim_down), math.ceil(ylim_up))) + '\n')
         scripts_out.writelines(''.join("box on;") + '\n')
-        scripts_out.writelines(''.join("legend({'unbound', 'pre', 'bound'}, 'location', 'EO');") + '\n')
+        scripts_out.writelines(''.join("legend({'un-bound', 'edge', 'bound'}, 'location', 'EO');") + '\n')
         scripts_out.writelines(''.join("xlabel('AA position on mRNA');") + '\n')
         scripts_out.writelines(''.join("ylabel('Enrichment [a.u]');") + '\n')
         scripts_out.writelines(''.join("title('%s (%s)');" % (title_name, self.gene_dict[mrna])) + '\n')
@@ -873,9 +926,9 @@ class SeRP(object):
                         labelleft='on', labelright='off',
                         direction='out', width=0.5, length=2.0)
         x = gene_ratio_smooth.index.tolist()
-        plt.plot(x, gene_ratio_smooth.values.tolist(), color='#0072bd', linewidth=0.8, label='unbound')
-        plt.plot(x, collision_ratio.values.tolist(), color='#edb120', linewidth=0.8, label='collision')
-        plt.plot(x, peak_ratio.values.tolist(), color='#d95319', linewidth=0.8, label='bound')
+        plt.plot(x, gene_ratio_smooth.values.tolist(), color='#0072bd', linewidth=0.8, label='un-bound')
+        plt.plot(x, collision_ratio.values.tolist(), color='#edb120', linewidth=0.8, label='bound')
+        plt.plot(x, peak_ratio.values.tolist(), color='#d95319', linewidth=0.8, label='strongly-bound')
         plt.axvline(x=cds_region[0], c="#999999", ls="-.", lw=0.5)
         plt.axvline(x=cds_region[-1], c="#999999", ls="-.", lw=0.5)
         plt.axhline(y=self.enrich, c="#999999", ls="-.", lw=0.5)
@@ -954,7 +1007,7 @@ class SeRP(object):
             # gene_rpf = pd.DataFrame(self.all_rpf_dict[mrna], columns=col_index + self.ck_name + self.ip_name)
             gene_rpf = self.all_rpf_dict[mrna]
             # gene_rpf = gene_rpf.apply(pd.to_numeric, errors='ignore')
-            gene_rpf = gene_rpf.apply(pd.to_numeric)
+            gene_rpf = gene_rpf.apply(self.safe_to_numeric)
             gene_rpf.index = gene_rpf.from_tis
 
             # normalise the data to rpm
@@ -965,6 +1018,7 @@ class SeRP(object):
             for rpf_sum in gene_rpf_sum:
                 if rpf_sum > self.threshold:
                     sp_rpf_threshold += 1
+
             if sp_rpf_threshold < sample_num:
                 peak_tmp = '\t'.join([mrna, self.gene_dict[mrna],
                                       '\t'.join([str(i) for i in gene_rpf_sum]),
@@ -982,7 +1036,9 @@ class SeRP(object):
             utr3_region = gene_rpf[gene_rpf.region == '3utr'].index.tolist()
 
             # set the threshold of the background region
-            first_aa = self.flt_background_value(ip_name, raw_gene_rpm, cds_region)
+            first_aa = self.flt_background_max_value(ip_name, raw_gene_rpm, cds_region)
+            # first_aa = self.flt_background_mean_value(ip_name, raw_gene_rpm, cds_region)
+
             if first_aa:
                 pass
             else:
@@ -994,6 +1050,23 @@ class SeRP(object):
                 # self.peak_merge = self.peak_merge.append(pd.Series(peak_tmp.split('\t')), ignore_index=True)
                 self.peak_merge.append(peak_tmp.split('\t'))
                 peak_results.writelines('\t'.join(peak_tmp.split('\t')) + '\n')
+
+
+                # use the mean_aa_rpm to fill the empty rpf.
+                gene_rpm = self.fill_empty(ck_name, raw_gene_rpm, cds_region)
+
+                # calculate the enrichment ratio for each sample
+                gene_ratio = self.calc_ratio(gene_rpm, ck_name, ip_name)
+
+                # smooth the data
+                gene_ratio_mean, gene_ratio_smooth = self.smooth_data(gene_ratio, gene_rpf)
+
+                # add the collision and peak ratio column with nan value
+                enrich_out = pd.concat([gene_rpf, gene_ratio_smooth], axis=1).reset_index(drop=True)
+                enrich_out = pd.concat([enrich_out, pd.DataFrame(np.nan, index=enrich_out.index, columns=['edge', 'bound'])], axis=1)
+
+                self.enrich_out.append(enrich_out.reset_index(drop=True))
+
                 continue
 
             # use the mean_aa_rpm to fill the empty rpf.
@@ -1012,9 +1085,10 @@ class SeRP(object):
 
             # calculate the correlation of samples
             ck_gene_rpf_corr = raw_gene_rpm[ck_name].corr()
-            ck_min_corr = str(round(ck_gene_rpf_corr.min()[0], 4))
+            ck_min_corr = str(round(ck_gene_rpf_corr.values.min(), 4))
+            
             ip_gene_rpf_corr = raw_gene_rpm[ip_name].corr()
-            ip_min_corr = str(round(ip_gene_rpf_corr.min()[0], 4))
+            ip_min_corr = str(round(ip_gene_rpf_corr.values.min(), 4))
 
             # filter the correlation of the ck replicates： default 0.5
             ck_corr_pairs, total_pairs = self.corr_calc(ck_gene_rpf_corr, ck_name)
@@ -1085,6 +1159,13 @@ class SeRP(object):
                 # self.peak_merge = self.peak_merge.append(pd.Series(peak_tmp.split('\t')), ignore_index=True)
                 self.peak_merge.append(peak_tmp.split('\t'))
                 peak_results.writelines('\t'.join(peak_tmp.split('\t')) + '\n')
+
+                enrich_out = pd.concat([gene_rpf, gene_ratio_smooth], axis=1).reset_index(drop=True)
+                # add the collision and peak ratio column with nan value
+                enrich_out = pd.concat([enrich_out, pd.DataFrame(np.nan, index=enrich_out.index, columns=['edge', 'bound'])], axis=1)
+
+                self.enrich_out.append(enrich_out.reset_index(drop=True))
+
             else:
                 # get the collision region from the smooth data
                 peak_left_start, peak_right_end = self.retrieve_collision(gene_ratio_smooth, peak)
@@ -1114,8 +1195,8 @@ class SeRP(object):
                 if self.figure_out:
                     self.draw_figure(mrna, gene_ratio_smooth, collision_ratio, peak_ratio, cds_region)
                 
-                collision_ratio.rename(columns={'enrich': 'collision'}, inplace=True)
-                peak_ratio.rename(columns={'enrich': 'peak'}, inplace=True)
+                collision_ratio.rename(columns={'enrich': 'edge'}, inplace=True)
+                peak_ratio.rename(columns={'enrich': 'bound'}, inplace=True)
                 self.enrich_out.append(pd.concat([gene_rpf, gene_ratio_smooth, collision_ratio, peak_ratio], axis=1).reset_index(drop=True))
 
         self.peak_merge = pd.DataFrame(self.peak_merge)
@@ -1181,19 +1262,26 @@ class SeRP(object):
         # save the results in bed format, start with 0
         # bed12 format: chrom / chromStart / chromEn / name / score / strand /
         # thickStart / thickEnd / itemRGB / blockCount / blockSize / blockStarts-
-        peak_bed = peak_all.loc[:, ['transcripts', 'peak_start', 'peak_end', 'peak_num', 'mean_fold', 'max_site']]
+        peak_bed = peak_all.loc[:, ['transcripts', 'peak_start', 'peak_end', 'peak_num', 'mean_fold', 'max_site', 'P_Value']]
         peak_bed.loc[:, 'name'] = peak_bed['transcripts'] + '_peak_' + peak_bed['peak_num']
         peak_bed.loc[:, 'strand'] = '+'
 
-        peak_bed = peak_bed.apply(pd.to_numeric, errors='ignore')
+        # peak_bed = peak_bed.apply(pd.to_numeric, errors='ignore')
+        peak_bed= peak_bed.apply(self.safe_to_numeric)
+
         peak_bed.loc[:, 'peak_start'] = peak_bed.loc[:, 'peak_start'] - 1
         peak_bed = peak_bed.loc[peak_bed.loc[:, 'peak_start'] >= 0, :]
         peak_bed.loc[:, 'start'] = peak_bed.loc[:, 'peak_start'] * 3
         peak_bed.loc[:, 'end'] = peak_bed.loc[:, 'peak_end'] * 3 + 2
 
-        self.bed_merge = peak_bed.loc[:, ['transcripts', 'start', 'end', 'name', 'mean_fold', 'strand']]
-        self.bed_merge.to_csv(self.peak_bed_file, sep='\t', header=True, index=False)
+        bed_merge = peak_bed.loc[:, ['transcripts', 'start', 'end', 'name', 'mean_fold', 'strand']]
+        bed_merge.columns = ['#transcripts', 'start', 'end', 'name', 'mean_fold', 'strand']
+        bed_merge.to_csv(self.peak_bed_file, sep='\t', header=True, index=False)
         
+        peak_sig_bed = peak_bed.loc[peak_bed.loc[:, 'P_Value'] < 0.05, :]
+        bed_sig_merge = peak_sig_bed.loc[:, ['transcripts', 'start', 'end', 'name', 'mean_fold', 'strand']]
+        bed_sig_merge.columns = ['#transcripts', 'start', 'end', 'name', 'mean_fold', 'strand']
+        bed_sig_merge.to_csv(self.peak_sig_bed_file, sep='\t', header=True, index=False)
 
         # save the results in txt format contains the peak sequences
         # txt format: transcripts / gene_name / max_size / upstream sequence / peak sequence / downstream sequence

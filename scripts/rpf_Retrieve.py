@@ -26,11 +26,11 @@ def main():
     # print('Step2: Import gene list.\n', flush=True)
     # rpfs.import_gene_list()
 
-    print('Step2: Retrieve the gene RPFs.\n', flush=True)
+    print('\nStep2: Retrieve the gene RPFs.\n', flush=True)
     rpfs.retrieve_rpf()
     rpfs.rpf_to_rpm()
 
-    print('Step3: Format the RPFs table.\n', flush=True)
+    print('\nStep3: Format the RPFs table.\n', flush=True)
     rpfs.melt_rpf_table()
 
     print('Step4: Output the RPFs table.\n', flush=True)

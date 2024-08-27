@@ -89,7 +89,10 @@ class Retrieve(object):
         
         if self.norm:
             total_rpf_num = [x for x in self.total_rpf_num for _ in range(3)]
-            self.high_rpf.iloc[:, 6::] = self.high_rpf.iloc[:, 6:] * 1000000 / total_rpf_num
+            #　print the class of data type of eaech column
+            now_cols = self.high_rpf.columns[6:].to_list()
+            self.high_rpf[now_cols] = self.high_rpf[now_cols].apply(pd.to_numeric, downcast='float')
+            self.high_rpf.iloc[:, 6:] = (self.high_rpf.iloc[:, 6:] * 1000000) / total_rpf_num
         else:
             pass
 

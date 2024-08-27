@@ -1093,7 +1093,7 @@ def serp_peak_args_parser():
     data_group.add_argument("-m", dest="min", required=False, type=int, default=50,
                             help='''specify the minimum number of RPFs coverage for genes to be retained
              (default %(default)s)''')
-    data_group.add_argument("--corr", dest="corr", required=False, type=float, default=0.5,
+    data_group.add_argument("--corr", dest="corr", required=False, type=float, default=0.3,
                             help="specify the minimum correlation of replicates (default %(default)s)")
 
     # arguments for the peaks scanning, gaps and ratio filtering

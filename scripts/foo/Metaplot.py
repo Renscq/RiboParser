@@ -9,6 +9,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import polars as pl
 import pandas as pd
+import numpy as np
 
 
 class Metaplot(object):
@@ -152,7 +153,7 @@ class Metaplot(object):
 
             # get the high expression gene id
             now_rpf["sum"] = pd.DataFrame(now_sp_rpf.sum(axis=1))
-            cds_rpf = now_rpf[now_rpf["region"] == "cds"][["name", "sum"]].groupby("name")["sum"].apply(sum)
+            cds_rpf = now_rpf[now_rpf["region"] == "cds"][["name", "sum"]].groupby("name")["sum"].apply(np.sum)
             self.high_gene = cds_rpf[cds_rpf > self.rpf_num]
 
             # filter the high expression genes
