@@ -72,7 +72,7 @@ class Coverage(object):
         # self.raw_rpf = rpf_results[0]
         self.sample_name = rpf_results[1].copy()
         self.sample_num = rpf_results[2]
-        # self.merged_rpf = rpf_results[3]
+        self.merged_rpf = rpf_results[3]
         self.total_rpf_num = rpf_results[4]
         # self.gene_rpf_sum = rpf_results[5]
         self.high_gene = rpf_results[6]
@@ -392,11 +392,24 @@ class Coverage(object):
             out_png = self.output + "_" + sp + "_" + gene_bins + "_heat_plot.png"
 
             matplotlib.use('AGG')
-            fig = plt.figure(figsize=(8, 8), dpi=300)
-            # sns.clustermap(np.log2(coverage_sp + 1), row_cluster=False, col_cluster=False, cmap="YlGnBu", z_score=0, cbar_kws={'label': 'log2(RPM)'})
-            sns.heatmap(zscore(np.log2(coverage_sp + 1), axis = 1), cmap="Blues", cbar_kws={'label': 'log2(RPM)'})
-            plt.xticks([1, self.utr5_bin, self.utr5_bin + self.cds_bin, self.utr5_bin + self.cds_bin + self.utr3_bin], ['TSS', 'TIS', 'TTS', 'TES'])
-            plt.title("Mean coverage of ({number} genes)".format(number=self.gene_num))
+
+            fig, axes = plt.subplots(1, 2, figsize=(16, 8), gridspec_kw={'width_ratios': [1, 1]})
+            sns.heatmap(np.log2(coverage_sp + 1), cmap="Blues", cbar_kws={'label': 'log2(RPM + 1)'}, ax=axes[0])
+            axes[0].set_title("Mean coverage of ({number})".format(number=self.gene_num))
+            axes[0].set_xticks([1, self.utr5_bin, self.utr5_bin + self.cds_bin, self.utr5_bin + self.cds_bin + self.utr3_bin])
+            axes[0].set_xticklabels(['TSS', 'TIS', 'TTS', 'TES'])
+            
+            sns.heatmap(zscore(coverage_sp, axis = 1), cmap="Blues", cbar_kws={'label': 'Z-score'}, ax=axes[1])
+            axes[1].set_title("Z-score of mean coverage of ({number})".format(number=self.gene_num))
+            axes[1].set_xticks([1, self.utr5_bin, self.utr5_bin + self.cds_bin, self.utr5_bin + self.cds_bin + self.utr3_bin])
+            axes[1].set_xticklabels(['TSS', 'TIS', 'TTS', 'TES'])
+
+            # fig = plt.figure(figsize=(8, 8), dpi=300)
+            # # sns.clustermap(np.log2(coverage_sp + 1), row_cluster=False, col_cluster=False, cmap="YlGnBu", z_score=0, cbar_kws={'label': 'log2(RPM)'})
+            # sns.heatmap(zscore(np.log2(coverage_sp + 1), axis = 1), cmap="Blues", cbar_kws={'label': 'log2(RPM)'})
+            # plt.xticks([1, self.utr5_bin, self.utr5_bin + self.cds_bin, self.utr5_bin + self.cds_bin + self.utr3_bin], ['TSS', 'TIS', 'TTS', 'TES'])
+            # plt.title("Mean coverage of ({number} genes)".format(number=self.gene_num))
+
             fig.tight_layout()
             # plt.show()
 

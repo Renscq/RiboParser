@@ -5,8 +5,8 @@
 # @Script  : rpf_CDT.py
 
 
-from .ribo import ArgsParser
-from .ribo import CDT
+from ribo import ArgsParser
+from ribo import CDT
 
 
 def main():

@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: RiboParser
-Version: 0.1.7.4
+Version: 0.1.7.5
 Summary: A pipeline for ribosome profiling data analysis
 Home-page: https://github.com/renscq/RiboParser
 Author: Ren Shuchao
@@ -412,7 +412,7 @@ do
 cutadapt --match-read-wildcards \
  -a AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGC \
  -m 25 -O 6 -j 12 \
- -o `\basename $fq fastq.gz`clean.fastq.gz $fq &> $fq".log"
+ -o `\basename $fq fastq.gz`clean.fastq.gz $fq &>> $fq".log"
 
 done
 ```
@@ -679,7 +679,7 @@ do
 cutadapt --match-read-wildcards \
  -a AAAAAAAA \
  -m 25 -O 6 -j 10 \
- -o `\basename $fq fastq.gz`clean.fastq.gz $fq &> $fq".log"
+ -o `\basename $fq fastq.gz`clean.fastq.gz $fq &>> $fq".log"
 done
 ```
 
@@ -873,7 +873,7 @@ prefix_name=$(basename $bam Aligned.toTranscriptome.out.bam)
 
 rpf_Check -b $bam -s --thread 10 \
  -t ../../../1.reference/norm/gene.norm.txt \
- -o $prefix_name &> $prefix_name".log"
+ -o $prefix_name &>> $prefix_name".log"
 
 done
 ```
@@ -904,7 +904,7 @@ prefix_name=$(basename $bam .bam)
 rpf_Digest -b $bam -m 25 -M 50 --scale \
  -s ../../../1.reference/norm/gene.norm.rna.fa \
  -t ../../../1.reference/norm/gene.norm.txt \
- -o $prefix_name &> $prefix_name".log"
+ -o $prefix_name &>> $prefix_name".log"
 
 done
 ```
@@ -934,7 +934,7 @@ for bam in ../01.qc/*.bam
 do
 
 prefix_name=$(basename $bam .bam)
-rna_Offset -m 27 -M 50 -e 12 -o $prefix_name &> $prefix_name".log"
+rna_Offset -m 27 -M 50 -e 12 -o $prefix_name &>> $prefix_name".log"
 
 done
 ```
@@ -958,7 +958,7 @@ rna_Density -b $bam -m 27 -M 33 -l --thread 10 \
  -p ../03.offset/$prefix_name"_offset.txt" \
  -s ../../../1.reference/norm/gene.norm.rna.fa \
  -t ../../../1.reference/norm/gene.norm.txt \
- -o $prefix_name &> $prefix_name".log"
+ -o $prefix_name &>> $prefix_name".log"
 
 done
 
@@ -996,7 +996,7 @@ ncs2d_elp6d_rna_YPD3  /home/sce/3.rna-seq/5.riboparser/04.density/SRR1944935_rna
 
 #################################################
 # merge all the RNA-seq files
-rpf_Merge -l RNA.file.list -o RNA &> RNA.log
+rpf_Merge -l RNA.file.list -o RNA &>> RNA.log
 
 cd ..
 ```
@@ -1011,7 +1011,7 @@ $ cd ./06.periodicity/
 # check the periodicity
 rpf_Periodicity \
  -r ../05.merge/RNA_merged.txt \
- -m 30 --tis 0 --tts 0 -o RNA &> RNA.log
+ -m 30 --tis 0 --tts 0 -o RNA &>> RNA.log
 ```
 
 ### 4.7 `Meta-gene` analysis
@@ -1028,7 +1028,7 @@ $ cd ./07.metaplot/
 rpf_Metaplot \
  -t ../../../1.reference/norm/gene.norm.txt \
  -r ../05.merge/RNA_merged.txt \
- -m 50 --mode bar -o RNA &> RNA.log
+ -m 50 --mode bar -o RNA &>> RNA.log
 ```
 
 ### 4.8 Gene coverage
@@ -1048,7 +1048,7 @@ rpf_Coverage \
  -m 50 --outlier \
  -b 10,100,10 \
  -n --heat \
- -o RNA &> RNA.log
+ -o RNA &>> RNA.log
 ```
 
 ### 4.9 Check the repeatability of samples
@@ -1062,7 +1062,7 @@ $ cd ./09.correlation/
 # calculate the samples replication of RNA-seq
 rpf_Corr \
  -r ../05.merge/RNA_merged.txt \
- -o RNA &> RNA.log
+ -o RNA &>> RNA.log
 ```
 
 
@@ -1135,7 +1135,7 @@ prefix_name=$(basename $bam Aligned.toTranscriptome.out.bam)
 
 rpf_Check -b $bam -s --thread 10 \
  -t ../../../1.reference/norm/gene.norm.txt \
- -o $prefix_name &> $prefix_name".log"
+ -o $prefix_name &>> $prefix_name".log"
 
 done
 ```
@@ -1239,7 +1239,7 @@ prefix_name=$(basename $bam .bam)
 rpf_Digest -b $bam -m 27 -M 33 --scale \
  -s ../../../1.reference/norm/gene.norm.rna.fa \
  -t ../../../1.reference/norm/gene.norm.txt \
- -o $prefix_name &> $prefix_name".log"
+ -o $prefix_name &>> $prefix_name".log"
 
 done
 ```
@@ -1338,7 +1338,7 @@ prefix_name=$(basename $bam .bam)
 rpf_Offset -b $bam -m 27 -M 33 -p 30 -d \
  --mode SSCBM \
  -t ../../../1.reference/norm/gene.norm.txt \
- -o $prefix_name &> $prefix_name".log"
+ -o $prefix_name &>> $prefix_name".log"
 
 done
 ```
@@ -1441,7 +1441,7 @@ rpf_Density -b $bam -m 27 -M 33 --period 40 -l --thread 12 \
  -p ../03.offset/$prefix_name"_SSCBM_offset.txt" \
  -s ../../../1.reference/norm/gene.norm.rna.fa \
  -t ../../../1.reference/norm/gene.norm.txt \
- -o $prefix_name &> $prefix_name".log"
+ -o $prefix_name &>> $prefix_name".log"
 
 done
 
@@ -1532,7 +1532,7 @@ Required arguments:
 ```bash
 #################################################
 # merge all the Ribo-seq files
-rpf_Merge -l RIBO.file.list -o RIBO &> RIBO.log
+rpf_Merge -l RIBO.file.list -o RIBO &>> RIBO.log
 
 cd ..
 ```
@@ -1589,7 +1589,7 @@ $ cd ./06.periodicity/
 # check the periodicity
 rpf_Periodicity \
  -r ../05.merge/RIBO_merged.txt \
- -m 30 --tis 0 --tts 0 -o RIBO &> RIBO.log
+ -m 30 --tis 0 --tts 0 -o RIBO &>> RIBO.log
 
 cd ..
 ```
@@ -1654,7 +1654,7 @@ $ cd ./07.metaplot/
 rpf_Metaplot \
  -t ../../../1.reference/norm/gene.norm.txt \
  -r ../05.merge/RIBO_merged.txt \
- -m 50 --mode bar -o RIBO &> RIBO.log
+ -m 50 --mode bar -o RIBO &>> RIBO.log
 
 cd ..
 ```
@@ -1726,7 +1726,7 @@ rpf_Coverage \
  -m 50 --outlier \
  -b 10,100,10 \
  -n --heat \
- -o RIBO &> RIBO.log
+ -o RIBO &>> RIBO.log
 
 cd ..
 ```
@@ -1787,7 +1787,7 @@ $ cd ./09.correlation/
 # calculate the samples replication of Ribo-seq
 rpf_Corr \
  -r ../05.merge/RIBO_merged.txt \
- -o RIBO &> RIBO.log
+ -o RIBO &>> RIBO.log
 ```
 
 3. Results of `rpf_Corr`
@@ -1855,7 +1855,7 @@ rpf_Quant \
  -r ../05.merge/RIBO_merged.txt \
  --tis 15 \
  --tts 5 \
- -o RIBO &> RIBO.log 
+ -o RIBO &>> RIBO.log 
 
 cd ..
 ```
@@ -1934,7 +1934,7 @@ rpf_Pausing \
  -s $sites \
  -f 0 \
  --scale minmax \
- -o "$sites"_site &> "$sites"_site.log
+ -o "$sites"_site &>> "$sites"_site.log
 done
 
 cd ..
@@ -2008,7 +2008,7 @@ rpf_Occupancy \
  -s "$sites" \
  -f 0 --stop \
  --scale minmax \
- -o "$sites"_site &> "$sites"_site.log
+ -o "$sites"_site &>> "$sites"_site.log
  
 done
 
@@ -2087,7 +2087,7 @@ rpf_CDT \
  -s $sites \
  --tis 10 \
  --tts 5 \
- -o "$sites"_site &> "$sites"_site.log
+ -o "$sites"_site &>> "$sites"_site.log
 
 done
 
@@ -2163,7 +2163,7 @@ rpf_CST \
  -s $sites \
  --tis 10 \
  --tts 5 \
- -o "$sites"_site &> "$sites"_site.log
+ -o "$sites"_site &>> "$sites"_site.log
 
 done
 
@@ -2271,12 +2271,55 @@ rpf_CoV \
  --tts 5 \
  --fig \
  -g design.txt \
- -o RIBO &> RIBO.log
+ -o RIBO &>> RIBO.log
 
-cd ..
 ```
 
-3. Results of `rpf_CoV`
+3. Explanation of `rpf_Cumulative_CoV`
+
+```bash
+$ rpf_Cumulative_CoV -h
+
+Retrieve the RPFs with gene list.
+
+Step1: Checking the input Arguments.
+
+usage: rpf_Cumulative_CoV [-h] -r RPF [-o OUTPUT] [-l LIST] [-m MIN] [-n] [-t TRIM] [-s] [-z]
+
+This script is used to calculate the cumulative CoV.
+
+options:
+  -h, --help  show this help message and exit
+  -l LIST     the list of input genes for transcript id.
+  -m MIN      retain transcript with more than minimum RPFs (default: 0).
+  -n          normalize the RPFs count to RPM (default: False).
+  -t TRIM     trim transcript with specific length (default: 50 nt).
+  -s          split gene rpf to each TXT file (default: False).
+  -z          set the start site to zero (default: False).
+
+Required arguments:
+  -r RPF      the name of input RPFs density file in TXT format.
+  -o OUTPUT   prefix of output file name (default: filename + '_cumulative_CoV.txt'.
+
+```
+
+
+4. Calculate the cumulative gene coefficient of variation in Ribo-seq data
+
+```bash
+#################################################
+# calculate the cumulative coefficient of variation
+rpf_Cumulative_CoV \
+ -l ../../../1.reference/norm/gene.norm.txt \
+ -r ../05.merge/RIBO_merged.txt \
+ -m 50 \
+ -n \
+ -z \
+ -t 300 \
+ -o RIBO &>> RIBO.log
+```
+
+5. Results of `rpf_CoV`
 
 ```bash
 gene_compared_CoV.txt # Compared gene coefficient of variation
@@ -2349,7 +2392,7 @@ rpf_Meta_Codon \
  -m 50 -f 0 \
  -c codon_list.txt \
  -a 15 -u -n \
- -o RIBO &> RIBO.log
+ -o RIBO &>> RIBO.log
 
 cd ..
 ```
@@ -2408,7 +2451,7 @@ rpf_Shuffle \
  -r ../05.merge/RIBO_merged.txt \
  -s 0 \
  -i \
- -o RIBO &> RIBO.log
+ -o RIBO &>> RIBO.log
 ```
 
 3. Shuffle gene density values in RNA-seq data
@@ -2424,7 +2467,7 @@ rpf_Shuffle \
  -r ../05.merge/RNA_merged.txt \
  -s 0 \
  -i \
- -o RNA &> RNA.log
+ -o RNA &>> RNA.log
 ```
 
 4. Results of `rpf_Shuffle`
@@ -2477,12 +2520,12 @@ $ cd ./sce/4.ribo-seq/5.riboparser/18.retrieve/
 #################################################
 # retrieve and format the gene density with gene covered more than 50 reads
 rpf_Retrieve \
- -l ../../../1.reference/norm/gene.norm.txt \
+ -l ../../../1.reference/norm/gene.norm.txt \ 
  -r ../05.merge/RIBO_merged.txt \
- -m 0 \
+ -m 50 \
  -f \
  -n \
- -o RIBO &> RIBO.log
+ -o RIBO &>> RIBO.log
 
 cd ..
 ```
@@ -2501,7 +2544,7 @@ rpf_Retrieve \
  -m 50 \
  -f \
  -n \
- -o RNA &> RNA.log
+ -o RNA &>> RNA.log
 
 cd ..
 ```
@@ -2537,7 +2580,7 @@ This script is used to draw the frame shift plot.
 
 options:
   -h, --help     show this help message and exit
-  -p PERIOD      the minimum in-frame value for frame shifting screen, range [0 - 1]. (default: 0.45).
+  -p PERIOD      the minimum in-frame value for frame shifting screen, range [0 - 100]. (default: 45).
   -m MIN         retain transcript with more than minimum RPFs. (default: 50).
   --tis TIS      the number of codons after TIS will be discarded.. (default: 0 AA).
   --tts TTS      the number of codons before TTS will be discarded.. (default: 0 AA).
@@ -2563,9 +2606,7 @@ rpf_Shift \
  --tis 5 --tts 5 \
  -m 50 \
  -p 45 \
- -f \
- -n \
- -o RIBO &> RIBO.log
+ -o RIBO &>> RIBO.log
 
 cd ..
 ```
@@ -2580,10 +2621,105 @@ RIBO_gene_frame_shift_count_plot.png
 RIBO_gene_frame_shift_count.txt
 RIBO_gene_periodicity.txt
 RIBO_SRR1944912_gene_frame_shift.txt
-
 ```
 
-## 7. Contribution
+
+
+## 7. one step for pipeline
+
+### 7.0 Prepare the directories and design file for your project
+
+1. create the directories to store the raw-data and results
+
+```bash
+$ cd
+$ mkdir sce
+$ cd ./sce/
+$ mkdir -p ./sce/1.reference
+$ mkdir -p ./sce/2.rawdata/ribo-seq ./sce/2.rawdata/rna-seq
+$ mkdir -p ./sce/3.rna-seq
+$ mkdir -p ./sce/4.ribo-seq
+```
+
+2. prepare the design file for your RNA-seq and Ribo-seq data
+
+The design file must contain at least two columns names `Name` and `Group`
+
+```bash
+$ cat design.txt
+
+Name    Group
+SRR1944912      WT_ribo_YPD
+SRR1944913      WT_ribo_YPD
+SRR1944914      WT_ribo_YPD
+SRR1944915      ncs2d_ribo_YPD
+SRR1944916      ncs2d_ribo_YPD
+SRR1944917      ncs2d_ribo_YPD
+```
+
+
+### 7.1 run_step1.sh
+
+This step is used for constructing the database, which is essential for the alignment of reads and subsequent analysis using `RiboParser`.
+
+This step is suitable for most genome and gene annotation files derived from `NCBI`.
+
+`NOTE`: The download files in `Step 0.0` need to be modified according to the `species` used in your project!
+
+```bash
+$ nohup sh run_step1.sh &
+```
+
+### 7.2 run_step2.sh
+
+This step is used for analyzing `RNA-seq` data, including data cleaning, 
+alignment, and expression quantification.
+
+`NOTE`: The `adapter` information in `Step 0.0` needs to be modified according to the sequencing 
+method used in your project!
+
+```bash
+$ nohup sh run_step2.sh &
+```
+
+### 7.3 run_step3.sh
+
+This step is used for analyzing `Ribo-seq` data, including data cleaning, 
+alignment, and expression quantification.
+
+The `adapter` information in `Step 0.0` needs to be modified according to the 
+sequencing method used in your project!
+
+```bash
+$ nohup sh run_step3.sh &
+```
+
+### 7.4 run_step4.sh
+
+This step is used for analyzing `RNA-seq` data, utilizing `RiboParser` to check the 
+sequencing quality of the `RNA-seq` data and prepare formatted files for subsequent 
+joint analysis with `Ribo-seq`.
+
+The `BAM` files and `reference genome information` files in `Step 1.0` may need to be 
+modified according to the files defined for your project!
+
+```bash
+$ nohup sh run_step4.sh &
+```
+
+### 7.5 run_step5.sh
+
+This step is used for analyzing `Ribo-seq` data, utilizing `RiboParser` to check the 
+sequencing quality of the `Ribo-seq` data.
+
+The `BAM` files, `parameters` and `reference genome information` files in `Step 0.0` may 
+need to be modified according to the files defined for your project!
+
+```bash
+$ nohup sh run_step5.sh &
+```
+
+## 8. Contribution
 
 Thanks for all the open source tools used in the process.
 
@@ -2593,6 +2729,6 @@ Contribute to our open-source project by submitting questions and code.
 
 Contact `rensc0718@163.com` for more information.
 
-## 8. License
+## 9. License
 
 GPL License.

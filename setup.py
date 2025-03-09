@@ -10,7 +10,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="RiboParser",
-    version="0.1.7.4",
+    version="0.1.7.6",
     packages=find_packages(),
     
     author="Ren Shuchao",
@@ -63,6 +63,7 @@ setup(
             "rpf_Coverage=utils.rpf_Coverage:main",
             "rpf_Corr=utils.rpf_Corr:main",
             "rpf_Quant=utils.rpf_Quant:main",
+            "rpf_Percent=utils.rpf_Percent:main",
             # Ribo-pausing
             "rpf_Pausing=utils.rpf_Pausing:main",
             "rpf_Occupancy=utils.rpf_Occupancy:main",

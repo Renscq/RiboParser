@@ -19,6 +19,7 @@ min_length=27
 max_length=33
 
 # set the paramater for the offset detection
+offset_mode="RSBM" # [RSBM, SSCBM]
 expect_rpf=30
 shift_nt=1
 

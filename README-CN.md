@@ -1711,10 +1711,17 @@ rpf_Coverage \
  -n --heat \
  -o RIBO &> RIBO.log
 
+rpf_Percent \
+ -t ../../../1.reference/norm/gene.norm.txt \
+ -r ../05.merge/RIBO_merged.txt \
+ -n -m 50 \
+ -f 0 \
+ -o RIBO &>> RIBO.log
+
 cd ..
 ```
 
-3. `rpf_Coverage`的结果
+3. `rpf_Coverage` 的结果
 
 ```bash
 RIBO.log # Log file of program execution
@@ -2608,7 +2615,124 @@ RIBO_gene_periodicity.txt
 RIBO_SRR1944912_gene_frame_shift.txt
 ```
 
-## 7. 贡献
+## 7. shell 包装流程
+
+### 7.0 为项目准备目录结构和实验设计文件
+
+1. 创建用于存储原始数据和分析结果的目录结构
+
+```bash
+$ cd
+$ mkdir sce
+$ cd ./sce/
+$ mkdir -p ./sce/1.reference
+$ mkdir -p ./sce/2.rawdata/ribo-seq ./sce/2.rawdata/rna-seq
+$ mkdir -p ./sce/3.rna-seq
+$ mkdir -p ./sce/4.ribo-seq
+```
+
+2. 为您的 RNA-seq 和 Ribo-seq 数据准备设计文件
+
+设计文件必须至少包含两列：`Name` 和 `Group`，如果有其他信息，可以在后面添加列。
+该文件内容可保存 excel 格式用于 `RiboShiny` 的分析使用。
+
+```bash
+$ cat design.txt
+
+Name    Group
+SRR1944912      WT_ribo_YPD
+SRR1944913      WT_ribo_YPD
+SRR1944914      WT_ribo_YPD
+SRR1944915      ncs2d_ribo_YPD
+SRR1944916      ncs2d_ribo_YPD
+SRR1944917      ncs2d_ribo_YPD
+```
+
+
+### 7.1 run_step1.sh
+
+此步骤用于构建数据库，这是进行 reads 比对及后续使用 `RiboParser` 进行分析的关键步骤。  
+
+该步骤适用于大多数来自 `NCBI` 的基因组和基因注释文件。  
+
+**注意**：`Step 0.0` 中的下载文件需要根据您的项目所使用的 `物种` 进行修改.
+
+```bash
+$ nohup sh run_step1.sh &
+```
+
+### 7.2 run_step2.sh
+
+此步骤用于分析 `RNA-seq` 数据，包括数据清洗、比对和表达定量。  
+
+**注意**：`Step 0.0` 中的 `接头` 信息需要根据您的项目所使用的测序方法进行修改.
+
+```bash
+$ nohup sh run_step2.sh &
+```
+
+### 7.3 run_step3.sh
+
+此步骤用于分析 `Ribo-seq` 数据，包括数据清洗、比对和表达定量。  
+
+**注意**：`Step 0.0` 中的 `接头` 信息需要根据您的项目所使用的测序方法进行修改.
+
+```bash
+$ nohup sh run_step3.sh &
+```
+
+### 7.4 run_step4.sh
+
+此步骤用于分析 `RNA-seq` 数据，利用 `RiboParser` 检查 `RNA-seq` 数据的测序质量，并准备格式化文件，以便与 `Ribo-seq` 进行后续联合分析。  
+
+**注意**：`Step 1.0` 中的 `BAM` 文件和 `参考基因组信息` 文件可能需要根据您的项目文件进行修改.
+
+```bash
+$ nohup sh run_step4.sh &
+```
+
+### 7.5 run_step5.sh
+
+此步骤用于分析 `Ribo-seq` 数据，利用 `RiboParser` 检查 `Ribo-seq` 数据的测序质量。
+
+**注意**：`Step 0.0` 中的 `BAM` 文件、`parameters` 和 `reference genome information` 文件可以
+需要根据为您的项目定义的文件进行修改.
+
+```bash
+$ nohup sh run_step5.sh &
+```
+
+
+## 8. Computational performance of the RiboParser
+我们在CentOS 7系统上使用12个线程评估工作流，使用来自三个不同物种（S. cerevisiae， M. musus和H. sapiens）的RNA-seq和Ribo-seq数据。
+软件中的多线程使用 python 开发，因为众所周知的原因，不建议使用太高的线程，收益较低。
+
+| | | | | | | | | | | |
+|-|-|-|-|-|-|-|-|-|-|-|
+||||||Index building| |Preprocessing & Alignment| |Riboparser| |
+|species|Dataset|library|sample number|sample size|Elapsed time|Disk usage|Elapsed time|Disk usage|Elapsed time|Disk usage|
+|S. cerevisiae|GSE67387|Ribo-seq|6|32 G|38 s|357 M|43 m 21 s|30 G|1 h 26 m 23s|3.6 G|
+| | |RNA-seq|6|17 G|38 s|357 M|32 m 52 s|26 G|37 m 42 s|2.8 G|
+|M. musculus|GSE114064|Ribo-seq|6|43 G|59 m 8 s|36G|50 m 27 s|31 G|32 m 3 s|7.9 G|
+| | |RNA-seq|6|60 G|59 m 8 s|36G|4 h 14 m 45 s|62 G|29 m 30 s|7.6 G|
+|H. sapiens|GSE131650|Ribo-seq|6|42G|1 h 55 m 56 s|44 G|2 h 11 m 42 s|29 G|2 h 18 m 57 s|14 G|
+| | |RNA-seq|6|54G|1 h 55 m 56 s|44 G|1 h 15 m 15 s|30 G|40 m 35 s|11 G|
+
+RiboParser系统推荐：
+为了获得最佳性能，我们建议在基于linux的系统上部署RiboParser（已经在Ubuntu 20.04 LTS/CentOS 7上进行了测试）。
+
+较低配置
+- Memory: ≥ 16 GB RAM
+- Processor: ≥ 4-core CPU (Intel Xeon E5-2600+ or equivalent)
+- Storage: ≥ 512 GB HDD (SATA III)
+
+较高配置
+- Memory: ≥ 32 GB RAM
+- Processor: ≥ 8-core CPU (AMD EPYC 7B12/Intel i9-10900X)
+- Storage: ≥ 512 GB NVMe SSD for rapid I/O and 2 TB HDD (SATA III)
+
+
+## 9. 贡献
 
 感谢在这个过程中使用的所有开源工具。
 
@@ -2616,8 +2740,8 @@ RIBO_SRR1944912_gene_frame_shift.txt
 
 欢迎提交问题和代码对我们的项目做出贡献。
 
-更多信息请联系`rensc0718@163.com`。
+更多信息请联系 `rensc0718@163.com`。
 
-## 8. License
+## 10. License
 
 GPL License.

@@ -1016,6 +1016,13 @@ rpf_Coverage \
  -b 10,100,10 \
  -n --heat \
  -o RNA &>> RNA.log
+
+rpf_Percent \
+ -t ../../../1.reference/norm/gene.norm.txt \
+ -r ../05.merge/RNA_merged.txt \
+ -n -m 50 \
+ -f 0 \
+ -o RNA &>> RNA.log
 ```
 
 ### 4.9 Check the repeatability of samples
@@ -1693,6 +1700,13 @@ rpf_Coverage \
  -m 50 --outlier \
  -b 10,100,10 \
  -n --heat \
+ -o RIBO &>> RIBO.log
+
+rpf_Percent \
+ -t ../../../1.reference/norm/gene.norm.txt \
+ -r ../05.merge/RIBO_merged.txt \
+ -n -m 50 \
+ -f 0 \
  -o RIBO &>> RIBO.log
 
 cd ..
@@ -2591,7 +2605,6 @@ RIBO_SRR1944912_gene_frame_shift.txt
 ```
 
 
-
 ## 7. one step for pipeline
 
 ### 7.0 Prepare the directories and design file for your project
@@ -2686,7 +2699,36 @@ need to be modified according to the files defined for your project!
 $ nohup sh run_step5.sh &
 ```
 
-## 8. Contribution
+
+## 8. Computational performance of the RiboParser
+We assessed the workflow on a CentOS 7 system using 12 threads, with RNA-seq and Ribo-seq data from three different species (S. cerevisiae, M. musculus, and H. sapiens). 
+
+| | | | | | | | | | | |
+|-|-|-|-|-|-|-|-|-|-|-|
+||||||Index building| |Preprocessing & Alignment| |Riboparser| |
+|species|Dataset|library|sample number|sample size|Elapsed time|Disk usage|Elapsed time|Disk usage|Elapsed time|Disk usage|
+|S. cerevisiae|GSE67387|Ribo-seq|6|32 G|38 s|357 M|43 m 21 s|30 G|1 h 26 m 23s|3.6 G|
+| | |RNA-seq|6|17 G|38 s|357 M|32 m 52 s|26 G|37 m 42 s|2.8 G|
+|M. musculus|GSE114064|Ribo-seq|6|43 G|59 m 8 s|36G|50 m 27 s|31 G|32 m 3 s|7.9 G|
+| | |RNA-seq|6|60 G|59 m 8 s|36G|4 h 14 m 45 s|62 G|29 m 30 s|7.6 G|
+|H. sapiens|GSE131650|Ribo-seq|6|42G|1 h 55 m 56 s|44 G|2 h 11 m 42 s|29 G|2 h 18 m 57 s|14 G|
+| | |RNA-seq|6|54G|1 h 55 m 56 s|44 G|1 h 15 m 15 s|30 G|40 m 35 s|11 G|
+
+System Recommendations for RiboParser:
+For optimal performance, we recommend deploying RiboParser on Linux-based systems (tested on Ubuntu 20.04 LTS/CentOS 7). The hardware specifications scale with biological complexity:
+
+Minimum Configuration
+- Memory: ≥ 16 GB RAM
+- Processor: ≥ 4-core CPU (Intel Xeon E5-2600+ or equivalent)
+- Storage: ≥ 512 GB HDD (SATA III)
+
+Optimal Configuration
+- Memory: ≥ 32 GB RAM
+- Processor: ≥ 8-core CPU (AMD EPYC 7B12/Intel i9-10900X)
+- Storage: ≥ 512 GB NVMe SSD for rapid I/O and 2 TB HDD (SATA III)
+
+
+## 9. Contribution
 
 Thanks for all the open source tools used in the process.
 
@@ -2696,6 +2738,6 @@ Contribute to our open-source project by submitting questions and code.
 
 Contact `rensc0718@163.com` for more information.
 
-## 9. License
+## 10. License
 
 GPL License.

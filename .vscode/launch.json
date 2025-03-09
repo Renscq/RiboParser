@@ -1,6 +1,24 @@
 {
     "configurations": [
         {
+            "name": "Python: rpf_Percent.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceRoot}/utils/rpf_Percent.py",
+            "args": [
+                "-r",
+                "/home/rensc/software/temp/tests/density/usda_rpf_retrieve.txt",
+                "-t",
+                "/mnt/t64/database/usda110/norm/usda110.norm.txt",
+                "-o",
+                "/home/rensc/software/temp/tests/period/usda",
+                "-m",
+                "50"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Python: rpf_Shift.py",
             "type": "debugpy",
             "request": "launch",
@@ -379,15 +397,15 @@
             "program": "${workspaceRoot}/utils/rpf_CDT.py",
             "args": [
                 "-l",
-                "/mnt/t64/database/sce/fungidb/norm/sce.norm.txt",
-                // "/mnt/t64/database/gmx/ncbi/norm/gmx4.norm.txt",
+                // "/mnt/t64/database/sce/fungidb/norm/sce.norm.txt",
+                "/mnt/t64/database/sce/ncbi/norm/sce.norm.txt",
                 // "/mnt/t64/database/hsa/chm13/norm/chm13.norm.txt",
                 "--rna",
-                "/mnt/t64/rensc/serp/GSE67387/mrna/mrna/step05-merge/sce_rpf_merged.txt",
+                "/mnt/t64/rensc/serp/GSE67387/mrna/mrna2/step05-merge/sce_rpf_merged.txt",
                 // "/home/rensc/t64/usda110/nodules-rna/gmx/mrna/dpi25/step05-merge/gmx_rpf_merged.txt",
                 // "/home/rensc/software/riboParser/tests/density/hsa_rna_retrieve.txt",
                 "--rpf",
-                "/mnt/t64/rensc/serp/GSE67387/ribo/ribo/step05-merge/sce_rpf_merged.txt",
+                "/mnt/t64/rensc/serp/GSE67387/ribo/ribo4/step05-merge/sce_rpf_merged.txt",
                 // "/mnt/t64/rensc/usda110/nodules-ribo/gmx/ribo/dpi25/step05-merge/gmx_rpf_merged.txt",
                 // "/home/rensc/software/riboParser/tests/density/hsa_rpf_retrieve.txt",
                 "-o",
