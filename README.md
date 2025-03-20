@@ -1040,7 +1040,7 @@ rpf_Corr \
 ```
 
 
-## 5. Perform RNA-seq data analysis of `GSE67387` with `RiboParser`
+## 5. Perform Ribo-seq data analysis of `GSE67387` with `RiboParser`
 
 ### 5.0 Prepare the directory to store the results
 

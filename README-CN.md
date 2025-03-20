@@ -1031,7 +1031,7 @@ rpf_Corr \
 ```
 
 
-## 5. 使用`RiboParser`对`GSE67387`进行RNA-seq数据分析
+## 5. 使用 `RiboParser` 对 `GSE67387` 数据集的 Ribo-seq 进行分析
 
 ### 5.0 准备用于存储结果的目录
 
