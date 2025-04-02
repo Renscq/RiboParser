@@ -97,14 +97,14 @@ def plot_venn2(sig_mock_anno, sig_flag_anno, out_mock, out_flag):
 
 def main():
     ArgsParser.now_time()
-    print('\nRetrieve the sequence of peak region.\n', flush=True)
-    print('Step1: Checking the input Arguments.\n', flush=True)
+    print('\nRetrieve the sequence of peak region.', flush=True)
+    print('\nStep1: Checking the input Arguments.', flush=True)
     args = ArgsParser.serp_overlap()
 
-    print('\nStep2: Import the peak region.\n', flush=True)
+    print('\nStep2: Import the peak region.', flush=True)
     sig_mock_peak, sig_flag_peak = import_peak_region(args.mock, args.flag)
 
-    print('\nStep3: Get the overlap region.\n', flush=True)
+    print('\nStep3: Get the overlap region.', flush=True)
     if not args.out_mock:
         out_mock = args.mock[::-4]
     else:
@@ -115,10 +115,10 @@ def main():
         out_flag = args.out_flag
     sig_mock_anno, sig_flag_anno = merge_overlap(sig_mock_peak, sig_flag_peak, out_mock, out_flag)
 
-    print('\nStep4: Draw the venn figure.\n', flush=True)
+    print('\nStep4: Draw the venn figure.', flush=True)
     plot_venn2(sig_mock_anno, sig_flag_anno, args.out_mock, args.out_flag)
 
-    print('\nAll done.\n', flush=True)
+    print('\nAll done.', flush=True)
     ArgsParser.now_time()
 
 

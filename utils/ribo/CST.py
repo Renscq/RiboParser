@@ -160,6 +160,8 @@ class CodonSelectiveTime(object):
                     step2 --> import the rna density
                     step3 --> check the samples number
         '''
+
+        print('Import the Ribo-seq density file.\n', flush=True)
         
         # import the rpf density
         rpf_results = RPFs.import_rpf(rpf_file=self.rpf_file, sample_num=None,
@@ -174,7 +176,7 @@ class CodonSelectiveTime(object):
 
         del rpf_results
 
-        print('', flush=True)
+        print('import the RNA-seq density file.\n', flush=True)
 
         # import the rna density
         rna_results = RPFs.import_rpf(rpf_file=self.rna_file, sample_num=None,
@@ -194,9 +196,8 @@ class CodonSelectiveTime(object):
         rna_sample_num = len(self.rna_sample)
 
         if rpf_sample_num != rna_sample_num:
-            print('''
-                    The number of samples in Ribo-seq and RNA-seq is not equal, please check the input density file.
-                  ''', flush=True)
+            print('The number of samples in Ribo-seq and RNA-seq is not equal, '
+            'please check the input density file.\n', flush=True)
             sys.exit(1)
 
 
@@ -284,7 +285,7 @@ class CodonSelectiveTime(object):
 
         # check the high expression gene
         if len(self.overlap_gene) == 0:
-            print('No fitted gene in the Ribo-seq and RNA-seq data.', flush=True)
+            print('No fitted gene in the Ribo-seq and RNA-seq data.\n', flush=True)
             sys.exit(1)
         else:
             print('The number of gene in the Ribo-seq and RNA-seq data is: {}'.format(len(self.overlap_gene)), flush=True)
@@ -507,7 +508,7 @@ class CodonSelectiveTime(object):
         elif scale == 'zscore':
             relative_cst = (cst - cst.mean()) / cst.std()
         else:
-            print('Unknown scale method.', flush=True)
+            print('Unknown scale method.\n', flush=True)
             sys.exit()
         return relative_cst
     

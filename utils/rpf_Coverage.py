@@ -10,7 +10,7 @@ from .ribo import Coverage
 
 def main():
     ArgsParser.now_time()
-    print('\nDraw the metagene coverage.\n', flush=True)
+    print('\nDraw the metagene coverage.', flush=True)
     print('Step1: Checking the input Arguments.', flush=True)
     args = ArgsParser.coverage_args_parser()
     meta = Coverage.Coverage(args)

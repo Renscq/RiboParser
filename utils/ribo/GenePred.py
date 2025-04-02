@@ -77,7 +77,7 @@ class GenePred(object):
                 run_tmp = subprocess.run(['gff3ToGenePred', '-warnAndContinue', '-rnaNameAttr=attr',
                                         '-geneNameAttr=attr', self.gtf, self.gp_file])
             else:
-                print('{0} not found in current environment.'.format('gff3ToGenePred'), flush=True)
+                print('{0} not found in current environment.\n'.format('gff3ToGenePred'), flush=True)
                 sys.exit(1)
 
         elif self.gtf_format == '.gtf':
@@ -86,11 +86,11 @@ class GenePred(object):
                 run_tmp = subprocess.run(['gtfToGenePred', '-allErrors', '-genePredExt',
                                         '-ignoreGroupsWithoutExons', self.gtf, self.gp_file])
             else:
-                print('{0} not found in current environment.'.format('gtfToGenePred'), flush=True)
+                print('{0} not found in current environment.\n'.format('gtfToGenePred'), flush=True)
                 sys.exit(1)
         else:
-            print('Unknown file format {0}.'.format(self.gtf_format),)
-            print('Please input annotation file in GTF or GFF format.', flush=True)
+            print('Unknown file format {0}.\n'.format(self.gtf_format),)
+            print('Please input annotation file in GTF or GFF format.\n', flush=True)
             sys.exit(1)
 
     def gp2gtf(self):
@@ -112,7 +112,7 @@ class GenePred(object):
             run_tmp = subprocess.run(['genePredToGtf', 'file', '-utr', '-honorCdsStat',
                                       '-source=ribo', self.gp_file, self.gtf_new])
         else:
-            print('{0} not found in current environment.'.format('genePredToGtf'), flush=True)
+            print('{0} not found in current environment.\n'.format('genePredToGtf'), flush=True)
             sys.exit(1)
         # os.remove(self.gp_file)
 

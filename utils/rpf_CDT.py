@@ -5,8 +5,8 @@
 # @Script  : rpf_CDT.py
 
 
-from ribo import ArgsParser
-from ribo import CDT
+from .ribo import ArgsParser
+from .ribo import CDT
 
 
 def main():
@@ -32,7 +32,7 @@ def main():
     cdt.draw_cdt_corr()
     cdt.draw_cdt_heat()
 
-    print('All done.\n', flush=True)
+    print('\nAll done.', flush=True)
     ArgsParser.now_time()
 
 

@@ -10,23 +10,23 @@ from .ribo import Metaplot
 
 def main():
     ArgsParser.now_time()
-    print('\nDraw the metaplot.\n', flush=True)
-    print('Step1: Checking the input Arguments.\n', flush=True)
+    print('\nDraw the metaplot.', flush=True)
+    print('\nStep1: Checking the input Arguments.', flush=True)
     args = ArgsParser.metaplot_args_parser()
     meta = Metaplot.Metaplot(args)
 
-    print('\nStep2: Import the RPFs file.\n', flush=True)
+    print('\nStep2: Import the RPFs file.', flush=True)
     meta.gene_anno()
     meta.read_rpf()
     meta.output_merge_meta()
 
-    print('\nStep3: Draw the metaplot.\n', flush=True)
+    print('\nStep3: Draw the metaplot.', flush=True)
     if args.mode == "bar":
         meta.draw_bar_metaplot()
     elif args.mode == "line":
         meta.draw_line_metaplot()
 
-    print('\nAll done.\n', flush=True)
+    print('\nAll done.', flush=True)
     ArgsParser.now_time()
 
 

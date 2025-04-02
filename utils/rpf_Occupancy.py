@@ -27,7 +27,7 @@ def main():
     occupancy.draw_occupancy_relative_heat()
     occupancy.draw_occupancy_line()
 
-    print('All done.\n', flush=True)
+    print('\nAll done.', flush=True)
     ArgsParser.now_time()
 
 

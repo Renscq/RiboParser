@@ -10,8 +10,8 @@ from .ribo import Percentage
 
 def main():
     ArgsParser.now_time()
-    print('\nDraw the metagene coverage.\n', flush=True)
-    print('Step1: Checking the input Arguments.', flush=True)
+    print('\nDraw the metagene coverage.', flush=True)
+    print('\nStep1: Checking the input Arguments.', flush=True)
     args = ArgsParser.percentage_args_parser()
     percent = Percentage.Percentage(args)
 

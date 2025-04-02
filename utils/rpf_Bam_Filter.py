@@ -9,8 +9,8 @@ from .ribo import ArgsParser
 
 def main():
     ArgsParser.now_time()
-    print('Filter the specific length reads from bam file.\n', flush=True)
-    print('Step1: Checking the input Arguments.', flush=True)
+    print('\nFilter the specific length reads from bam file.', flush=True)
+    print('\nStep1: Checking the input Arguments.', flush=True)
     args = ArgsParser.bam_filter_args_parser()
 
     from ribo import BamFilter
