@@ -39,7 +39,9 @@ conda activate ribo
 ### 1.2 Install software dependencies using `conda`
 
 ```bash
-conda install cutadapt -c bioconda
+conda install python=3.12
+pip install cutadapt
+
 conda install bowtie -c bioconda
 conda install samtools -c bioconda
 conda install star -c bioconda
@@ -54,12 +56,13 @@ conda install ucsc-gff3togenepred -c bioconda
 conda install ucsc-bedgraphtobigwig -c bioconda
 conda install ucsc-bedsort -c bioconda
 conda install pigz -c conda-forge
+
 ```
 
 or install the packages in a single command.
 
 ```bash
-conda install cutadapt bowtie samtools star bedtools subread rsem gffread sra-tools \
+conda install bowtie samtools star bedtools subread rsem gffread sra-tools \
  ucsc-genepredtogtf ucsc-gtftogenepred ucsc-gff3togenepred ucsc-bedgraphtobigwig ucsc-bedsort \
  -c bioconda
 
