@@ -1,6 +1,49 @@
 {
     "configurations": [
         {
+            "name": "Python: WSL: rpf_Reference.py",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "utils.rpf_Reference",
+            "args": [
+                "-g",
+                "/mnt/e/BaiduNetdiskDownload/ribo/01.reference/GCF_000001405.40_GRCh38.p14_genomic.fna",
+                "-t",
+                "/mnt/e/BaiduNetdiskDownload/ribo/01.reference/GCF_000001405.40_GRCh38.p14_genomic.gtf",
+                "-u",
+                "0",
+                "-w",
+                "-o",
+                "/mnt/e/BaiduNetdiskDownload/ribo/01.reference/hsa",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Python: WSL: rpf_Density.py",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "utils.rpf_Density",
+            // "program": "${workspaceRoot}/utils/rpf_Density.py",
+            "args": [
+                "-b",
+                "/mnt/e/BaiduNetdiskDownload/ribo/04.ribo/01.qc/test.clean.bam",
+                "-p",
+                "/mnt/e/BaiduNetdiskDownload/ribo/04.ribo/03.offset/test.clean_SSCBM_offset.txt",
+                "-t",
+                "/mnt/e/BaiduNetdiskDownload/ribo/02.norm/gene.norm2.txt",
+                "-s",
+                "/mnt/e/BaiduNetdiskDownload/ribo/02.norm/gene.norm.rna.fa",
+                "-l",
+                "--thread",
+                "4",
+                "-o",
+                "/mnt/e/BaiduNetdiskDownload/ribo/04.ribo/04.density/test",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Python: rpf_Percent.py",
             "type": "debugpy",
             "request": "launch",

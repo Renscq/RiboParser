@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @Project : test01.py
+# @Project : riboParser
 # @Script  : GenePred.py
 
 
@@ -395,6 +395,20 @@ class GenePred(object):
             self.gp_df['txEnd'] = txEnd_list
             self.gp_df['utr5_length'] = utr5_list
             self.gp_df['utr3_length'] = utr3_list
+
+
+    def remove_duplicate(self):
+        '''
+        @Message  : function to remove the duplicate transcripts.
+        @Input    : self.gp_df --> dataframe of the genepred file
+        @Return   : self.gp_df --> dataframe of the genepred file with removed duplicate transcripts
+        @Flow     : step1 --> drop the duplicate transcripts by name2 and strand
+        '''
+        
+        print('Remove duplicate transcripts.', flush=True)
+        self.gp_df.drop_duplicates(subset=['transcript_id'], inplace=True)
+        self.gp_df.reset_index(drop=True, inplace=True)
+
 
     def read_genome(self):
         '''

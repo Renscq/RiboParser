@@ -21,6 +21,7 @@ def main():
 
     print('\nStep3: Import the transcripts annotation.', flush=True)
     ribo_attr.read_transcript()
+    ribo_attr.check_transcript()
 
     print('\nStep4: Import the BAM file.', flush=True)
     ribo_attr.read_bam()
