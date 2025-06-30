@@ -1313,9 +1313,10 @@ do
 prefix_name=$(basename $bam .bam)
 
 rpf_Offset -b $bam -m 27 -M 33 -p 30 -d \
- --mode SSCBM \
  -t ../../../1.reference/norm/gene.norm.txt \
  -o $prefix_name &>> $prefix_name".log"
+
+# rpf_RSBM_Offset
 
 done
 ```
