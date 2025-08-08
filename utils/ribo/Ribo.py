@@ -211,9 +211,17 @@ class Ribo(object):
         # filter the min_length, max_length and periodicity
         offset = offset[offset['periodicity'] >= self.periodicity]
         offset = offset[(offset["length"] >= self.min_length) & (offset["length"] <= self.max_length)]
+        
+        if offset.empty:
+            sys.stdout.writelines('''No offset data retained, 
+            please check the input offset file or adjust the min periodicity parameters!''')
+            sys.exit()
+        else:
+            ave_periodicity = round(np.mean(offset['periodicity']), 2) 
+            print("The average periodicity of the imported offset table is {periodicity}.".format(periodicity=ave_periodicity), flush=True)
 
         self.offset = offset[["length", "p_site"]].groupby(offset["length"])["p_site"].apply(list).T.to_dict()
-        print("Filterd RPFs offset table: ", flush=True)
+        print("Filtered RPFs offset table: ", flush=True)
         print(self.offset, flush=True)
 
         # check the data type.
@@ -246,17 +254,32 @@ class Ribo(object):
                 if (self.min_length <= read_length <= self.max_length) and (read_length in self.offset):
                     if self.offset[read_length][0] == -1:
                         p_site = line.get_reference_positions()
-                        self.mrna_dict[line.reference_name].rpf[p_site] += 1
+                        try:
+                            self.mrna_dict[line.reference_name].rpf[p_site] += 1
+                        except KeyError as key_error:
+                            print("{error}".format(error=key_error), flush=True)
+                            print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                            print("skip reads {reads}!".format(reads=line), flush=True)
+                            continue
+                        except IndexError as index_error:
+                            print("{error}".format(error=index_error), flush=True)
+                            print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                            print("skip reads {reads}!".format(reads=line), flush=True)
+                            continue
 
                     else:
                         p_site = map_start + self.offset[read_length][0]
                         try:
                             self.mrna_dict[line.reference_name].rpf[p_site] += 1
-                        except KeyError:
-                            # sys.stdout.writelines("skip reads {reads}!".format(reads=line))
+                        except KeyError as key_error:
+                            print("{error}".format(error=key_error), flush=True)
+                            print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                            print("skip reads {reads}!".format(reads=line), flush=True)
                             continue
-                        except IndexError:
-                            sys.stdout.writelines("skip reads {reads}!".format(reads=line))
+                        except IndexError as index_error:
+                            print("{error}".format(error=index_error), flush=True)
+                            print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                            print("skip reads {reads}!".format(reads=line), flush=True)
                             continue
                 else:
                     pass
@@ -280,9 +303,15 @@ class Ribo(object):
                         for site in p_site:
                             try:
                                 self.mrna_dict[line.reference_name].rpf[site] += 1
-                            except KeyError:
+                            except KeyError as key_error:
+                                print("{error}".format(error=key_error), flush=True)
+                                print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                                print("skip reads {reads}!".format(reads=line), flush=True)
                                 continue
-                            except IndexError:
+                            except IndexError as index_error:
+                                print("{error}".format(error=index_error), flush=True)
+                                print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                                print("skip reads {reads}!".format(reads=line), flush=True)
                                 continue
                     else:
 
@@ -291,10 +320,15 @@ class Ribo(object):
                             self.mrna_dict[line.reference_name].rpf[p_site] += 1
                             p_site = map_start + self.offset[read_length][1]
                             self.mrna_dict[line.reference_name].rpf[p_site] += 1
-                        except KeyError:
-                            # sys.stdout.writelines("skip reads {reads}!".format(reads=line))
+                        except KeyError as key_error:
+                            print("{error}".format(error=key_error), flush=True)
+                            print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                            print("skip reads {reads}!".format(reads=line), flush=True)
                             continue
-                        except IndexError:
+                        except IndexError as index_error:
+                            print("{error}".format(error=index_error), flush=True)
+                            print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                            print("skip reads {reads}!".format(reads=line), flush=True)
                             continue
                 else:
                     pass
@@ -316,9 +350,15 @@ class Ribo(object):
                         for site in p_site:
                             try:
                                 self.mrna_dict[line.reference_name].rpf[site] += 1
-                            except KeyError:
+                            except KeyError as key_error:
+                                print("{error}".format(error=key_error), flush=True)
+                                print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                                print("skip reads {reads}!".format(reads=line), flush=True)
                                 continue
-                            except IndexError:
+                            except IndexError as index_error:
+                                print("{error}".format(error=index_error), flush=True)
+                                print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                                print("skip reads {reads}!".format(reads=line), flush=True)
                                 continue
                     else:
 
@@ -329,10 +369,15 @@ class Ribo(object):
                             self.mrna_dict[line.reference_name].rpf[p_site] += 1
                             p_site = map_start + self.offset[read_length][2]
                             self.mrna_dict[line.reference_name].rpf[p_site] += 1
-                        except KeyError:
-                            # sys.stdout.writelines("skip reads {reads}!".format(reads=line))
+                        except KeyError as key_error:
+                            print("{error}".format(error=key_error), flush=True)
+                            print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                            print("skip reads {reads}!".format(reads=line), flush=True)
                             continue
-                        except IndexError:
+                        except IndexError as index_error:
+                            print("{error}".format(error=index_error), flush=True)
+                            print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                            print("skip reads {reads}!".format(reads=line), flush=True)
                             continue
                 else:
                     pass
@@ -378,9 +423,15 @@ class Ribo(object):
                                 for site in p_site:
                                     try:
                                         mrna_dict[reads.reference_name].rpf[site] += 1
-                                    except KeyError:
+                                    except KeyError as key_error:
+                                        print("{error}".format(error=key_error), flush=True)
+                                        print("Now gene: {gene}".format(gene=reads.reference_name), flush=True)
+                                        print("skip reads {reads}!".format(reads=reads), flush=True)
                                         continue
-                                    except IndexError:
+                                    except IndexError as index_error:
+                                        print("{error}".format(error=index_error), flush=True)
+                                        print("Now gene: {gene}".format(gene=reads.reference_name), flush=True)
+                                        print("skip reads {reads}!".format(reads=reads), flush=True)
                                         continue
                             else:
 
@@ -388,12 +439,16 @@ class Ribo(object):
                                 try:
                                     mrna_dict[reads.reference_name].rpf[p_site] += 1
 
-                                except KeyError:
+                                except KeyError as key_error:
+                                    print("{error}".format(error=key_error), flush=True)
+                                    print("Now gene: {gene}".format(gene=reads.reference_name), flush=True)
+                                    print("skip reads {reads}!".format(reads=reads), flush=True)
                                     continue
-                                    # sys.stdout.writelines("skip reads {reads}!".format(reads=line))
-                                except IndexError:
+                                except IndexError as index_error:
+                                    print("{error}".format(error=index_error), flush=True)
+                                    print("Now gene: {gene}".format(gene=reads.reference_name), flush=True)
+                                    print("skip reads {reads}!".format(reads=reads), flush=True)
                                     continue
-                                    # sys.stdout.writelines("skip reads {reads}!".format(reads=line))
                         else:
                             pass
 
