@@ -130,6 +130,22 @@ merge_rsem = "scripts.rsem.merge_rsem:main"
 dos2unix = "scripts.unix.dos2unix:main"
 
 [tool.setuptools]
-packages = ["utils", "scripts"]
+packages = [
+    'utils',
+    'utils.ribo',
+    'utils.serp',
+    'scripts',
+    'scripts.bedgraph',
+    'scripts.bowtie',
+    'scripts.fasta',
+    'scripts.fastq',
+    'scripts.merge_ribo',
+    'scripts.oligo',
+    'scripts.ribocode',
+    'scripts.ribotish',
+    'scripts.rsem',
+    'scripts.unix',
+]
+
 
 include-package-data = true
