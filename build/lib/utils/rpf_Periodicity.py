@@ -9,25 +9,25 @@ from .ribo import Periodicity
 
 def main():
     ArgsParser.now_time()
-    print('Draw the periodicity plot.\n', flush=True)
-    print('Step1: Checking the input Arguments.\n', flush=True)
+    print('\nDraw the periodicity plot.', flush=True)
+    print('\nStep1: Checking the input Arguments.', flush=True)
     args = ArgsParser.periodicity_args_parser()
 
-    print('Step2: Import the RPFs file.\n', flush=True)
+    print('\nStep2: Import the RPFs file.', flush=True)
     rpfs = Periodicity.Periodicity(args)
     rpfs.import_rpf()
 
-    print('Step3: Calculate the 3nt periodicity.\n', flush=True)
+    print('\nStep3: Calculate the 3nt periodicity.', flush=True)
     rpfs.calc_3nt_period()
 
-    print('Step4: Ouput the 3nt periodicity.\n', flush=True)
+    print('\nStep4: Ouput the 3nt periodicity.', flush=True)
     rpfs.output_meta()
 
-    print('Step5: Draw the 3nt periodicity plot.\n', flush=True)
+    print('\nStep5: Draw the 3nt periodicity plot.', flush=True)
     rpfs.draw_3nt_period_count()
     rpfs.draw_3nt_period_ratio()
 
-    print('All done.\n', flush=True)
+    print('\nAll done.', flush=True)
     ArgsParser.now_time()
 
 

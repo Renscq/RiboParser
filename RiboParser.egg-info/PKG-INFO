@@ -1,6 +1,6 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: RiboParser
-Version: 0.1.7.6
+Version: 0.1.7.9
 Summary: A pipeline for ribosome profiling data analysis
 Home-page: https://github.com/renscq/RiboParser
 Author: Ren Shuchao
@@ -30,6 +30,17 @@ Requires-Dist: seaborn~=0.13.2
 Requires-Dist: plotly~=5.22.0
 Requires-Dist: seqlogo~=5.29.9
 Requires-Dist: kaleido~=0.2.1
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: license
+Dynamic: platform
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
 
 <!--
  * @Author: 'rensc' 'rensc0718@163.com'
@@ -72,7 +83,9 @@ conda activate ribo
 ### 1.2 Install software dependencies using `conda`
 
 ```bash
-conda install cutadapt -c bioconda
+conda install python=3.12
+pip install cutadapt
+
 conda install bowtie -c bioconda
 conda install samtools -c bioconda
 conda install star -c bioconda
@@ -87,12 +100,13 @@ conda install ucsc-gff3togenepred -c bioconda
 conda install ucsc-bedgraphtobigwig -c bioconda
 conda install ucsc-bedsort -c bioconda
 conda install pigz -c conda-forge
+
 ```
 
 or install the packages in a single command.
 
 ```bash
-conda install cutadapt bowtie samtools star bedtools subread rsem gffread sra-tools \
+conda install bowtie samtools star bedtools subread rsem gffread sra-tools \
  ucsc-genepredtogtf ucsc-gtftogenepred ucsc-gff3togenepred ucsc-bedgraphtobigwig ucsc-bedsort \
  -c bioconda
 
@@ -1073,7 +1087,7 @@ rpf_Corr \
 ```
 
 
-## 5. Perform RNA-seq data analysis of `GSE67387` with `RiboParser`
+## 5. Perform Ribo-seq data analysis of `GSE67387` with `RiboParser`
 
 ### 5.0 Prepare the directory to store the results
 
@@ -1343,9 +1357,10 @@ do
 prefix_name=$(basename $bam .bam)
 
 rpf_Offset -b $bam -m 27 -M 33 -p 30 -d \
- --mode SSCBM \
  -t ../../../1.reference/norm/gene.norm.txt \
  -o $prefix_name &>> $prefix_name".log"
+
+# rpf_RSBM_Offset
 
 done
 ```

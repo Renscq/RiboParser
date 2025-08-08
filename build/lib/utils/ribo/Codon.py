@@ -84,7 +84,7 @@ class Codon(object):
                 self.codon_dict[codon].append(np.nan)
 
     def get_all_codon_usage(self):
-        print('Whole gene sequence.', flush=True)
+        print('Whole gene sequence.\n', flush=True)
         all_cds = self.merged_rpf.loc[self.merged_rpf['region'] == 'cds', 'codon']
         all_cds_codon_count = all_cds.value_counts()
         all_codon_freq = round(all_cds_codon_count * 1000 / all_cds_codon_count.sum(), 3)
@@ -107,7 +107,7 @@ class Codon(object):
     def get_codon_usage(self):
 
         for sample in self.sample_name:
-            print('Now sample is: {sample}.'.format(sample=sample), flush=True)
+            print('Now sample is: {sample}.\n'.format(sample=sample), flush=True)
             # filter the high expression genes
             high_gene = self.gene_rpf_sum[self.gene_rpf_sum[sample] > self.rpf_num]
             gene_ids = list(high_gene.index)

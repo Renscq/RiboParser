@@ -118,14 +118,14 @@ def draw_corr_plot(frame, frame0, frame1, frame2, types, out_prefix):
 
 def main():
     ArgsParser.now_time()
-    print('\nDraw the correlation of samples.\n', flush=True)
-    print('\nStep1: Checking the input Arguments.\n', flush=True)
+    print('\nDraw the correlation of samples.', flush=True)
+    print('\nStep1: Checking the input Arguments.', flush=True)
     args = ArgsParser.rpf_corr_args_parser()
 
-    print('\nStep2: Import the RPFs file.\n', flush=True)
+    print('\nStep2: Import the RPFs file.', flush=True)
     rpf, sample_name, frame_rpm, frame0_rpm, frame1_rpm, frame2_rpm = read_rpf(args.rpf)
 
-    print('\nStep3: calculate the RPM.\n', flush=True)
+    print('\nStep3: calculate the RPM.', flush=True)
     gene_corr_f, gene_corr_f0, gene_corr_f1, gene_corr_f2 = calc_gene_rpm(rpf,
                                                                           sample_name, frame_rpm, 
                                                                           frame0_rpm, frame1_rpm, frame2_rpm,
@@ -134,11 +134,11 @@ def main():
                                                                      frame0_rpm, frame1_rpm, frame2_rpm,
                                                                      args.output)
 
-    print('\nStep4: Draw the correlation plot.\n', flush=True)
+    print('\nStep4: Draw the correlation plot.', flush=True)
     draw_corr_plot(gene_corr_f, gene_corr_f0, gene_corr_f1, gene_corr_f2, 'gene', args.output)
     draw_corr_plot(rpf_corr_f, rpf_corr_f0, rpf_corr_f1, rpf_corr_f2, 'rpf', args.output)
 
-    print('\nAll done.\n', flush=True)
+    print('\nAll done.', flush=True)
     ArgsParser.now_time()
 
 

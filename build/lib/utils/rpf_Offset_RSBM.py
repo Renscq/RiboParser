@@ -10,29 +10,29 @@ from .ribo.Offset_RSBM import *
 
 def main():
     ArgsParser.now_time()
-    sys.stdout.writelines('Detect the p-site offset.\n')
-    sys.stdout.writelines('Step1: Checking the input Arguments.\n')
+    print('\nDetect the p-site offset.', flush=True)
+    print('\nStep1: Checking the input Arguments.', flush=True)
     args = ArgsParser.offset_rsbm_args_parser()
     offset_attr = Offset(args)
 
-    sys.stdout.writelines('Step2: Import the transcripts annotation.\n')
+    print('\nStep2: Import the transcripts annotation.', flush=True)
     offset_attr.read_transcript()
 
-    sys.stdout.writelines('Step3: Import the bam file.\n')
+    print('\nStep3: Import the bam file.', flush=True)
     offset_attr.get_mrna_reads()
 
-    sys.stdout.writelines('Step4: Detect the RSBM offset of sequence profile.\n')
+    print('\nStep4: Detect the RSBM offset of sequence profile.', flush=True)
     offset_attr.get_frame_offset()
     offset_attr.format_frame_offset()
     offset_attr.adjust_frame_offset()
 
-    sys.stdout.writelines('Step5: Output the frame offset.\n')
+    print('\nStep5: Output the frame offset.', flush=True)
     offset_attr.write_frame_offset()
 
-    sys.stdout.writelines('Step6: Draw the frame offset heatmap.\n')
+    print('\nStep6: Draw the frame offset heatmap.', flush=True)
     offset_attr.draw_frame_heatmap()
 
-    sys.stdout.writelines('All done.\n')
+    print('\nAll done.', flush=True)
     ArgsParser.now_time()
 
 

@@ -11,8 +11,8 @@ import numpy as np
 
 def main():
     ArgsParser.now_time()
-    print('Create the p-site offset for RNA-seq.\n', flush=True)
-    print('Step1: Checking the input Arguments.\n', flush=True)
+    print('\nCreate the p-site offset for RNA-seq.', flush=True)
+    print('\nStep1: Checking the input Arguments.', flush=True)
     args = ArgsParser.rna_offset_args_parser()
     
     # create the Offset table
@@ -37,11 +37,11 @@ def main():
     offset_table['ribo'] = 'first'
 
     # output the offset table
-    print('Step2: Output the offset table.\n', flush=True)
+    print('\nStep2: Output the offset table.', flush=True)
     offset_table.to_csv(args.output + '_offset.txt', sep='\t', index=False)
     
     ArgsParser.now_time()
-    print('All done.\n', flush=True)
+    print('\nAll done.', flush=True)
 
 
 if __name__ == '__main__':

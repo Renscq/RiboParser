@@ -10,8 +10,8 @@ from .ribo import RNA
 
 def main():
     ArgsParser.now_time()
-    print('\nConvert reads to reads density.\n', flush=True)
-    print('Step1: Checking the input Arguments.', flush=True)
+    print('\nConvert reads to reads density.', flush=True)
+    print('\nStep1: Checking the input Arguments.', flush=True)
     args = ArgsParser.rna_args_parser()
 
     rna_attr = RNA.RNA(args)

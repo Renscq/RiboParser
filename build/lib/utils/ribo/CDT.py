@@ -159,7 +159,7 @@ class CodonDecodingTime(object):
         elif scale == 'zscore':
             relative_cdt = (cdt - cdt.mean()) / cdt.std()
         else:
-            print('Unknown scale method.', flush=True)
+            print('Unknown scale method.\n', flush=True)
             sys.exit()
         return relative_cdt
     

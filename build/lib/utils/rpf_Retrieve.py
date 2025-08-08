@@ -10,25 +10,25 @@ from .ribo.Retrieve import *
 
 def main():
     ArgsParser.now_time()
-    print('Retrieve the RPFs with gene list.\n', flush=True)
-    print('Step1: Checking the input Arguments.\n', flush=True)
+    print('\nRetrieve the RPFs with gene list.', flush=True)
+    print('\nStep1: Checking the input Arguments.', flush=True)
     args = ArgsParser.retrieve_args_parser()
     rpfs = Retrieve(args)
 
     # print('Step2: Import gene list.\n', flush=True)
     # rpfs.import_gene_list()
 
-    print('Step2: Retrieve the gene RPFs.\n', flush=True)
+    print('\nStep2: Retrieve the gene RPFs.', flush=True)
     rpfs.retrieve_rpf()
     rpfs.rpf_to_rpm()
 
-    print('Step3: Format the RPFs table.\n', flush=True)
+    print('\nStep3: Format the RPFs table.', flush=True)
     rpfs.melt_rpf_table()
 
-    print('Step4: Output the RPFs table.\n', flush=True)
+    print('\nStep4: Output the RPFs table.', flush=True)
     rpfs.output_rpf_table()
 
-    print('All done.', flush=True)
+    print('\nAll done.', flush=True)
     ArgsParser.now_time()
 
 

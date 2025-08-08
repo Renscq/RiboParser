@@ -27,9 +27,11 @@ scripts/fastq/fq2fa.py
 scripts/fastq/fq2txt.py
 scripts/fastq/fq_len_flt.py
 scripts/fastq/fq_len_sum.py
+scripts/fastq/fq_length.py
 scripts/fastq/fq_split.py
 scripts/fastq/fq_trim.py
 scripts/fastq/phred_quality.py
+scripts/fastq/simulate_fastq.py
 scripts/merge_ribo/__init__.py
 scripts/merge_ribo/merge_cdt.py
 scripts/merge_ribo/merge_coverage.py
@@ -107,6 +109,7 @@ utils/ribo/Coverage.py
 utils/ribo/Cumulative_CoV.py
 utils/ribo/Density.py
 utils/ribo/Digestion.py
+utils/ribo/EndSite.py
 utils/ribo/Ensembl_Ref.py
 utils/ribo/GenePred.py
 utils/ribo/MetaCodon.py

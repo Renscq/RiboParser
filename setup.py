@@ -1,7 +1,7 @@
 """
 Author: 'rensc' 'rensc0718@163.com'
 LastEditors: 'rensc' 'rensc0718@163.com'
-LastEditTime: 2025-02-13 12:00:00
+LastEditTime: 2025-08-08 16:00:00
 FilePath: \RiboParser\setup.py
 Description:
 """
@@ -10,7 +10,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="RiboParser",
-    version="0.1.7.6",
+    version="0.1.9",
     packages=find_packages(),
     
     author="Ren Shuchao",
@@ -104,11 +104,13 @@ setup(
             # fastq
             "fq_len_flt=scripts.fastq.fq_len_flt:main",
             "fq_len_sum=scripts.fastq.fq_len_sum:main",
+            "fq_length=scripts.fastq.fq_length:main",
             "fq_split=scripts.fastq.fq_split:main",
             "fq_trim=scripts.fastq.fq_trim:main",
             "fq2fa=scripts.fastq.fq2fa:main",
             "fq2txt=scripts.fastq.fq2txt:main",
             "phred_quality=scripts.fastq.phred_quality:main",
+            "simulate_fastq=scripts.fastq.simulate_fastq:main",
             # merge_ribo
             "merge_cdt=scripts.merge_ribo.merge_cdt:main",
             "merge_coverage=scripts.merge_ribo.merge_coverage:main",

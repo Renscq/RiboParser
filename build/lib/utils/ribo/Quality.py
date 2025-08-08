@@ -618,7 +618,6 @@ class Quality(object):
         out_png = self.output_prefix + "_reads_saturation.png"
         out_rpf = self.output_prefix + "_reads_saturation.txt"
         
-
         mrna_df = pd.DataFrame(self.mrna_dict).T
         mrna_df.loc[:, 'mean'] = mrna_df.mean(axis=1)
         mrna_df = mrna_df.sort_values(['mean'], ascending=True)

@@ -11,7 +11,7 @@ from .ribo.GenePred import *
 def main():
     ArgsParser.now_time()
     print('\nMake the reference for riboParser.', flush=True)
-    print('Step1: Checking the input Arguments.', flush=True)
+    print('\nStep1: Checking the input Arguments.', flush=True)
     args = ArgsParser.make_ribo_ref()
     ribo_ref = GenePred(args)
 

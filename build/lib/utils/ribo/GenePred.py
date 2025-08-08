@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @Project : test01.py
+# @Project : riboParser
 # @Script  : GenePred.py
 
 
@@ -77,7 +77,7 @@ class GenePred(object):
                 run_tmp = subprocess.run(['gff3ToGenePred', '-warnAndContinue', '-rnaNameAttr=attr',
                                         '-geneNameAttr=attr', self.gtf, self.gp_file])
             else:
-                print('{0} not found in current environment.'.format('gff3ToGenePred'), flush=True)
+                print('{0} not found in current environment.\n'.format('gff3ToGenePred'), flush=True)
                 sys.exit(1)
 
         elif self.gtf_format == '.gtf':
@@ -86,11 +86,11 @@ class GenePred(object):
                 run_tmp = subprocess.run(['gtfToGenePred', '-allErrors', '-genePredExt',
                                         '-ignoreGroupsWithoutExons', self.gtf, self.gp_file])
             else:
-                print('{0} not found in current environment.'.format('gtfToGenePred'), flush=True)
+                print('{0} not found in current environment.\n'.format('gtfToGenePred'), flush=True)
                 sys.exit(1)
         else:
-            print('Unknown file format {0}.'.format(self.gtf_format),)
-            print('Please input annotation file in GTF or GFF format.', flush=True)
+            print('Unknown file format {0}.\n'.format(self.gtf_format),)
+            print('Please input annotation file in GTF or GFF format.\n', flush=True)
             sys.exit(1)
 
     def gp2gtf(self):
@@ -112,7 +112,7 @@ class GenePred(object):
             run_tmp = subprocess.run(['genePredToGtf', 'file', '-utr', '-honorCdsStat',
                                       '-source=ribo', self.gp_file, self.gtf_new])
         else:
-            print('{0} not found in current environment.'.format('genePredToGtf'), flush=True)
+            print('{0} not found in current environment.\n'.format('genePredToGtf'), flush=True)
             sys.exit(1)
         # os.remove(self.gp_file)
 
@@ -395,6 +395,20 @@ class GenePred(object):
             self.gp_df['txEnd'] = txEnd_list
             self.gp_df['utr5_length'] = utr5_list
             self.gp_df['utr3_length'] = utr3_list
+
+
+    def remove_duplicate(self):
+        '''
+        @Message  : function to remove the duplicate transcripts.
+        @Input    : self.gp_df --> dataframe of the genepred file
+        @Return   : self.gp_df --> dataframe of the genepred file with removed duplicate transcripts
+        @Flow     : step1 --> drop the duplicate transcripts by name2 and strand
+        '''
+        
+        print('Remove duplicate transcripts.', flush=True)
+        self.gp_df.drop_duplicates(subset=['transcript_id'], inplace=True)
+        self.gp_df.reset_index(drop=True, inplace=True)
+
 
     def read_genome(self):
         '''

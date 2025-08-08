@@ -75,7 +75,7 @@ class BamFilter():
             print("import file: {bam}.\n".format(bam=self.ibam), flush=True)
             read_format = 'r'
         else:
-            print("Unknown file format, please input the correct bam or sam file.", flush=True)
+            print("Unknown file format, please input the correct bam or sam file.\n", flush=True)
             sys.exit()
 
         self.input_bam = pysam.AlignmentFile(self.ibam, read_format)
@@ -87,4 +87,3 @@ class BamFilter():
 
         self.input_bam.close()
         self.flt_bam.close()
-

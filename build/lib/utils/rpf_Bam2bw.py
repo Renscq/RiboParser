@@ -10,8 +10,8 @@ from .ribo import Bam2Wig
 
 def main():
     ArgsParser.now_time()
-    print('\nConvert genome bam reads to bedgraph.\n', flush=True)
-    print('Step1: Checking the input Arguments.', flush=True)
+    print('\nConvert genome bam reads to bedgraph.', flush=True)
+    print('\nStep1: Checking the input Arguments.', flush=True)
     args = ArgsParser.rpf_bam2bw_args_parser()
 
     bam_attr = Bam2Wig.Bam2Wig(args)

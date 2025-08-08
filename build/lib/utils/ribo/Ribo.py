@@ -77,8 +77,13 @@ class Ribo(object):
         mrna_seq = SeqIO.parse(self.mrna_seq, "fasta")
         mrna_sequence = OrderedDict()
         for line in mrna_seq:
-            # sys.stdout.writelines("import gene:  {gene}\n".format(gene=line.id))
-            mrna_sequence[line.id] = line.seq
+            # check the repeat transcript id
+            if line.id in mrna_sequence:
+                print("Warning: {gene} is duplicated in gene sequence file, check the input file.".format(gene=line.id), flush=True)
+                continue
+            else:
+                # store the sequence in the mrna_sequence dict
+                mrna_sequence[line.id] = line.seq
 
         # mrna_sequence = pysam.FastaFile(self.mrna_seq)
 
@@ -87,27 +92,71 @@ class Ribo(object):
             if self.longest:
                 for line in islice(trans_file_in, 1, None):
                     record = line.strip().split('\t')
-                    if int(record[6]) % 3 != 0 and not self.silence:
-                        sys.stdout.write("{gene} CDS did not fit 3nt periodicity. \n".format(gene=record[2]))
 
+                    # check the 3nt periodicity
+                    if int(record[6]) % 3 != 0 and not self.silence:
+                        print("{gene} CDS did not fit 3nt periodicity. \n".format(gene=record[2]), flush=True)
+                    
+                    # check the transcript is representative or not
                     if record[9] == "True":
-                        now_mrna = Mrna(record)
-                        # sys.stdout.writelines(now_mrna.transcript_id + '\n')
-                        now_mrna.length = now_mrna.utr5_length + now_mrna.utr3_length + now_mrna.cds_length
-                        try:
-                            now_mrna.seq = mrna_sequence[now_mrna.transcript_id]
-                            now_mrna.rpf = np.zeros(len(now_mrna.seq))
-                            # now_mrna.rpf = [0] * len(now_mrna.seq)
-                            self.mrna_dict[now_mrna.transcript_id] = now_mrna
-                        except KeyError:
-                            continue
+                        # check the repeat transcript id
+                        if record[2] in self.mrna_dict:
+                            print("Warning: {gene} is duplicated in gene message file, check the input file.".format(gene=record[2]), flush=True)
+                            if int(record[5]) + int(record[6]) + int(record[7]) > self.mrna_dict[record[2]].length:
+
+                                # if the new transcript is longer than the old one, replace it
+                                now_mrna = Mrna(record)
+                                now_mrna.length = now_mrna.utr5_length + now_mrna.utr3_length + now_mrna.cds_length
+                                try:
+                                    now_mrna.seq = mrna_sequence[now_mrna.transcript_id]
+                                    now_mrna.rpf = np.zeros(len(now_mrna.seq))
+                                    # now_mrna.rpf = [0] * len(now_mrna.seq)
+                                    self.mrna_dict[now_mrna.transcript_id] = now_mrna
+                                except KeyError:
+                                    print("Warning: {gene} KeyError, check the gene name.".format(gene=record[2]), flush=True)
+                                    continue
+                            else:
+                                # if the new transcript is shorter than the old one, skip it
+                                continue
+                        else:
+                            now_mrna = Mrna(record)
+                            # sys.stdout.writelines(now_mrna.transcript_id + '\n')
+                            now_mrna.length = now_mrna.utr5_length + now_mrna.utr3_length + now_mrna.cds_length
+                            try:
+                                now_mrna.seq = mrna_sequence[now_mrna.transcript_id]
+                                now_mrna.rpf = np.zeros(len(now_mrna.seq))
+                                # now_mrna.rpf = [0] * len(now_mrna.seq)
+                                self.mrna_dict[now_mrna.transcript_id] = now_mrna
+                            except KeyError:
+                                continue
                     else:
                         continue
+
             else:
                 for line in islice(trans_file_in, 1, None):
                     record = line.strip().split('\t')
+
+                    # check the repeat transcript id
+                    if record[2] in self.mrna_dict:
+                        print("Warning: {gene} is duplicated in gene message file, check the input file.".format(gene=record[2]), flush=True)
+                        
+                        if int(record[5]) + int(record[6]) + int(record[7]) > self.mrna_dict[record[2]].length:
+                            # if the new transcript is longer than the old one, replace it
+                            now_mrna = Mrna(record)
+                            now_mrna.length = now_mrna.utr5_length + now_mrna.utr3_length + now_mrna.cds_length
+                            try:
+                                now_mrna.seq = mrna_sequence[now_mrna.transcript_id]
+                                now_mrna.rpf = np.zeros(len(now_mrna.seq))
+                                self.mrna_dict[now_mrna.transcript_id] = now_mrna
+                            except KeyError:
+                                print("Warning: {gene} KeyError, check the gene name.".format(gene=record[2]), flush=True)
+                                continue
+                        else:
+                            continue
+
+                    # check the 3nt periodicity
                     if int(record[6]) % 3 != 0:
-                        sys.stdout.write("{gene} CDS did not fit 3nt periodicity. \n".format(gene=record[2]))
+                        print("{gene} CDS did not fit 3nt periodicity. \n".format(gene=record[2]), flush=True)
 
                     now_mrna = Mrna(record)
                     # sys.stdout.writelines(now_mrna.transcript_id + '\n')
@@ -117,7 +166,28 @@ class Ribo(object):
                         now_mrna.rpf = np.zeros(len(now_mrna.seq))
                         self.mrna_dict[now_mrna.transcript_id] = now_mrna
                     except KeyError:
+                        print("Warning: {gene} KeyError, check the gene name.".format(gene=record[2]), flush=True)
                         continue
+
+    def check_transcript(self):
+        # check the transcript length in the mrna_dict equal to the sequence length
+        '''
+        @Message  : check the transcript length in the mrna_dict equal to the sequence length
+        @Input    : mrna_dict --> the gene message
+        @Return   : None
+        @Flow     : step1 --> iterate the mrna_dict
+                    step2 --> check the transcript length equal to the sequence length
+                    step3 --> print the warning message if not equal
+                    step4 --> remove the transcript if not equal
+        '''
+
+        for gene in list(self.mrna_dict.keys()):
+            
+            if len(self.mrna_dict[gene].seq) != (self.mrna_dict[gene].length):
+                print("Warning: {gene} transcript length not equal to sequence length, check the input file.".format(gene=gene), flush=True)
+                del self.mrna_dict[gene]
+
+        print("{number} gene retained.".format(number = len(self.mrna_dict.keys())), flush=True)
 
     def read_offset(self):
         '''
@@ -141,9 +211,17 @@ class Ribo(object):
         # filter the min_length, max_length and periodicity
         offset = offset[offset['periodicity'] >= self.periodicity]
         offset = offset[(offset["length"] >= self.min_length) & (offset["length"] <= self.max_length)]
+        
+        if offset.empty:
+            sys.stdout.writelines('''No offset data retained, 
+            please check the input offset file or adjust the min periodicity parameters!''')
+            sys.exit()
+        else:
+            ave_periodicity = round(np.mean(offset['periodicity']), 2) 
+            print("The average periodicity of the imported offset table is {periodicity}.".format(periodicity=ave_periodicity), flush=True)
 
         self.offset = offset[["length", "p_site"]].groupby(offset["length"])["p_site"].apply(list).T.to_dict()
-        print("Filterd RPFs offset table: ", flush=True)
+        print("Filtered RPFs offset table: ", flush=True)
         print(self.offset, flush=True)
 
         # check the data type.
@@ -176,12 +254,33 @@ class Ribo(object):
                 if (self.min_length <= read_length <= self.max_length) and (read_length in self.offset):
                     if self.offset[read_length][0] == -1:
                         p_site = line.get_reference_positions()
-                        self.mrna_dict[line.reference_name].rpf[p_site] += 1
+                        try:
+                            self.mrna_dict[line.reference_name].rpf[p_site] += 1
+                        except KeyError as key_error:
+                            print("{error}".format(error=key_error), flush=True)
+                            print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                            print("skip reads {reads}!".format(reads=line), flush=True)
+                            continue
+                        except IndexError as index_error:
+                            print("{error}".format(error=index_error), flush=True)
+                            print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                            print("skip reads {reads}!".format(reads=line), flush=True)
+                            continue
 
                     else:
                         p_site = map_start + self.offset[read_length][0]
-                        self.mrna_dict[line.reference_name].rpf[p_site] += 1
-
+                        try:
+                            self.mrna_dict[line.reference_name].rpf[p_site] += 1
+                        except KeyError as key_error:
+                            print("{error}".format(error=key_error), flush=True)
+                            print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                            print("skip reads {reads}!".format(reads=line), flush=True)
+                            continue
+                        except IndexError as index_error:
+                            print("{error}".format(error=index_error), flush=True)
+                            print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                            print("skip reads {reads}!".format(reads=line), flush=True)
+                            continue
                 else:
                     pass
 
@@ -204,9 +303,15 @@ class Ribo(object):
                         for site in p_site:
                             try:
                                 self.mrna_dict[line.reference_name].rpf[site] += 1
-                            except KeyError:
+                            except KeyError as key_error:
+                                print("{error}".format(error=key_error), flush=True)
+                                print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                                print("skip reads {reads}!".format(reads=line), flush=True)
                                 continue
-                            except IndexError:
+                            except IndexError as index_error:
+                                print("{error}".format(error=index_error), flush=True)
+                                print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                                print("skip reads {reads}!".format(reads=line), flush=True)
                                 continue
                     else:
 
@@ -215,10 +320,15 @@ class Ribo(object):
                             self.mrna_dict[line.reference_name].rpf[p_site] += 1
                             p_site = map_start + self.offset[read_length][1]
                             self.mrna_dict[line.reference_name].rpf[p_site] += 1
-                        except KeyError:
-                            # sys.stdout.writelines("skip reads {reads}!".format(reads=line))
+                        except KeyError as key_error:
+                            print("{error}".format(error=key_error), flush=True)
+                            print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                            print("skip reads {reads}!".format(reads=line), flush=True)
                             continue
-                        except IndexError:
+                        except IndexError as index_error:
+                            print("{error}".format(error=index_error), flush=True)
+                            print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                            print("skip reads {reads}!".format(reads=line), flush=True)
                             continue
                 else:
                     pass
@@ -240,9 +350,15 @@ class Ribo(object):
                         for site in p_site:
                             try:
                                 self.mrna_dict[line.reference_name].rpf[site] += 1
-                            except KeyError:
+                            except KeyError as key_error:
+                                print("{error}".format(error=key_error), flush=True)
+                                print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                                print("skip reads {reads}!".format(reads=line), flush=True)
                                 continue
-                            except IndexError:
+                            except IndexError as index_error:
+                                print("{error}".format(error=index_error), flush=True)
+                                print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                                print("skip reads {reads}!".format(reads=line), flush=True)
                                 continue
                     else:
 
@@ -253,10 +369,15 @@ class Ribo(object):
                             self.mrna_dict[line.reference_name].rpf[p_site] += 1
                             p_site = map_start + self.offset[read_length][2]
                             self.mrna_dict[line.reference_name].rpf[p_site] += 1
-                        except KeyError:
-                            # sys.stdout.writelines("skip reads {reads}!".format(reads=line))
+                        except KeyError as key_error:
+                            print("{error}".format(error=key_error), flush=True)
+                            print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                            print("skip reads {reads}!".format(reads=line), flush=True)
                             continue
-                        except IndexError:
+                        except IndexError as index_error:
+                            print("{error}".format(error=index_error), flush=True)
+                            print("Now gene: {gene}".format(gene=line.reference_name), flush=True)
+                            print("skip reads {reads}!".format(reads=line), flush=True)
                             continue
                 else:
                     pass
@@ -302,9 +423,15 @@ class Ribo(object):
                                 for site in p_site:
                                     try:
                                         mrna_dict[reads.reference_name].rpf[site] += 1
-                                    except KeyError:
+                                    except KeyError as key_error:
+                                        print("{error}".format(error=key_error), flush=True)
+                                        print("Now gene: {gene}".format(gene=reads.reference_name), flush=True)
+                                        print("skip reads {reads}!".format(reads=reads), flush=True)
                                         continue
-                                    except IndexError:
+                                    except IndexError as index_error:
+                                        print("{error}".format(error=index_error), flush=True)
+                                        print("Now gene: {gene}".format(gene=reads.reference_name), flush=True)
+                                        print("skip reads {reads}!".format(reads=reads), flush=True)
                                         continue
                             else:
 
@@ -312,12 +439,16 @@ class Ribo(object):
                                 try:
                                     mrna_dict[reads.reference_name].rpf[p_site] += 1
 
-                                except KeyError:
+                                except KeyError as key_error:
+                                    print("{error}".format(error=key_error), flush=True)
+                                    print("Now gene: {gene}".format(gene=reads.reference_name), flush=True)
+                                    print("skip reads {reads}!".format(reads=reads), flush=True)
                                     continue
-                                    # sys.stdout.writelines("skip reads {reads}!".format(reads=line))
-                                except IndexError:
+                                except IndexError as index_error:
+                                    print("{error}".format(error=index_error), flush=True)
+                                    print("Now gene: {gene}".format(gene=reads.reference_name), flush=True)
+                                    print("skip reads {reads}!".format(reads=reads), flush=True)
                                     continue
-                                    # sys.stdout.writelines("skip reads {reads}!".format(reads=line))
                         else:
                             pass
 

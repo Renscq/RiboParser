@@ -34,7 +34,7 @@ def main():
     cst.draw_cst_corr()
     cst.draw_cst_heat()
 
-    print('All done.\n', flush=True)
+    print('\nAll done.', flush=True)
     ArgsParser.now_time()
 
 
