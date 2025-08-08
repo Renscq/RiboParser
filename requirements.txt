@@ -3,7 +3,6 @@ numpy~=1.26.4
 pandas~=2.2.2
 pyarrow~=16.1.0
 polars~=0.20.31
-interval~=1.0.0
 joblib~=1.4.2
 # file formats
 biopython~=1.78
