@@ -4,8 +4,8 @@
 # @Script  : rpf_quant.py
 
 
-from .ribo import ArgsParser
-from .ribo import Quant
+from utils.ribo import ArgsParser
+from utils.ribo import Quant
 
 
 def main():

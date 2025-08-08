@@ -4,8 +4,8 @@
 # @Script  : rpf_metaplot.py
 
 
-from .ribo import ArgsParser
-from .ribo import Metaplot
+from utils.ribo import ArgsParser
+from utils.ribo import Metaplot
 
 
 def main():

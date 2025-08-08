@@ -6,8 +6,8 @@
 
 import time
 
-from .ribo import ArgsParser
-from .serp.SeRP import *
+from utils.ribo import ArgsParser
+from utils.serp.SeRP import *
 
 
 # main programme is here

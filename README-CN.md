@@ -34,6 +34,8 @@ doi:10.1016/j.jgg.2025.04.010.
 
 ## 1. 软件配置
 
+首先，需要安装 `miniconda` 或者 `micromamba` 来管理软件环境。
+
 ### 1.1 用`conda`创建环境
 
 ```bash
@@ -95,7 +97,17 @@ python -m build
 pip install .
 ```
 
-### 1.4 运行测试
+### 1.4 使用 `conda` 或者 `micromamba` 安装 `RiboParser`
+```bash
+# conda 安装
+conda install riboparser -c rensc
+
+# mamba 安装
+micromamba install riboparser -c rensc
+
+```
+
+### 1.5 运行测试
 测试软件的依赖性、安装和操作问题。
 
 ```bash

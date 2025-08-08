@@ -4,7 +4,7 @@
 # @Script  : rna_Offset.py
 
 
-from .ribo import ArgsParser
+from utils.ribo import ArgsParser
 import pandas as pd
 import numpy as np
 

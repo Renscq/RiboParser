@@ -4,8 +4,8 @@
 # @Script  : rpf_pausing.py
 
 
-from .ribo import ArgsParser
-from .ribo import Pausing
+from utils.ribo import ArgsParser
+from utils.ribo import Pausing
 
 
 def main():

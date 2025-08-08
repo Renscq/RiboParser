@@ -4,8 +4,8 @@
 # @Script  : ribo_parser.py
 
 
-from ribo import ArgsParser
-from ribo.Ribo import *
+from utils.ribo import ArgsParser
+from utils.ribo.Ribo import *
 
 
 def format_seq(ribo_attr):

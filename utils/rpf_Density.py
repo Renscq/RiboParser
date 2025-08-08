@@ -4,8 +4,8 @@
 # @Script  : rpf_density.py
 
 
-from .ribo import ArgsParser
-from .ribo import Ribo
+from utils.ribo import ArgsParser
+from utils.ribo import Ribo
 
 
 def main():

@@ -4,7 +4,7 @@
 # @Script  : rpf_Bam_Filter.py
 
 
-from .ribo import ArgsParser
+from utils.ribo import ArgsParser
 
 
 def main():

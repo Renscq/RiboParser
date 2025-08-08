@@ -8,7 +8,7 @@ import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib_venn import venn2
 import pandas as pd
-from interval import Interval
+# from interval import Interval
 
 from .ribo import ArgsParser
 
@@ -64,7 +64,7 @@ def get_overlap(left_peak, right_peak, marker):
         else:
             mock_start = int(rows_mock.peak_start)
             mock_end = int(rows_mock.peak_end)
-            
+
             for idx_flag, rows_flag in tmp_flag.iterrows():
                 flag_start = int(rows_flag.peak_start)
                 flag_end = int(rows_flag.peak_end)

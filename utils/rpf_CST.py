@@ -4,8 +4,8 @@
 # @Script  : rpf_CST.py
 
 
-from .ribo import ArgsParser
-from .ribo import CST
+from utils.ribo import ArgsParser
+from utils.ribo import CST
 
 
 def main():

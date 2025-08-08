@@ -4,8 +4,8 @@
 # @Script  : rpf_Check.py
 
 
-from .ribo import ArgsParser
-from .ribo.Quality import *
+from utils.ribo import ArgsParser
+from utils.ribo.Quality import *
 
 
 def main():

@@ -37,6 +37,8 @@ The results of this data analysis can be further analyzed and visualized in `Rib
 
 ## 1. Software configuration
 
+First, you need to install the software of `miniconda` or `micromamba`.
+
 ### 1.1 create the environment with `conda`
 
 ```bash
@@ -98,9 +100,20 @@ python -m build
 
 # install the riboparser
 pip install .
+
 ```
 
-### 1.4 run the test
+### 1.4 `conda` or `micromamba` install `RiboParser`
+```bash
+# conda
+conda install riboparser -c rensc
+
+# mamba
+micromamba install riboparser -c rensc
+
+```
+
+### 1.5 run the test
 Test software for dependency, installation, and operation issues.
 
 ```bash

@@ -8,9 +8,9 @@ import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib_venn import venn2
 import pandas as pd
-from interval import Interval
+# from interval import Interval
 
-from .ribo import ArgsParser
+from utils.ribo import ArgsParser
 
 
 def import_peak_region(mock, flag):
@@ -23,6 +23,35 @@ def import_peak_region(mock, flag):
     return sig_mock_peak, sig_flag_peak
 
 
+# def get_overlap(left_peak, right_peak, marker):
+#     for idx_mock, rows_mock in left_peak.iterrows():
+#         if rows_mock.overlap != 'NaN':
+#             continue
+#         # get the same genes in another peak table
+#         tmp_flag = right_peak[right_peak.transcripts == rows_mock.transcripts]
+#         if tmp_flag.empty:
+#             if left_peak.loc[idx_mock, 'overlap'] == 'NaN':
+#                 left_peak.loc[idx_mock, 'overlap'] = marker
+#         else:
+#             # make the interval for test
+#             mock_start = int(rows_mock.peak_start)
+#             mock_end = int(rows_mock.peak_end)
+#             mock_interval = Interval(mock_start, mock_end, lower_closed=True, upper_closed=True)
+#             for idx_flag, rows_flag in tmp_flag.iterrows():
+#                 # make the interval for test
+#                 flag_start = int(rows_flag.peak_start)
+#                 flag_end = int(rows_flag.peak_end)
+#                 flag_interval = Interval(flag_start, flag_end, lower_closed=True, upper_closed=True)
+#                 # annotate the overlap condition
+#                 if flag_interval.overlaps(mock_interval):
+#                     if left_peak.loc[idx_mock, 'overlap'] == 'NaN':
+#                         left_peak.loc[idx_mock, 'overlap'] = 'overlap'
+#                 else:
+#                     if left_peak.loc[idx_mock, 'overlap'] == 'NaN':
+#                         left_peak.loc[idx_mock, 'overlap'] = marker
+#     return left_peak
+
+
 def get_overlap(left_peak, right_peak, marker):
     for idx_mock, rows_mock in left_peak.iterrows():
         if rows_mock.overlap != 'NaN':
@@ -33,17 +62,14 @@ def get_overlap(left_peak, right_peak, marker):
             if left_peak.loc[idx_mock, 'overlap'] == 'NaN':
                 left_peak.loc[idx_mock, 'overlap'] = marker
         else:
-            # make the interval for test
             mock_start = int(rows_mock.peak_start)
             mock_end = int(rows_mock.peak_end)
-            mock_interval = Interval(mock_start, mock_end, lower_closed=True, upper_closed=True)
             for idx_flag, rows_flag in tmp_flag.iterrows():
-                # make the interval for test
                 flag_start = int(rows_flag.peak_start)
                 flag_end = int(rows_flag.peak_end)
-                flag_interval = Interval(flag_start, flag_end, lower_closed=True, upper_closed=True)
+
                 # annotate the overlap condition
-                if flag_interval.overlaps(mock_interval):
+                if flag_start <= mock_end and mock_start <= flag_end:
                     if left_peak.loc[idx_mock, 'overlap'] == 'NaN':
                         left_peak.loc[idx_mock, 'overlap'] = 'overlap'
                 else:
