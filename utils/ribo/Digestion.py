@@ -71,8 +71,7 @@ class Ribo(object):
                         now_mrna = Mrna(record)
                         now_mrna.length = now_mrna.utr5_length + now_mrna.utr3_length + now_mrna.cds_length
                         try:
-                            now_mrna.seq = mrna_sequence[
-                                now_mrna.transcript_id]
+                            now_mrna.seq = mrna_sequence[now_mrna.transcript_id]
                             now_mrna.rpf = [0] * len(now_mrna.seq)
                             self.mrna_dict[now_mrna.transcript_id] = now_mrna
                         except KeyError:

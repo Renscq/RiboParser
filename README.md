@@ -90,9 +90,14 @@ Alternatively, we can download the version from GitHub, re-setup and then instal
 
 ```bash
 cd RiboParser
+# install the dependency
+pip install build
 
-python3 setup.py sdist bdist_wheel
-pip install dist/RiboParser-0.1.6.1-py3-none-any.whl
+# build the riboparser package
+python -m build
+
+# install the riboparser
+pip install .
 ```
 
 ### 1.4 run the test

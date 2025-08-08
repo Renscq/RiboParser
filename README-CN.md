@@ -85,8 +85,14 @@ pip install riboparser
 ```bash
 cd RiboParser
 
-python3 setup.py sdist bdist_wheel
-pip install dist/RiboParser-0.1.6.1-py3-none-any.whl
+# 安装构建工具
+pip install build
+
+# 构建包
+python -m build
+
+# 安装本地包
+pip install .
 ```
 
 ### 1.4 运行测试
