@@ -9,6 +9,12 @@
 
 # RiboParser
 
+```
+Ren, S., Li, Y. & Zhou, Z. RiboParser/RiboShiny: An integrated platform for comprehensive analysis and visualization of ribo-seq data. Journal of Genetics and Genomics (2025) 
+
+doi:10.1016/j.jgg.2025.04.010.
+```
+
 为了简化理解和应用，我们将分析可公开访问的项目数据，分解每个分析步骤以说明完整的工作流程。
 
 这个过程包括一般的分析步骤和专门的分析和可视化技术，由`RiboParser`和`RiboShiny`提供便利。

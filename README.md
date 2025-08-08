@@ -7,7 +7,14 @@
  * 
 -->
 
-# RiboParser
+
+# RiboParser 
+
+```
+Ren, S., Li, Y. & Zhou, Z. RiboParser/RiboShiny: An integrated platform for comprehensive analysis and visualization of ribo-seq data. Journal of Genetics and Genomics (2025) 
+
+doi:10.1016/j.jgg.2025.04.010.
+```
 
 To streamline understanding and application, we will analyze publicly accessible project data, breaking down each analytical step to illustrate the complete workflow.
 
@@ -25,6 +32,7 @@ The specific steps involved are:
 8. Codon-level analysis
 
 The results of this data analysis can be further analyzed and visualized in `RiboShiny`.
+
 
 
 ## 1. Software configuration
@@ -2741,6 +2749,7 @@ Thanks to Nedialkova DD and Leidel SA for providing the excellent dataset.
 Contribute to our open-source project by submitting questions and code.
 
 Contact `rensc0718@163.com` for more information.
+
 
 ## 10. License
 
