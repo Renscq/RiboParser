@@ -4,8 +4,8 @@
 # @Script  : rpf_bam2bw.py
 
 
-from .ribo import ArgsParser
-from .ribo import Bam2Wig
+from utils.ribo import ArgsParser
+from utils.ribo import Bam2Wig
 
 
 def main():

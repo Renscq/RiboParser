@@ -4,8 +4,8 @@
 # @Script  : rpf_Retrieve.py
 
 
-from .ribo import ArgsParser
-from .ribo.Retrieve import *
+from utils.ribo import ArgsParser
+from utils.ribo.Retrieve import *
 
 
 def main():

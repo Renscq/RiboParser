@@ -8,7 +8,6 @@ scikit-learn~=1.4.2
 statsmodels~=0.14.2
 pysam~=0.22.1
 joblib~=1.4.2
-interval~=1.0.0
 matplotlib~=3.8.4
 matplotlib-venn~=1.1.1
 seaborn~=0.13.2

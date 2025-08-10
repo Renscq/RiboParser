@@ -4,8 +4,8 @@
 # @Script  : rna_density.py
 
 
-from .ribo import ArgsParser
-from .ribo import RNA
+from utils.ribo import ArgsParser
+from utils.ribo import RNA
 
 
 def main():

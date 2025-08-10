@@ -4,8 +4,8 @@
 # @Script  : rpf_periodicity.py
 
 
-from .ribo import ArgsParser
-from .ribo import Periodicity
+from utils.ribo import ArgsParser
+from utils.ribo import Periodicity
 
 def main():
     ArgsParser.now_time()

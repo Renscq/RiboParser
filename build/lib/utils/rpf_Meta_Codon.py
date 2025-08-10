@@ -4,8 +4,8 @@
 # @Script  : rpf_meta_codon.py
 
 
-from .ribo.ArgsParser import *
-from .ribo.MetaCodon import *
+from utils.ribo.ArgsParser import *
+from utils.ribo.MetaCodon import *
 
 
 def main():

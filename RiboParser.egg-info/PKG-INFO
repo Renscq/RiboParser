@@ -2,11 +2,9 @@ Metadata-Version: 2.4
 Name: RiboParser
 Version: 0.1.9
 Summary: A pipeline for ribosome profiling data analysis
-Home-page: https://github.com/renscq/RiboParser
-Author: Ren Shuchao
-Author-email: rensc0718@163.com
-License: GPL
-Platform: linux-x86_64
+Author-email: Ren Shuchao <rensc0718@163.com>
+License-Expression: GPL-3.0-or-later
+Project-URL: Homepage, https://github.com/renscq/RiboParser
 Classifier: Programming Language :: Python :: 3.12
 Classifier: Operating System :: POSIX :: Linux
 Classifier: Topic :: Scientific/Engineering :: Bio-Informatics
@@ -23,24 +21,12 @@ Requires-Dist: scikit-learn~=1.4.2
 Requires-Dist: statsmodels~=0.14.2
 Requires-Dist: pysam~=0.22.1
 Requires-Dist: joblib~=1.4.2
-Requires-Dist: interval~=1.0.0
 Requires-Dist: matplotlib~=3.8.4
 Requires-Dist: matplotlib-venn~=1.1.1
 Requires-Dist: seaborn~=0.13.2
 Requires-Dist: plotly~=5.22.0
 Requires-Dist: seqlogo~=5.29.9
 Requires-Dist: kaleido~=0.2.1
-Dynamic: author
-Dynamic: author-email
-Dynamic: classifier
-Dynamic: description
-Dynamic: description-content-type
-Dynamic: home-page
-Dynamic: license
-Dynamic: platform
-Dynamic: requires-dist
-Dynamic: requires-python
-Dynamic: summary
 
 <!--
  * @Author: 'rensc' 'rensc0718@163.com'
@@ -51,7 +37,15 @@ Dynamic: summary
  * 
 -->
 
-# RiboParser
+
+# RiboParser 
+
+```
+Ren, S., Li, Y. & Zhou, Z. 
+RiboParser/RiboShiny: An integrated platform for comprehensive analysis and visualization of ribo-seq data. 
+Journal of Genetics and Genomics (2025) 
+doi:10.1016/j.jgg.2025.04.010.
+```
 
 To streamline understanding and application, we will analyze publicly accessible project data, breaking down each analytical step to illustrate the complete workflow.
 
@@ -71,7 +65,10 @@ The specific steps involved are:
 The results of this data analysis can be further analyzed and visualized in `RiboShiny`.
 
 
+
 ## 1. Software configuration
+
+First, you need to install the software of `miniconda` or `micromamba`.
 
 ### 1.1 create the environment with `conda`
 
@@ -80,33 +77,23 @@ conda create -n ribo
 conda activate ribo
 ```
 
-### 1.2 Install software dependencies using `conda`
-
+### 1.2 Install `riboparser` and the entire environment directly via `miniconda` or `micromamba`.
 ```bash
-conda install python=3.12
-pip install cutadapt
+# conda
+conda install riboparser -c rensc
 
-conda install bowtie -c bioconda
-conda install samtools -c bioconda
-conda install star -c bioconda
-conda install bedtools -c bioconda
-conda install subread -c bioconda
-conda install rsem -c bioconda
-conda install gffread -c bioconda
-conda install sra-tools -c bioconda
-conda install ucsc-genepredtogtf -c bioconda
-conda install ucsc-gtftogenepred -c bioconda
-conda install ucsc-gff3togenepred -c bioconda
-conda install ucsc-bedgraphtobigwig -c bioconda
-conda install ucsc-bedsort -c bioconda
-conda install pigz -c conda-forge
+# mamba
+micromamba install riboparser -c rensc
 
 ```
 
-or install the packages in a single command.
+
+### 1.3 Install `riboparser` and software dependencies step by step.
+
+Install the software dependencies.
 
 ```bash
-conda install bowtie samtools star bedtools subread rsem gffread sra-tools \
+conda install bowtie samtools cutadapt star bedtools subread rsem gffread sra-tools \
  ucsc-genepredtogtf ucsc-gtftogenepred ucsc-gff3togenepred ucsc-bedgraphtobigwig ucsc-bedsort \
  -c bioconda
 
@@ -114,9 +101,7 @@ conda install pigz -c conda-forge
 ```
 
 
-### 1.3 `pip` install `RiboParser`
-
-When the server is connected to the network, we can use `pip` to install software directly. 
+`pip` install `RiboParser`
 
 ```bash
 pip install riboparser
@@ -126,9 +111,15 @@ Alternatively, we can download the version from GitHub, re-setup and then instal
 
 ```bash
 cd RiboParser
+# install the dependency
+pip install build
 
-python3 setup.py sdist bdist_wheel
-pip install dist/RiboParser-0.1.6.1-py3-none-any.whl
+# build the riboparser package
+python -m build
+
+# install the riboparser
+pip install .
+
 ```
 
 ### 1.4 run the test
@@ -2785,6 +2776,7 @@ Thanks to Nedialkova DD and Leidel SA for providing the excellent dataset.
 Contribute to our open-source project by submitting questions and code.
 
 Contact `rensc0718@163.com` for more information.
+
 
 ## 10. License
 

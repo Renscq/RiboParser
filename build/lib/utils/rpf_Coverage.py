@@ -4,8 +4,8 @@
 # @Script  : rpf_coverage.py
 
 
-from .ribo import ArgsParser
-from .ribo import Coverage
+from utils.ribo import ArgsParser
+from utils.ribo import Coverage
 
 
 def main():

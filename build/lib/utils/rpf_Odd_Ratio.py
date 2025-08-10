@@ -4,8 +4,8 @@
 # @Script  : rpf_odd_ratio.py
 
 
-from .ribo import ArgsParser
-from .ribo import Odd_Ratio
+from utils.ribo import ArgsParser
+from utils.ribo import Odd_Ratio
 
 
 def main():

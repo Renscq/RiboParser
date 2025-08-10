@@ -9,8 +9,8 @@ import sys
 import numpy as np
 from Bio import SeqIO
 
-from .ribo import ArgsParser
-from .ribo.Ensembl_Ref import *
+from utils.ribo import ArgsParser
+from utils.ribo.Ensembl_Ref import *
 
 
 def readline(record):

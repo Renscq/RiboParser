@@ -1,5 +1,5 @@
 README.md
-setup.py
+pyproject.toml
 RiboParser.egg-info/PKG-INFO
 RiboParser.egg-info/SOURCES.txt
 RiboParser.egg-info/dependency_links.txt

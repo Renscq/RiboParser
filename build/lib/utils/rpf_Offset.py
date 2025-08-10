@@ -4,8 +4,8 @@
 # @Script  : detect_offset.py
 
 
-from .ribo import ArgsParser
-from .ribo.Offset import *
+from utils.ribo import ArgsParser
+from utils.ribo.Offset import *
 
 
 def main():

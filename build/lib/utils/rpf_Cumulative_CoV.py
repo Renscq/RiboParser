@@ -4,8 +4,8 @@
 # @Script  : rpf_Cumulative_CoV.py
 
 
-from .ribo import ArgsParser
-from .ribo.Cumulative_CoV import *
+from utils.ribo import ArgsParser
+from utils.ribo.Cumulative_CoV import *
 
 
 def main():

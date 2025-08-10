@@ -3,8 +3,8 @@
 # @Script  : rpf_Shuffle.py
 
 
-from .ribo import ArgsParser
-from .ribo.Shuffle import *
+from utils.ribo import ArgsParser
+from utils.ribo.Shuffle import *
 
 
 def main():

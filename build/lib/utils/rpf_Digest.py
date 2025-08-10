@@ -4,8 +4,8 @@
 # @Script  : rpf_digest.py
 
 
-from .ribo.ArgsParser import *
-from .ribo.Digestion import *
+from utils.ribo.ArgsParser import *
+from utils.ribo.Digestion import *
 
 
 def main():

@@ -10,7 +10,7 @@ from matplotlib_venn import venn2
 import pandas as pd
 # from interval import Interval
 
-from .ribo import ArgsParser
+from utils.ribo import ArgsParser
 
 
 def import_peak_region(mock, flag):
@@ -64,12 +64,11 @@ def get_overlap(left_peak, right_peak, marker):
         else:
             mock_start = int(rows_mock.peak_start)
             mock_end = int(rows_mock.peak_end)
-
             for idx_flag, rows_flag in tmp_flag.iterrows():
                 flag_start = int(rows_flag.peak_start)
                 flag_end = int(rows_flag.peak_end)
 
-                # check the overlap condition
+                # annotate the overlap condition
                 if flag_start <= mock_end and mock_start <= flag_end:
                     if left_peak.loc[idx_mock, 'overlap'] == 'NaN':
                         left_peak.loc[idx_mock, 'overlap'] = 'overlap'

@@ -4,8 +4,8 @@
 # @Script  : make_ribo_ref.py
 
 
-from .ribo import ArgsParser
-from .ribo.GenePred import *
+from utils.ribo import ArgsParser
+from utils.ribo.GenePred import *
 
 
 def main():

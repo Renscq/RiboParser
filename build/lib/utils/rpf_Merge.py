@@ -8,7 +8,7 @@ from collections import OrderedDict
 import pandas as pd
 import polars as pl
 
-from .ribo import ArgsParser
+from utils.ribo import ArgsParser
 
 
 def read_sample_list(sample_list):

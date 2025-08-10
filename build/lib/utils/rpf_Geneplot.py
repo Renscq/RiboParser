@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from .ribo import ArgsParser
+from utils.ribo import ArgsParser
 
 
 def read_gene_list(gene_list):
