@@ -47,33 +47,23 @@ conda create -n ribo
 conda activate ribo
 ```
 
-### 1.2 Install software dependencies using `conda`
-
+### 1.2 Install `riboparser` and the entire environment directly via `miniconda` or `micromamba`.
 ```bash
-conda install python=3.12
-pip install cutadapt
+# conda
+conda install riboparser -c rensc
 
-conda install bowtie -c bioconda
-conda install samtools -c bioconda
-conda install star -c bioconda
-conda install bedtools -c bioconda
-conda install subread -c bioconda
-conda install rsem -c bioconda
-conda install gffread -c bioconda
-conda install sra-tools -c bioconda
-conda install ucsc-genepredtogtf -c bioconda
-conda install ucsc-gtftogenepred -c bioconda
-conda install ucsc-gff3togenepred -c bioconda
-conda install ucsc-bedgraphtobigwig -c bioconda
-conda install ucsc-bedsort -c bioconda
-conda install pigz -c conda-forge
+# mamba
+micromamba install riboparser -c rensc
 
 ```
 
-or install the packages in a single command.
+
+### 1.3 Install `riboparser` and software dependencies step by step.
+
+Install the software dependencies.
 
 ```bash
-conda install bowtie samtools star bedtools subread rsem gffread sra-tools \
+conda install bowtie samtools cutadapt star bedtools subread rsem gffread sra-tools \
  ucsc-genepredtogtf ucsc-gtftogenepred ucsc-gff3togenepred ucsc-bedgraphtobigwig ucsc-bedsort \
  -c bioconda
 
@@ -81,9 +71,7 @@ conda install pigz -c conda-forge
 ```
 
 
-### 1.3 `pip` install `RiboParser`
-
-When the server is connected to the network, we can use `pip` to install software directly. 
+`pip` install `RiboParser`
 
 ```bash
 pip install riboparser
@@ -104,17 +92,7 @@ pip install .
 
 ```
 
-### 1.4 `conda` or `micromamba` install `RiboParser`
-```bash
-# conda
-conda install riboparser -c rensc
-
-# mamba
-micromamba install riboparser -c rensc
-
-```
-
-### 1.5 run the test
+### 1.4 run the test
 Test software for dependency, installation, and operation issues.
 
 ```bash

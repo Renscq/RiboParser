@@ -44,27 +44,20 @@ conda create -n ribo
 conda activate ribo
 ```
 
-### 1.2 使用`conda`安装软件依赖项
+### 1.2 使用 `conda` 安装 `riboparser` 和软件依赖项
 
 ```bash
-conda install cutadapt -c bioconda
-conda install bowtie -c bioconda
-conda install samtools -c bioconda
-conda install star -c bioconda
-conda install bedtools -c bioconda
-conda install subread -c bioconda
-conda install rsem -c bioconda
-conda install gffread -c bioconda
-conda install sra-tools -c bioconda
-conda install ucsc-genepredtogtf -c bioconda
-conda install ucsc-gtftogenepred -c bioconda
-conda install ucsc-gff3togenepred -c bioconda
-conda install ucsc-bedgraphtobigwig -c bioconda
-conda install ucsc-bedsort -c bioconda
-conda install pigz -c conda-forge
+# conda
+conda install riboparser -c rensc
+
+# mamba
+micromamba install riboparser -c rensc
+
 ```
 
-或者利用单个命令安装上述包。
+### 1.3 按步骤安装 `riboparser` 和软件依赖包
+
+利用单个命令安装依赖包。
 
 ```bash
 conda install cutadapt bowtie samtools star bedtools subread rsem gffread sra-tools \
@@ -75,15 +68,14 @@ conda install pigz -c conda-forge
 ```
 
 
-### 1.3 利用`pip`安装`RiboParser`
-
-当服务器连接到网络时，我们可以使用`pip`直接安装软件。
+利用`pip`安装`RiboParser`
 
 ```bash
 pip install riboparser
+
 ```
 
-或者，我们可以从GitHub下载版本，重新设置，然后安装它。
+或者，我们可以从GitHub下载版本，重新 build，然后安装。
 
 ```bash
 cd RiboParser
@@ -98,17 +90,8 @@ python -m build
 pip install .
 ```
 
-### 1.4 使用 `conda` 或者 `micromamba` 安装 `RiboParser`
-```bash
-# conda 安装
-conda install riboparser -c rensc
 
-# mamba 安装
-micromamba install riboparser -c rensc
-
-```
-
-### 1.5 运行测试
+### 1.4 运行测试
 测试软件的依赖性、安装和操作问题。
 
 ```bash
