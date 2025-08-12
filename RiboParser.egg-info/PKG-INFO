@@ -26,7 +26,6 @@ Requires-Dist: matplotlib-venn~=1.1.1
 Requires-Dist: seaborn~=0.13.2
 Requires-Dist: plotly~=5.22.0
 Requires-Dist: seqlogo~=5.29.9
-Requires-Dist: kaleido~=0.2.1
 
 <!--
  * @Author: 'rensc' 'rensc0718@163.com'

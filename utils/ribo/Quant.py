@@ -7,10 +7,12 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-import plotly.graph_objs as go
-import plotly.express as px
+# import plotly.graph_objs as go
+# import plotly.express as px
 from scipy.spatial.distance import pdist
 from scipy.cluster import hierarchy
+
+from sklearn.decomposition import PCA
 
 import numpy as np
 import pandas as pd
@@ -212,110 +214,228 @@ class Quant(object):
 
         return factor1, factor2
 
+    # def draw_rpf_barplot(self):
+    #     """
+    #     draw the rpf region of each samples with plotly
+
+    #     1. summary the rpf num of each region [5'-utr, cds, 3'-utr]
+    #     2. draw the stacked bar plot
+    #     """
+        
+    #     out_pdf = self.output_prefix + "_cds_rpm_bar_plot.pdf"
+    #     # out_png = self.output_prefix + "_rpf_barplot.png"
+
+    #     rpf_sum = self.merged_rpf.groupby('region')[self.sample_name].apply(sum)
+    #     rpf_sum_per = round(rpf_sum.div(rpf_sum.sum()) * 100, 2)
+
+    #     rpf_sum_per_t = rpf_sum_per.reset_index().melt(id_vars="region",
+    #                                                    var_name="samples",
+    #                                                    value_name="proportion")
+
+    #     fig = px.bar(rpf_sum_per_t,
+    #                  x="samples",
+    #                  y="proportion",
+    #                  color="region",
+    #                  orientation="v",
+    #                  text_auto=True,
+    #                  category_orders={"region": ["5utr", "cds", "3utr"]},
+    #                  color_discrete_sequence=px.colors.qualitative.Pastel2)
+
+    #     fig.update_layout(xaxis_title="proportion (%)",
+    #                       yaxis_title="samples",
+    #                       template="simple_white",
+    #                       height=500, width=300 + len(self.sample_name) * 20)
+
+    #     fig.write_image(out_pdf, engine="kaleido")
+    #     # fig.write_image(out_png, engine="kaleido")
+
     def draw_rpf_barplot(self):
         """
-        draw the rpf region of each samples with plotly
+        Draw the RPF region of each sample using matplotlib & seaborn
 
-        1. summary the rpf num of each region [5'-utr, cds, 3'-utr]
-        2. draw the stacked bar plot
+        1. Summarize the RPF number of each region [5'-UTR, CDS, 3'-UTR]
+        2. Draw the stacked bar plot
         """
-        
-        out_pdf = self.output_prefix + "_cds_rpm_bar_plot.pdf"
-        # out_png = self.output_prefix + "_rpf_barplot.png"
 
+        out_pdf = self.output_prefix + "_cds_rpm_bar_plot.pdf"
+
+        # Step 1: Summarize
         rpf_sum = self.merged_rpf.groupby('region')[self.sample_name].apply(sum)
         rpf_sum_per = round(rpf_sum.div(rpf_sum.sum()) * 100, 2)
 
-        rpf_sum_per_t = rpf_sum_per.reset_index().melt(id_vars="region",
-                                                       var_name="samples",
-                                                       value_name="proportion")
+        rpf_sum_per_t = rpf_sum_per.reset_index().melt(
+            id_vars="region",
+            var_name="samples",
+            value_name="proportion"
+        )
 
-        fig = px.bar(rpf_sum_per_t,
-                     x="samples",
-                     y="proportion",
-                     color="region",
-                     orientation="v",
-                     text_auto=True,
-                     category_orders={"region": ["5utr", "cds", "3utr"]},
-                     color_discrete_sequence=px.colors.qualitative.Pastel2)
+        # Step 2: Draw
+        plt.figure(figsize=(max(6, len(self.sample_name) * 0.8), 5))
+        sns.barplot(
+            data=rpf_sum_per_t,
+            x="samples",
+            y="proportion",
+            hue="region",
+            palette="Pastel2"
+        )
 
-        fig.update_layout(xaxis_title="proportion (%)",
-                          yaxis_title="samples",
-                          template="simple_white",
-                          height=500, width=300 + len(self.sample_name) * 20)
+        plt.xlabel("Samples")
+        plt.ylabel("Proportion (%)")
+        plt.xticks(rotation=45, ha="right")
+        plt.legend(title="Region", bbox_to_anchor=(1.05, 1), loc='upper left')
 
-        fig.write_image(out_pdf, engine="kaleido")
-        # fig.write_image(out_png, engine="kaleido")
+        plt.tight_layout()
+        plt.savefig(out_pdf)
+        plt.close()
+        
 
     def draw_rpf_cdfplot(self):
         """
-        draw the cdf figure of each samples with plotly
-        to check the global expression levels
-
-        1. log the cds rpm
-        2. draw the eCDF plot of each sample with plotly
+        Draw the CDF figure of each sample using matplotlib & seaborn (no statsmodels)
+        
+        1. Log-transform the CDS RPM values
+        2. Draw the eCDF plot for each sample
         """
+
         out_pdf = self.output_prefix + "_cds_rpm_cdf_plot.pdf"
-        # out_png = self.output_prefix + "_rpf_cdfplot.png"
 
-        # get the log2 values
+        # Step 1: log2 transform
         cds_log = np.log2(self.cds_rpm + 1)
-        cds_log = cds_log.reset_index().melt(id_vars="name", var_name="samples", value_name="rpm")
+        cds_log = cds_log.reset_index().melt(
+            id_vars="name",
+            var_name="samples",
+            value_name="rpm"
+        )
 
-        # draw the proportion of RPFs in different region
-        fig = px.ecdf(cds_log, x="rpm", color="samples")
+        # Step 2: Draw eCDF for each sample
+        plt.figure(figsize=(8, 6))
+        palette = sns.color_palette("tab10", n_colors=len(cds_log["samples"].unique()))
+        
+        for color, sample in zip(palette, cds_log["samples"].unique()):
+            values = np.sort(cds_log.loc[cds_log["samples"] == sample, "rpm"].values)
+            y = np.arange(1, len(values) + 1) / len(values)
+            plt.plot(values, y, label=sample, linewidth=1.5, color=color)
 
-        fig.update_layout(xaxis_title="eCDF",
-                          yaxis_title="log2 RPM",
-                          template="simple_white",
-                          height=600, width=650)
+        plt.xlabel("log2 RPM")
+        plt.ylabel("eCDF")
+        plt.legend(title="Samples", bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.tight_layout()
+        plt.savefig(out_pdf)
+        plt.close()
 
-        fig.write_image(out_pdf, engine="kaleido")
-        # fig.write_image(out_png, engine="kaleido")
+    # def draw_rpf_cdfplot(self):
+    #     """
+    #     draw the cdf figure of each samples with plotly
+    #     to check the global expression levels
+
+    #     1. log the cds rpm
+    #     2. draw the eCDF plot of each sample with plotly
+    #     """
+    #     out_pdf = self.output_prefix + "_cds_rpm_cdf_plot.pdf"
+    #     # out_png = self.output_prefix + "_rpf_cdfplot.png"
+
+    #     # get the log2 values
+    #     cds_log = np.log2(self.cds_rpm + 1)
+    #     cds_log = cds_log.reset_index().melt(id_vars="name", var_name="samples", value_name="rpm")
+
+    #     # draw the proportion of RPFs in different region
+    #     fig = px.ecdf(cds_log, x="rpm", color="samples")
+
+    #     fig.update_layout(xaxis_title="eCDF",
+    #                       yaxis_title="log2 RPM",
+    #                       template="simple_white",
+    #                       height=600, width=650)
+
+    #     fig.write_image(out_pdf, engine="kaleido")
+    #     # fig.write_image(out_png, engine="kaleido")
+
 
     def draw_rpf_pcaplot(self):
         """
-        draw the pca figure of each samples with plotly
+        Draw the PCA figure of each sample using matplotlib & seaborn
 
-        1. log the cds rpm
-        2. calculate the components of each dimension
-        3. draw the PCA scatter plot of each sample
+        1. Log-transform the CDS RPM
+        2. Calculate PCA components
+        3. Draw PCA scatter plot
         """
-        from sklearn.decomposition import PCA
 
         out_pdf = self.output_prefix + "_cds_rpm_pca_plot.pdf"
-        # out_png = self.output_prefix + "_rpf_pcaplot.png"
-
-        # run the PCA with sklearn function
         out_txt = self.output_prefix + "_cds_rpm_pca.txt"
 
+        # Step 1: PCA calculation
+        data_log = np.log2(self.cds_rpm.T + 1)  # transpose so samples are rows
         pca = PCA(n_components=2)
-        pca.fit(np.log2(self.cds_rpm.T + 1))
-        variance_ratios = pca.explained_variance_ratio_
-        # covariance = pca.get_covariance() * 100
-        components = pca.fit_transform(np.log2(self.cds_rpm.T + 1))
+        components = pca.fit_transform(data_log)
+        variance_ratios = pca.explained_variance_ratio_ * 100  # percentage
 
+        # Step 2: Save PCA result
         pca_df = pd.DataFrame(data=components, columns=['PC1', 'PC2'])
         pca_df.index = self.sample_name
         pca_df = pca_df.reset_index().rename(columns={'index': 'samples'})
+        pca_df.to_csv(out_txt, sep='\t', index=False)
 
-        pca_df.to_csv(out_txt, sep='\t', index=True)
+        # Step 3: Draw scatter plot
+        plt.figure(figsize=(6, 5))
+        sns.scatterplot(
+            data=pca_df,
+            x="PC1", y="PC2",
+            hue="samples",
+            palette="Set2",
+            s=80,
+            edgecolor="black"
+        )
 
-        pca_df_t = pca_df.reset_index().melt(id_vars="index",
-                                             var_name="pc",
-                                             value_name="value").rename(columns={'index': 'samples'})
+        plt.xlabel(f"PC1 ({variance_ratios[0]:.2f}%)")
+        plt.ylabel(f"PC2 ({variance_ratios[1]:.2f}%)")
+        plt.legend(title="Samples", bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.tight_layout()
+        plt.savefig(out_pdf)
+        plt.close()
 
-        # draw the PCA figure
-        fig = px.scatter(pca_df, x="PC1", y="PC2", color="samples")
 
-        fig.update_xaxes(tickformat='.2e')
-        fig.update_yaxes(tickformat='.2e')
-        fig.update_layout(xaxis_title="PC1 (" + str("{:.2f}".format(variance_ratios[0])) + "%)",
-                          yaxis_title="PC2 (" + str("{:.2f}".format(variance_ratios[1])) + "%)",
-                          template="simple_white",
-                          height=400, width=490)
+    # def draw_rpf_pcaplot(self):
+    #     """
+    #     draw the pca figure of each samples with plotly
 
-        fig.write_image(out_pdf, engine="kaleido")
+    #     1. log the cds rpm
+    #     2. calculate the components of each dimension
+    #     3. draw the PCA scatter plot of each sample
+    #     """
+    #     from sklearn.decomposition import PCA
+
+    #     out_pdf = self.output_prefix + "_cds_rpm_pca_plot.pdf"
+    #     # out_png = self.output_prefix + "_rpf_pcaplot.png"
+
+    #     # run the PCA with sklearn function
+    #     out_txt = self.output_prefix + "_cds_rpm_pca.txt"
+
+    #     pca = PCA(n_components=2)
+    #     pca.fit(np.log2(self.cds_rpm.T + 1))
+    #     variance_ratios = pca.explained_variance_ratio_
+    #     # covariance = pca.get_covariance() * 100
+    #     components = pca.fit_transform(np.log2(self.cds_rpm.T + 1))
+
+    #     pca_df = pd.DataFrame(data=components, columns=['PC1', 'PC2'])
+    #     pca_df.index = self.sample_name
+    #     pca_df = pca_df.reset_index().rename(columns={'index': 'samples'})
+
+    #     pca_df.to_csv(out_txt, sep='\t', index=True)
+
+    #     pca_df_t = pca_df.reset_index().melt(id_vars="index",
+    #                                          var_name="pc",
+    #                                          value_name="value").rename(columns={'index': 'samples'})
+
+    #     # draw the PCA figure
+    #     fig = px.scatter(pca_df, x="PC1", y="PC2", color="samples")
+
+    #     fig.update_xaxes(tickformat='.2e')
+    #     fig.update_yaxes(tickformat='.2e')
+    #     fig.update_layout(xaxis_title="PC1 (" + str("{:.2f}".format(variance_ratios[0])) + "%)",
+    #                       yaxis_title="PC2 (" + str("{:.2f}".format(variance_ratios[1])) + "%)",
+    #                       template="simple_white",
+    #                       height=400, width=490)
+
+    #     fig.write_image(out_pdf, engine="kaleido")
 
     def draw_rpf_heatmap1(self):
         """
@@ -332,7 +452,7 @@ class Quant(object):
         cds_rpm = self.cds_rpm[(self.cds_rpm > 0).any(axis=1)]
         rpm_log = np.log2(cds_rpm + 1)
 
-        plt.figure(figsize=(8, 12), dpi=300)
+        plt.figure(figsize=(9, 12), dpi=300)
 
         sns.clustermap(rpm_log,
                        cmap="RdBu",
@@ -345,41 +465,86 @@ class Quant(object):
 
         plt.close()
 
+
     def draw_rpf_heatmap2(self):
         """
-        draw the gene rpm heatmap of each samples with plotly
+        Draw the gene RPM heatmap of each sample using matplotlib & seaborn
 
-        1. log the cds rpm
-        2. calculate the distance of rpm data matrix and clustered with scipy
-        3. draw the di-cluster heatmap with plotly
+        1. Log-transform the CDS RPM
+        2. Cluster rows using hierarchical clustering (Ward + Euclidean)
+        3. Draw clustered heatmap
         """
 
         out_pdf = self.output_prefix + "_cds_rpm_heatmap.pdf"
-        # out_png = self.output_prefix + "_rpf_heatmap.png"
 
+        # Step 1: log2 transform (remove all-zero rows)
         rpm_log = np.log2(self.cds_rpm[(self.cds_rpm > 0).any(axis=1)] + 1)
 
-        cds_dist = pdist(rpm_log)
-        clustering = hierarchy.linkage(cds_dist, method='ward', metric='euclidean')
-
+        # Step 2: hierarchical clustering on rows
+        cds_dist = pdist(rpm_log, metric='euclidean')
+        clustering = hierarchy.linkage(cds_dist, method='ward')
         row_idx = hierarchy.leaves_list(clustering)
+
+        # Reorder matrix according to clustering
         rpm_clustered = rpm_log.iloc[row_idx, :]
 
-        fig = go.Figure(
-            data=go.Heatmap(x=rpm_clustered.columns.values,
-                            y=rpm_clustered.index.values,
-                            z=rpm_clustered,
-                            # zmin=-3, zmax=3,
-                            colorscale='RdBu',
-                            reversescale=True)
+        # step 3: row scale
+        rpm_scaled = rpm_clustered.sub(rpm_clustered.mean(axis=1), axis=0)
+        rpm_scaled = rpm_scaled.div(rpm_scaled.std(axis=1), axis=0)
+
+        # Step 4: draw heatmap
+        plt.figure(figsize=(max(6, rpm_clustered.shape[1] * 0.4), 8))
+        sns.heatmap(
+            rpm_scaled,
+            cmap="RdBu_r",
+            center=0,
+            cbar_kws={'label': 'log2 RPM (scaled)'},
+            xticklabels=True,
+            yticklabels=True
         )
 
-        fig.update_layout(xaxis=dict(side='bottom'),
-                          yaxis=dict(side='left'),
-                          height=600, width=450,
-                          title=dict(text='Expression pattern', x=0.5, xanchor='center'),
-                          xaxis_showgrid=False, yaxis_showgrid=False,
-                          xaxis_tickangle=-90, yaxis_tickangle=0)
+        plt.title("Expression pattern", fontsize=14, pad=12)
+        plt.xticks(rotation=90)
+        plt.yticks(rotation=0)
+        plt.tight_layout()
+        plt.savefig(out_pdf)
+        plt.close()
+        
+    # def draw_rpf_heatmap2(self):
+    #     """
+    #     draw the gene rpm heatmap of each samples with plotly
 
-        fig.write_image(out_pdf, engine="kaleido")
-        # fig.write_image(out_png, engine="kaleido")
+    #     1. log the cds rpm
+    #     2. calculate the distance of rpm data matrix and clustered with scipy
+    #     3. draw the di-cluster heatmap with plotly
+    #     """
+
+    #     out_pdf = self.output_prefix + "_cds_rpm_heatmap.pdf"
+    #     # out_png = self.output_prefix + "_rpf_heatmap.png"
+
+    #     rpm_log = np.log2(self.cds_rpm[(self.cds_rpm > 0).any(axis=1)] + 1)
+
+    #     cds_dist = pdist(rpm_log)
+    #     clustering = hierarchy.linkage(cds_dist, method='ward', metric='euclidean')
+
+    #     row_idx = hierarchy.leaves_list(clustering)
+    #     rpm_clustered = rpm_log.iloc[row_idx, :]
+
+    #     fig = go.Figure(
+    #         data=go.Heatmap(x=rpm_clustered.columns.values,
+    #                         y=rpm_clustered.index.values,
+    #                         z=rpm_clustered,
+    #                         # zmin=-3, zmax=3,
+    #                         colorscale='RdBu',
+    #                         reversescale=True)
+    #     )
+
+    #     fig.update_layout(xaxis=dict(side='bottom'),
+    #                       yaxis=dict(side='left'),
+    #                       height=600, width=450,
+    #                       title=dict(text='Expression pattern', x=0.5, xanchor='center'),
+    #                       xaxis_showgrid=False, yaxis_showgrid=False,
+    #                       xaxis_tickangle=-90, yaxis_tickangle=0)
+
+    #     fig.write_image(out_pdf, engine="kaleido")
+    #     # fig.write_image(out_png, engine="kaleido")

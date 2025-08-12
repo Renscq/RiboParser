@@ -601,23 +601,47 @@ class CodonSelectiveTime(object):
         self.merge_cst.to_csv(self.output + '_codon_selection_time.txt', sep='\t', index=False)
 
 
+    # def draw_cst_line(self):
+    #     import plotly.express as px
+    #     out_pdf = self.output + "_cst_line.pdf"
+    #     out_png = self.output + "_cst_line.png"
+        
+    #     matplotlib.use('AGG')
+    #     rel_cst = self.relative_cst.melt(id_vars=['Codon', 'AA'],
+    #                                      var_name='iteration',
+    #                                      value_name='cst',
+    #                                      value_vars=['cst_' + str(iters) for iters in range(self.times + 1)])
+
+    #     fig = px.line(rel_cst, x = "iteration", y = "cst", title = 'codon selection time')
+    #     # fig.show()
+    #     fig.write_image(out_pdf)
+    #     fig.write_image(out_png)
+
+
     def draw_cst_line(self):
-        import plotly.express as px
         out_pdf = self.output + "_cst_line.pdf"
         out_png = self.output + "_cst_line.png"
+
+        rel_cst = self.relative_cst.melt(
+            id_vars=['Codon', 'AA'],
+            var_name='iteration',
+            value_name='cst',
+            value_vars=['cst_' + str(iters) for iters in range(self.times + 1)]
+        )
+
+        plt.figure(figsize=(8, 6))
+        sns.lineplot(data=rel_cst, x="iteration", y="cst", estimator=None)  # estimator=None 保留原始点不汇总
+
+        plt.title('Codon Selection Time')
+        plt.xlabel('Iteration')
+        plt.ylabel('CST')
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+
+        plt.savefig(out_pdf)
+        plt.savefig(out_png)
+        plt.close()
         
-        matplotlib.use('AGG')
-        rel_cst = self.relative_cst.melt(id_vars=['Codon', 'AA'],
-                                         var_name='iteration',
-                                         value_name='cst',
-                                         value_vars=['cst_' + str(iters) for iters in range(self.times + 1)])
-
-        fig = px.line(rel_cst, x = "iteration", y = "cst", title = 'codon selection time')
-        # fig.show()
-        fig.write_image(out_pdf)
-        fig.write_image(out_png)
-
-
     def draw_cst_corr(self):
         out_pdf = self.output + "_cst_corrplot.pdf"
         out_png = self.output + "_cst_corrplot.png"

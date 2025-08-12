@@ -15,6 +15,4 @@ statsmodels~=0.14.2
 matplotlib~=3.8.4
 matplotlib-venn~=1.1.1
 seaborn~=0.13.2
-plotly~=5.22.0
 seqlogo~=5.29.9
-kaleido~=0.2.1
