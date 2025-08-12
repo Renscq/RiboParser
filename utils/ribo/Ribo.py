@@ -95,7 +95,7 @@ class Ribo(object):
 
                     # check the 3nt periodicity
                     if int(record[6]) % 3 != 0 and not self.silence:
-                        print("{gene} CDS did not fit 3nt periodicity. \n".format(gene=record[2]), flush=True)
+                        print("{gene} CDS did not fit 3nt periodicity.".format(gene=record[2]), flush=True)
                     
                     # check the transcript is representative or not
                     if record[9] == "True":
@@ -156,7 +156,7 @@ class Ribo(object):
 
                     # check the 3nt periodicity
                     if int(record[6]) % 3 != 0:
-                        print("{gene} CDS did not fit 3nt periodicity. \n".format(gene=record[2]), flush=True)
+                        print("{gene} CDS did not fit 3nt periodicity.".format(gene=record[2]), flush=True)
 
                     now_mrna = Mrna(record)
                     # sys.stdout.writelines(now_mrna.transcript_id + '\n')
