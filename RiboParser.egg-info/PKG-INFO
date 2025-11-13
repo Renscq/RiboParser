@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: RiboParser
-Version: 0.1.9
+Version: 0.1.10
 Summary: A pipeline for ribosome profiling data analysis
 Author-email: Ren Shuchao <rensc0718@163.com>
 License-Expression: GPL-3.0-or-later
@@ -24,7 +24,6 @@ Requires-Dist: joblib~=1.4.2
 Requires-Dist: matplotlib~=3.8.4
 Requires-Dist: matplotlib-venn~=1.1.1
 Requires-Dist: seaborn~=0.13.2
-Requires-Dist: plotly~=5.22.0
 Requires-Dist: seqlogo~=5.29.9
 
 <!--
