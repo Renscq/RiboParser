@@ -236,7 +236,7 @@ class BedGraph(object):
             pass
 
         self.smooth_bg = pl.from_dataframe(self.smooth_bg)
-        self.smooth_bg.write_csv(self.output, separator='\t', has_header=False)
+        self.smooth_bg.write_csv(self.output, separator='\t', include_header=False)
 
 def main():
     now_time()

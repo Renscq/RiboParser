@@ -380,4 +380,4 @@ class RNA(object):
         # total_reads_df["sum"] = total_readsf_df[['frame_1', 'frame_2', 'frame_3']].sum(axis=1)
         # total_reads_df.to_csv(rna_attr.output + "_rna.txt", sep = '\t', index = False)
         total_reads_pl = pl.DataFrame(self.total_reads_df)
-        total_reads_pl.write_csv(self.output + "_rna.txt", separator = '\t', has_header = True)
+        total_reads_pl.write_csv(self.output + "_rna.txt", separator = '\t', include_header = True)

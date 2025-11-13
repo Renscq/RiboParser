@@ -262,11 +262,11 @@ class Bam2Wig(object):
                 bed_df[["start", "end"]] = bed_df[["start", "end"]].astype(int)
 
                 bed_pl = pl.DataFrame(bed_df)
-                bed_pl.write_csv(self.output + ".bedgraph", separator = '\t', has_header = False)
+                bed_pl.write_csv(self.output + ".bedgraph", separator = '\t', include_header = False)
             else:
                 bed_df["start"] = bed_df["start"].astype(int)
                 bed_pl = pl.DataFrame(bed_df)
-                bed_pl.write_csv(self.output + ".wig", separator = '\t', has_header = False)
+                bed_pl.write_csv(self.output + ".wig", separator = '\t', include_header = False)
 
         else:
             if self.format == 'bedgraph':
@@ -279,8 +279,8 @@ class Bam2Wig(object):
                 bed_minus_pl = pl.DataFrame(self.bed_minus_df)
                 bed_plus_pl = pl.DataFrame(self.bed_plus_df)
 
-                bed_minus_pl.write_csv(self.output + "_minus.bedgraph", separator = '\t', has_header = False)
-                bed_plus_pl.write_csv(self.output + "_plus.bedgraph", separator = '\t', has_header = False)
+                bed_minus_pl.write_csv(self.output + "_minus.bedgraph", separator = '\t', include_header = False)
+                bed_plus_pl.write_csv(self.output + "_plus.bedgraph", separator = '\t', include_header = False)
             else:
                 self.bed_minus_df["start"] = self.bed_minus_df["start"].astype(int)
                 self.bed_plus_df["start"] = self.bed_plus_df["start"].astype(int)
@@ -288,5 +288,5 @@ class Bam2Wig(object):
                 bed_minus_pl = pl.DataFrame(self.bed_minus_df)
                 bed_plus_pl = pl.DataFrame(self.bed_plus_df)
 
-                bed_minus_pl.write_csv(self.output + "_minus.wig", separator = '\t', has_header = False)
-                bed_plus_pl.write_csv(self.output + "_plus.wig", separator = '\t', has_header = False)
+                bed_minus_pl.write_csv(self.output + "_minus.wig", separator = '\t', include_header = False)
+                bed_plus_pl.write_csv(self.output + "_plus.wig", separator = '\t', include_header = False)
