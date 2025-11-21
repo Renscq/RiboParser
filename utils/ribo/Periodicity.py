@@ -121,6 +121,11 @@ class Periodicity(object):
         matplotlib.use('AGG')
         fig, axes = plt.subplots(nrows=nrow, ncols=ncol, figsize=(nrow * 4, ncol * 3), sharey=True)
 
+        # FIX: ensure axes is always an array
+        if not isinstance(axes, np.ndarray):
+            axes = np.array([axes])
+        axes = axes.flatten()
+
         for (sample, group), ax in zip(self.period.groupby('Sample'), axes.flatten()):
             bars = group.plot(x='Frame', y='Count', kind='bar', ax=ax, title=sample, legend=False)
             ax.set_ylabel('Count')
@@ -150,6 +155,11 @@ class Periodicity(object):
         matplotlib.use('AGG')
         fig, axes = plt.subplots(nrows=nrow, ncols=ncol, figsize=(nrow * 4, ncol * 3), sharey=True)
 
+        # FIX: ensure axes is always an array
+        if not isinstance(axes, np.ndarray):
+            axes = np.array([axes])
+        axes = axes.flatten()
+        
         for (sample, group), ax in zip(self.period.groupby('Sample'), axes.flatten()):
             bars = group.plot(x='Frame', y='Ratio', kind='bar', ax=ax, title=sample, legend=False)
             ax.set_ylabel('Ratio (%)')
