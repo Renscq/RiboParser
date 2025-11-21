@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "RiboParser"
-version = "0.1.11"
+version = "0.1.12"
 authors = [{ name = "Ren Shuchao", email = "rensc0718@163.com" }]
 description = "A pipeline for ribosome profiling data analysis"
 readme = "README.md"
