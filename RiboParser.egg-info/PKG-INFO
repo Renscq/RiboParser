@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: RiboParser
-Version: 0.1.12
+Version: 0.1.13
 Summary: A pipeline for ribosome profiling data analysis
 Author-email: Ren Shuchao <rensc0718@163.com>
 License-Expression: GPL-3.0-or-later
@@ -11,20 +11,20 @@ Classifier: Topic :: Scientific/Engineering :: Bio-Informatics
 Classifier: Intended Audience :: Science/Research
 Requires-Python: >=3.12
 Description-Content-Type: text/markdown
-Requires-Dist: numpy>=1.26.4
-Requires-Dist: pandas>=2.2.2
-Requires-Dist: pyarrow>=16.1.0
-Requires-Dist: polars>=0.20.31
-Requires-Dist: biopython>=1.78
-Requires-Dist: scipy>=1.12.0
-Requires-Dist: scikit-learn>=1.4.2
-Requires-Dist: statsmodels>=0.14.2
-Requires-Dist: pysam>=0.22.1
-Requires-Dist: joblib>=1.4.2
-Requires-Dist: matplotlib>=3.8.4
-Requires-Dist: matplotlib-venn>=1.1.1
-Requires-Dist: seaborn>=0.13.2
-Requires-Dist: seqlogo>=5.29.9
+Requires-Dist: numpy
+Requires-Dist: pandas
+Requires-Dist: pyarrow
+Requires-Dist: polars
+Requires-Dist: biopython
+Requires-Dist: scipy
+Requires-Dist: scikit-learn
+Requires-Dist: statsmodels
+Requires-Dist: pysam
+Requires-Dist: joblib
+Requires-Dist: matplotlib
+Requires-Dist: matplotlib-venn
+Requires-Dist: seaborn
+Requires-Dist: seqlogo
 
 <!--
  * @Author: 'rensc' 'rensc0718@163.com'
