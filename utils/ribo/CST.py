@@ -378,12 +378,21 @@ class CodonSelectiveTime(object):
         '''
 
         if initiate_rate:
-            high_rna = self.high_rna.with_columns(
-                # self.high_rna[rna_sample] * self.high_rna['name'].apply(lambda x: self.gene_table[rpf_sample][x].initiate_rate if x in self.gene_table[rpf_sample].keys() else 1))
-                # Calling `map_elements` without specifying `return_dtype` can lead to unpredictable results. Specify `return_dtype` to silence this warning
-                self.high_rna[rna_sample] * self.high_rna['name'].apply(
-                    lambda x: self.gene_table[rpf_sample][x].initiate_rate if x in self.gene_table[rpf_sample].keys() else 1,
-                    return_dtype=pl.Float32))
+            from polars import col
+
+            self.high_rna = self.high_rna.with_columns(
+                (col(rna_sample) * col("name").map_elements(
+                    lambda x: self.gene_table[rpf_sample][x].initiate_rate 
+                    if x in self.gene_table[rpf_sample] else 1).cast(pl.Float32)
+                ).alias(rna_sample)
+            )
+            
+            # high_rna = self.high_rna.with_columns(
+            #     # self.high_rna[rna_sample] * self.high_rna['name'].apply(lambda x: self.gene_table[rpf_sample][x].initiate_rate if x in self.gene_table[rpf_sample].keys() else 1))
+            #     # Calling `map_elements` without specifying `return_dtype` can lead to unpredictable results. Specify `return_dtype` to silence this warning
+            #     self.high_rna[rna_sample] * self.high_rna['name'].apply(
+            #         lambda x: self.gene_table[rpf_sample][x].initiate_rate if x in self.gene_table[rpf_sample].keys() else 1,
+            #         return_dtype=pl.Float32))
             
         else:
             high_rna = self.high_rna
