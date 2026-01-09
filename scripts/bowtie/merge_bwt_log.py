@@ -6,9 +6,9 @@
 @Environment  : python 3.8.5
 @Version      : 1.0
 @Author       : Rensc 
-@Time         : 2024/01/16 15:47:02
+@Time         : 2026/01/109 15:39
 @E-mail       : rensc0718@163.com
-@License      : (C)Copyright 2023-2025, Ren Shuchao
+@License      : (C)Copyright 2026-2028, Ren Shuchao
 '''
 
 
@@ -45,15 +45,24 @@ def stat_bwt_args_parser():
 
 
 def process_log_files(log_file_list, database_list=None):
-    '''
-    @Message  : retrieve the mapped reads from log files.
-    @Input    : list --> pattern for log files (e.g., '*log')
-                name --> column name to merge (['rRNA', 'tRNA', 'ncRNA', 'mRNA', 'Genome'])
-    @Return   : 
-                output --> output nested dict contain the mapped reads
-    @Flow     : step1 --> retrieve the mapped reads and unmapped reads
-    '''
-    
+    """
+    Retrieve the mapped reads from log files.
+
+    Parameters
+    ----------
+    log_file_list : list
+        List of log file paths.
+    database_list : str or None
+        Comma-separated database names, e.g. "rRNA,tRNA,ncRNA,mRNA,Genome".
+
+    Returns
+    -------
+    result_dict : OrderedDict
+        Nested dict storing read counts.
+    database_list : list
+        Parsed database list.
+    """
+
     if database_list is None:
         database_list = ['rRNA', 'tRNA', 'ncRNA', 'mRNA', 'Genome']
     else:
@@ -61,34 +70,46 @@ def process_log_files(log_file_list, database_list=None):
 
     result_dict = OrderedDict()
 
-    # for each log file
     for log_file in log_file_list:
         file_prefix = os.path.basename(log_file).split('.')[0]
         result_dict[file_prefix] = OrderedDict()
 
+        mapped_sum = 0
+        flag = -1  # index for database_list
+
         with open(log_file, 'r') as file_in:
-            mapped_sum = 0
-            flag = -1
-
-            # for each line in log file
             for line in file_in:
-                # retrieve the total reads
-                if flag == -1 and line.startswith("# reads processed:"):
-                    result_dict[file_prefix]['Total'] = int(line.split(' ')[-1])
-                    flag += 1
-                # retrieve the mapped reads
-                elif flag >= 0 and line.startswith("Reported"):
-                    result_dict[file_prefix][database_list[flag]] = int(line.split(' ')[-2])
-                    mapped_sum += int(line.split(' ')[-2])
-                    flag += 1
-                # skip the useless lines
-                elif flag >= 0 and line.startswith("# reads with") or line.startswith("# reads that") or line.startswith("# reads processed:"):
-                    pass
-                # retrieve the unmapped reads
-                else:
-                    print('Error: the log file is not correct.', flush=True)
+                line = line.strip()
 
-            result_dict[file_prefix]['Others'] = result_dict[file_prefix]['Total'] - mapped_sum
+                # Total reads (only once)
+                if flag == -1 and line.startswith("# reads processed:"):
+                    result_dict[file_prefix]['Total'] = int(line.split()[-1])
+                    flag = 0
+
+                # Case 1: reported alignments
+                elif flag >= 0 and line.startswith("Reported"):
+                    count = int(line.split()[-2])
+                    result_dict[file_prefix][database_list[flag]] = count
+                    mapped_sum += count
+                    flag += 1
+
+                # Case 2: no alignments
+                elif flag >= 0 and line == "No alignments":
+                    result_dict[file_prefix][database_list[flag]] = 0
+                    flag += 1
+
+                # Skip summary/stat lines
+                elif line.startswith("# reads with") or \
+                     line.startswith("# reads that") or \
+                     line.startswith("# reads processed:"):
+                    continue
+
+                # Ignore empty or unrelated lines
+                else:
+                    continue
+
+        # Reads not mapped to any listed database
+        result_dict[file_prefix]['Others'] = (result_dict[file_prefix]['Total'] - mapped_sum)
 
     return result_dict, database_list
 

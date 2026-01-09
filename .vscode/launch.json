@@ -9,12 +9,12 @@
                 "-g",
                 "/mnt/e/BaiduNetdiskDownload/ribo/01.reference/GCF_000001405.40_GRCh38.p14_genomic.fna",
                 "-t",
-                "/mnt/e/BaiduNetdiskDownload/ribo/01.reference/GCF_000001405.40_GRCh38.p14_genomic.gtf",
+                "/mnt/e/BaiduNetdiskDownload/ribo/01.reference/GCF_000001405.40_GRCh38.p14_genomic.gff",
                 "-u",
-                "0",
+                "30",
                 "-w",
                 "-o",
-                "/mnt/e/BaiduNetdiskDownload/ribo/01.reference/hsa",
+                "/mnt/e/BaiduNetdiskDownload/ribo/01.reference/hsa1",
             ],
             "console": "integratedTerminal",
             "justMyCode": true
@@ -541,17 +541,19 @@
             "justMyCode": true
         },
         {
-            "name": "Python: rpf_Pausing.py",
+            "name": "Python: WSL: rpf_Pausing.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceRoot}/utils/rpf_Pausing.py",
+            "module": "utils.rpf_Pausing",
             "args": [
                 "-r",
                 // "/home/rensc/software/riboParser/tests/density/usda_rpf_retrieve.txt",
-                "/mnt/t64/rensc/herr/hsa/pc-b4-20230731/ribo/ribo/merge/step05-merge/hsa_rpf_merged.txt",
+                // "/mnt/t64/rensc/herr/hsa/pc-b4-20230731/ribo/ribo/merge/step05-merge/hsa_rpf_merged.txt",
+                "/mnt/e/rensc/PHD/1404/ribo/ribo/step05-merge/ncr_rpf_merged.txt",
                 "-o",
                 // "/home/rensc/software/riboParser/tests/pausing/usda",
-                "/home/rensc/software/riboParser/tests/pausing/hsa",
+                // "/home/rensc/software/riboParser/tests/pausing/hsa",
+                "/mnt/e/rensc/PHD/1404/ribo/ribo/pausing/ncu",
                 "-n",
                 "-m",
                 "50",
@@ -565,7 +567,8 @@
                 "5",
                 "-b",
                 "0",
-                "--stop"
+                "--stop",
+                "--all"
             ],
             "console": "integratedTerminal",
             "justMyCode": true
