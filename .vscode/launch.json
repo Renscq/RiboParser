@@ -7,14 +7,18 @@
             "module": "utils.rpf_Reference",
             "args": [
                 "-g",
-                "/mnt/e/BaiduNetdiskDownload/ribo/01.reference/GCF_000001405.40_GRCh38.p14_genomic.fna",
+                // "/mnt/e/BaiduNetdiskDownload/ribo/01.reference/GCF_000001405.40_GRCh38.p14_genomic.fna",
+                // E:\rensc\PHD\1404\database\dna\Neurospora_crassa.NC12.dna.toplevel.fa
+                "/mnt/e/rensc/PHD/1404/database/dna/Neurospora_crassa.NC12.dna.toplevel.fa",
                 "-t",
-                "/mnt/e/BaiduNetdiskDownload/ribo/01.reference/GCF_000001405.40_GRCh38.p14_genomic.gff",
+                // "/mnt/e/BaiduNetdiskDownload/ribo/01.reference/GCF_000001405.40_GRCh38.p14_genomic.gff",
+                "/mnt/e/rensc/PHD/1404/database/gtf/Neurospora_crassa.NC12.48.gtf",
                 "-u",
-                "30",
+                "0",
                 "-w",
                 "-o",
-                "/mnt/e/BaiduNetdiskDownload/ribo/01.reference/hsa1",
+                // "/mnt/e/BaiduNetdiskDownload/ribo/01.reference/hsa1",
+                "/mnt/e/rensc/PHD/1404/database/norm/ncu1",
             ],
             "console": "integratedTerminal",
             "justMyCode": true

@@ -36,7 +36,7 @@ class GenePred(object):
         self.gp_df = None
         self.columns = ['name', 'chrom', 'strand', 'txStart', 'txEnd', 'cdsStart', 'cdsEnd', 'exonCount',
                         'exonStarts', 'exonEnds', 'score', 'name2', 'cdsStartStat', 'cdsEndStat',
-                        'IstringexonFrames']
+                        'exonFrames']
         self.coding = args.coding
         self.longest = args.longest
         self.utr = args.utr
@@ -118,107 +118,63 @@ class GenePred(object):
 
     def read_genepred(self):
         '''
-        @Message  : function import the parser the genepred file .
+        @Message  : function import the parser the genepred file.
         @Input    : self.gp_file --> gene pred file derived from gtf file
         @Return   : self.gp_df --> dataframe of the genepred file
         @Flow     : step1 --> read the genepred file and rename the columns
                     step2 --> calculate the utr5, cds and utr3 length
         '''
 
-        self.gp_df = pd.read_csv(self.gp_file, sep='\t', header=None)
+        self.gp_df = pd.read_csv(self.gp_file, sep="\t", header=None)
         os.remove(self.gp_file)
-        self.gp_df.columns = ['name', 'chrom', 'strand', 'txStart', 'txEnd', 'cdsStart', 'cdsEnd', 'exonCount',
-                              'exonStarts', 'exonEnds', 'score', 'name2', 'cdsStartStat', 'cdsEndStat',
-                              'IstringexonFrames']
 
+        self.gp_df.columns = self.columns
+        
         utr5_list = []
         cds_list = []
         utr3_list = []
-        print('Import gtf annotation.', flush=True)
 
-        for idx, rows in self.gp_df.iterrows():
+        print("Import gtf annotation.", flush=True)
+
+        for idx, row in self.gp_df.iterrows():
 
             if idx % 1000 == 0:
-                print('rows: ' + str(idx), flush=True)
+                print(f"rows: {idx}", flush=True)
 
-            exonStarts = np.array(rows['exonStarts'].split(',')[:-1], dtype='int')
-            exonEnds = np.array(rows['exonEnds'].split(',')[:-1], dtype='int')
-
-            cdsStart = rows['cdsStart']
-            cdsEnd = rows['cdsEnd']
-
-            if rows['cdsStartStat'] == 'none' or rows['cdsEndStat'] == 'none':
+            if row.cdsStartStat == "none" or row.cdsEndStat == "none":
                 utr5_list.append(0)
                 cds_list.append(0)
                 utr3_list.append(0)
-
-            elif rows['exonCount'] == 1:
-                if rows.strand == '+':
-                    utr5_list.append(int(abs(cdsStart - exonStarts)))
-                    cds_list.append(int(abs(cdsEnd - cdsStart)))
-                    utr3_list.append(int(abs(exonEnds - cdsEnd)))
-
-                elif rows.strand == '-':
-                    utr5_list.append(int(abs(exonEnds - cdsEnd)))
-                    cds_list.append(int(abs(cdsEnd - cdsStart)))
-                    utr3_list.append(int(abs(cdsStart - exonStarts)))
-
-            elif rows['exonCount'] > 1:
-                if rows.strand == '+':
-                    intronStarts = exonStarts[1:]
-                    intronEnds = exonEnds[:-1]
-                    introns = intronStarts - intronEnds
-                    intron_length = abs(sum(introns))
-
-                    # get utr5 length
-                    now_right = bisect_right(exonStarts, cdsStart) - 1
-                    utr5_intron = sum(introns[0:now_right])
-                    utr5_length = cdsStart - exonStarts[0] - utr5_intron
-
-                    # get utr3 length
-                    now_left = bisect_left(exonEnds, cdsEnd)
-                    utr3_intron = sum(introns[now_left:])
-                    utr3_length = exonEnds[-1] - cdsEnd - utr3_intron
-
-                    # get cds length
-                    cds_length = abs(cdsEnd - cdsStart) - intron_length + utr5_intron + utr3_intron
-
-                    utr5_list.append(utr5_length)
-                    cds_list.append(cds_length)
-                    utr3_list.append(utr3_length)
-
-                elif rows.strand == '-':
-                    intronStarts = exonEnds[:-1]
-                    intronEnds = exonStarts[1:]
-                    introns = intronEnds - intronStarts
-                    intron_length = abs(sum(introns))
-
-                    # get utr5 length
-                    now_right = bisect_right(exonStarts, cdsStart) - 1
-                    utr3_intron = sum(introns[0:now_right])
-                    utr3_length = cdsStart - exonStarts[0] - utr3_intron
-
-                    # get utr3 length
-                    now_left = bisect_left(exonEnds, cdsEnd)
-                    utr5_intron = sum(introns[now_left:])
-                    utr5_length = exonEnds[-1] - cdsEnd - utr5_intron
-                    
-                    # get cds length
-                    cds_length = abs(cdsEnd - cdsStart) - intron_length + utr5_intron + utr3_intron
-
-                    utr5_list.append(utr5_length)
-                    cds_list.append(cds_length)
-                    utr3_list.append(utr3_length)
-
-            else:
-                print('Error: gene range was wrong at :' + rows.name + '\n', flush=True)
                 continue
-        
+
+            exon_starts = np.fromstring(row.exonStarts, sep=",", dtype=int)
+            exon_ends   = np.fromstring(row.exonEnds, sep=",", dtype=int)
+
+            cds_start = row.cdsStart
+            cds_end   = row.cdsEnd
+
+            utr5_length = 0
+            cds_length = 0
+            utr3_length = 0
+
+            for exon_start, exon_end in zip(exon_starts, exon_ends):
+                utr5_length += max(0, min(exon_end, cds_start) - exon_start)
+                cds_length += max(0, min(exon_end, cds_end) - max(exon_start, cds_start))
+                utr3_length += max(0, exon_end - max(exon_start, cds_end))
+
+            if row.strand == "-":
+                utr5_length, utr3_length = utr3_length, utr5_length
+
+            utr5_list.append(utr5_length)
+            cds_list.append(cds_length)
+            utr3_list.append(utr3_length)
+
         print('rows: ' + str(idx), flush=True)
 
-        self.gp_df['utr5_length'] = utr5_list
-        self.gp_df['cds_length'] = cds_list
-        self.gp_df['utr3_length'] = utr3_list
+        self.gp_df["utr5_length"] = utr5_list
+        self.gp_df["cds_length"] = cds_list
+        self.gp_df["utr3_length"] = utr3_list
+
 
     def get_rep_transcript_bak(self):
         '''
