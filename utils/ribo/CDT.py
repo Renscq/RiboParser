@@ -237,8 +237,8 @@ class CodonDecodingTime(object):
         norm_cdt.columns = [i + '_norm_cdt' for i in self.rpf_sample]
 
         # calculate the relative cdt
-        relative_cdt = self.scale_method(self.scale, norm_cdt)
-        relative_norm_cdt = self.scale_method(self.scale, relative_cdt)
+        relative_cdt = self.scale_method(self.scale, cdt)
+        relative_norm_cdt = self.scale_method(self.scale, norm_cdt)
 
         relative_cdt.columns = [i + '_relative_cdt' for i in self.rpf_sample]
         relative_norm_cdt.columns = [i + '_norm_relative_cdt' for i in self.rpf_sample]
