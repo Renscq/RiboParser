@@ -35,6 +35,27 @@ def file_check(*files):
             sys.exit()
 
 
+def ribo_parser():
+    parser = argparse.ArgumentParser(description="Check the information of RiboParser.")
+
+    # arguments for the modification
+    parser.add_argument('-v', dest="version", required=False, action="store_true", default=False,
+                        help="show the current version of RiboParser. (default: %(default)s).")
+    parser.add_argument('-c', dest="citation", required=False, action="store_true", default=False,
+                        help="show the citation of RiboParser. (default: %(default)s).")
+    parser.add_argument('-d', dest="dependency", required=False, action="store_true", default=False,
+                        help="check the dependency of RiboParser. (default: %(default)s).")
+    parser.add_argument('-m', dest="module", required=False, action="store_true", default=False,
+                        help="check the modules of RiboParser. (default: %(default)s).")
+
+    args = parser.parse_args()
+    # args_print(args)
+
+    return args
+
+
+
+
 def gtf_args_parser():
     parser = argparse.ArgumentParser(description="This script is used to build the references.")
 

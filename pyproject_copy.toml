@@ -38,6 +38,7 @@ Homepage = "https://github.com/renscq/RiboParser"
 
 [project.scripts]
 # Ribo-quality
+riboparser = "utils.riboparser:main"
 rpf_Reference = "utils.rpf_Reference:main"
 rpf_Check = "utils.rpf_Check:main"
 rpf_Digest = "utils.rpf_Digest:main"

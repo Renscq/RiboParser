@@ -1,6 +1,20 @@
 {
     "configurations": [
         {
+            "name": "Python: WSL: riboparser.py",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "utils.riboparser",
+            "args": [
+                "-v",
+                "-c",
+                "-d",
+                "-m"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Python: WSL: rpf_Reference.py",
             "type": "debugpy",
             "request": "launch",
