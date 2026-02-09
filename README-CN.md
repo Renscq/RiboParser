@@ -95,8 +95,15 @@ pip install .
 测试软件的依赖性、安装和操作问题。
 
 ```bash
-rpf_Check -h
-rpf_CST -h
+# 检查版本信息
+riboparser -v
+# 检查参考文献信息
+riboparser -c
+# 检查依赖环境信息
+riboparser -d
+# 检查包中模块信息
+riboparser -m
+
 ```
 
 ## 2. 准备参考文件

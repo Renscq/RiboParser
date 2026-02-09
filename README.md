@@ -96,8 +96,15 @@ pip install .
 Test software for dependency, installation, and operation issues.
 
 ```bash
-rpf_Check -h
-rpf_CST -h
+# check the version
+riboparser -v
+# check the citation
+riboparser -c
+# check the dependency
+riboparser -d
+# check the module
+riboparser -m
+
 ```
 
 ## 2. Prepare reference files
