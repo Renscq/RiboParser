@@ -8,9 +8,13 @@ import pkg_resources
 
 
 class RiboParserInfo:
-    VERSION = "0.1.14"
-    UPDATE_DATE = "2024-06-10"
-    CITATION = (
+    try:
+        version = pkg_resources.get_distribution("RiboParser").version
+    except Exception:
+        version = "unknown"
+    
+    update_date = "2024-06-10"
+    citation = (
         '''
         Shuchao Ren, Yinan Li, Zhipeng Zhou. 
         RiboParser/RiboShiny: An integrated platform for comprehensive analysis and visualization of ribo-seq data. 
@@ -18,25 +22,25 @@ class RiboParserInfo:
         doi:10.1016/j.jgg.2025.04.010.
         '''
     )
-    REQUIRED_PACKAGES = ["pandas", "polars", "numpy", "matplotlib-venn", "seqlogo", 
+    required_packages = ["pandas", "polars", "numpy", "matplotlib-venn", "seqlogo", 
                          "matplotlib", "seaborn", "biopython", 
                          "scipy", "scikit-learn", "statsmodels", 
                          "pysam", "joblib"]
 
     @classmethod
     def show_version(cls):
-        print(f"RiboParser version: {cls.VERSION}")
-        print(f"Last update: {cls.UPDATE_DATE}")
+        print(f"RiboParser version: {cls.version}")
+        print(f"Last update: {cls.update_date}")
 
     @classmethod
     def show_citation(cls):
         print("Please cite:")
-        print(cls.CITATION)
+        print(cls.citation)
 
     @classmethod
     def check_dependencies(cls):
         missing = []
-        for pkg in cls.REQUIRED_PACKAGES:
+        for pkg in cls.required_packages:
             try:
                 pkg_resources.get_distribution(pkg)
             except pkg_resources.DistributionNotFound:
@@ -45,7 +49,7 @@ class RiboParserInfo:
             print(f"Missing dependencies: {', '.join(missing)}")
             return False
         else:
-            print(cls.REQUIRED_PACKAGES)
+            print(cls.required_packages)
         print("All required dependencies are installed.")
         return True
 
@@ -115,7 +119,7 @@ class RiboParserInfo:
                 else:
                     others.append(mod)
 
-        # 去重并排序
+        # sort and unique
         rpf = sorted(set(rpf))
         serp = sorted(set(serp))
         classes = sorted(set(classes))
