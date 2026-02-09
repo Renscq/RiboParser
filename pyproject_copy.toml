@@ -131,6 +131,7 @@ dos2unix = "scripts.unix.dos2unix:main"
 [tool.setuptools]
 packages = [
     'utils',
+    'utils.data',
     'utils.ribo',
     'utils.serp',
     'scripts',
