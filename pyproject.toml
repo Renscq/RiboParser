@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "RiboParser"
-version = "0.1.14"
+version = "0.1.15"
 authors = [{ name = "Ren Shuchao", email = "rensc0718@163.com" }]
 description = "A pipeline for ribosome profiling data analysis"
 readme = "README.md"
@@ -38,6 +38,7 @@ Homepage = "https://github.com/renscq/RiboParser"
 
 [project.scripts]
 # Ribo-quality
+riboparser = "utils.riboparser:main"
 rpf_Reference = "utils.rpf_Reference:main"
 rpf_Check = "utils.rpf_Check:main"
 rpf_Digest = "utils.rpf_Digest:main"
@@ -130,6 +131,7 @@ dos2unix = "scripts.unix.dos2unix:main"
 [tool.setuptools]
 packages = [
     'utils',
+    'utils.data',
     'utils.ribo',
     'utils.serp',
     'scripts',
