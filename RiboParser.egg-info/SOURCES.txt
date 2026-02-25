@@ -64,7 +64,7 @@ scripts/unix/dos2unix.py
 utils/__init__.py
 utils/make_ensb_ref.py
 utils/make_ribo_ref.py
-utils/ribo_parser.py
+utils/riboparser.py
 utils/rna_Density.py
 utils/rna_Offset.py
 utils/rpf_Bam2bw.py
@@ -98,6 +98,7 @@ utils/rpf_end.py
 utils/serp_overlap.py
 utils/serp_peak.py
 utils/serp_properties.py
+utils/data/RiboParser.py
 utils/ribo/ArgsParser.py
 utils/ribo/Bam2Wig.py
 utils/ribo/BamFilter.py

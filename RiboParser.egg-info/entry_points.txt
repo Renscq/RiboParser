@@ -39,6 +39,7 @@ rand_seq = scripts.fasta.rand_seq:main
 retrieve_seq = scripts.fasta.retrieve_seq:main
 revs = scripts.fasta.revs:main
 ribocode_bed_format = scripts.ribocode.ribocode_bed_format:main
+riboparser = utils.riboparser:main
 ribotish_format = scripts.ribotish.ribotish_format:main
 rna_Density = utils.rna_Density:main
 rna_Offset = utils.rna_Offset:main

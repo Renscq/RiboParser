@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: RiboParser
-Version: 0.1.14
+Version: 0.1.15
 Summary: A pipeline for ribosome profiling data analysis
 Author-email: Ren Shuchao <rensc0718@163.com>
 License-Expression: GPL-3.0-or-later
@@ -124,8 +124,15 @@ pip install .
 Test software for dependency, installation, and operation issues.
 
 ```bash
-rpf_Check -h
-rpf_CST -h
+# check the version
+riboparser -v
+# check the citation
+riboparser -c
+# check the dependency
+riboparser -d
+# check the module
+riboparser -m
+
 ```
 
 ## 2. Prepare reference files

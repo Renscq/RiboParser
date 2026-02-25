@@ -811,8 +811,6 @@ def rpf_occupancy_args_parser():
                         help="normalize the occupancy. (default: %(default)s).")
     parser.add_argument('--stop', dest="stop",  action='store_true', required=False, default=False,
                         help="rmove the stop codon. (default: %(default)s).")
-    parser.add_argument('--ind', dest="individual", action='store_true', required=False, default=False,
-                        help="use the whole RPFs density of individual sample. (default: %(default)s).")
     parser.add_argument('--all', dest="all", action='store_true', required=False, default=False,
                         help="output all RPFs density. (default: %(default)s).")
     args = parser.parse_args()
