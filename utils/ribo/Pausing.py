@@ -221,8 +221,10 @@ class Pausing(object):
         titles.to_csv(out_cds_codon_txt, sep='\t', index=False, header=False)
 
         # cds = self.merge_pausing[self.merge_pausing['region'] == 'cds']
-        self.cds_codon_pausing = pd.pivot_table(self.merge_pausing, index=['name', 'codon'],
-                                                values=self.sample_name, aggfunc=[np.sum, np.mean])
+        self.cds_codon_pausing = pd.pivot_table(self.merge_pausing, 
+                                                index=['name', 'codon'],
+                                                values=self.sample_name, 
+                                                aggfunc=[np.sum, np.mean])
         self.cds_codon_pausing.to_csv(out_cds_codon_txt, sep='\t', mode='a', header=False)
 
 
