@@ -53,6 +53,8 @@ class Pausing(object):
         self.cds_codon_pausing = None
         self.codon_pausing = None
 
+        self.individual = args.individual
+
         # codon list
         self.stop = args.stop
         self.codon_dict, self.codon_table = RPFs.codon_table()
@@ -272,9 +274,19 @@ class Pausing(object):
         total_codon_pausing = self.merge_pausing.groupby('codon')[self.sample_name].mean()
         total_codon_pausing.columns = [i + '_absolute_total_ps' for i in self.sample_name]
 
-        valid_pausing = self.merge_pausing[self.merge_pausing[self.sample_name].max(axis=1) > 0]
-        valid_codon_pausing = valid_pausing.groupby('codon')[self.sample_name].mean()
-        valid_codon_pausing.columns = [i + '_absolute_valid_ps' for i in self.sample_name]
+        if self.individual:
+            # summary the valid codon pausing score with individual codon rpf > 0
+            valid_pausing = self.merge_pausing.copy()
+            valid_pausing[self.sample_name] = valid_pausing[self.sample_name].replace(0, np.nan)
+            valid_codon_pausing = valid_pausing.groupby('codon')[self.sample_name].mean()
+            valid_codon_pausing = valid_codon_pausing.fillna(0)
+            valid_codon_pausing.columns = [i + '_absolute_valid_ps' for i in self.sample_name]
+        else:
+            # summary the valid codon pausing score with all codon rpf > 0
+            valid_pausing = self.merge_pausing.copy()
+            valid_pausing = self.merge_pausing[self.merge_pausing[self.sample_name].max(axis=1) > 0]
+            valid_codon_pausing = valid_pausing.groupby('codon')[self.sample_name].mean()
+            valid_codon_pausing.columns = [i + '_absolute_valid_ps' for i in self.sample_name]
 
         # calculate the relative pausing score
         relative_total_codon_pausing = self.scale_method(self.scale, total_codon_pausing)

@@ -768,7 +768,9 @@ def rpf_pausing_args_parser():
     parser.add_argument('--scale', dest="scale",  choices=['zscore', 'minmax'], required=False, type=str, default='minmax',
                         help="normalize the pausing score. (default: %(default)s).")
     parser.add_argument('--stop', dest="stop",  action='store_true', required=False, default=False,
-                        help="remove the stop codon. (default: %(default)s).")    
+                        help="remove the stop codon. (default: %(default)s).")
+    parser.add_argument('--ind', dest="individual", action='store_true', required=False, default=False,
+                        help="use the whole RPFs density of individual sample. (default: %(default)s).")
     parser.add_argument('--fig', dest="figure", choices=['none', 'png', 'pdf'], required=False, default='none',
                         help="draw the rpf pausing score of each gene (it will takes a lot of time). (default: %(default)s).")
     parser.add_argument('--all', dest="all", action='store_true', required=False, default=False,
@@ -809,6 +811,8 @@ def rpf_occupancy_args_parser():
                         help="normalize the occupancy. (default: %(default)s).")
     parser.add_argument('--stop', dest="stop",  action='store_true', required=False, default=False,
                         help="rmove the stop codon. (default: %(default)s).")
+    parser.add_argument('--ind', dest="individual", action='store_true', required=False, default=False,
+                        help="use the whole RPFs density of individual sample. (default: %(default)s).")
     parser.add_argument('--all', dest="all", action='store_true', required=False, default=False,
                         help="output all RPFs density. (default: %(default)s).")
     args = parser.parse_args()
