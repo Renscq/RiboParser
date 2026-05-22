@@ -1,0 +1,122 @@
+# Author: Rensc
+# date: 2026-05-21
+
+"""
+Data models for transcript-centric smORF scanning.
+
+This file defines the core data structures used throughout the smORF module:
+1. Transcript: stores genePred-derived transcript structure.
+2. ORFRecord: stores detected ORF information and output-ready annotations.
+"""
+
+from dataclasses import dataclass, field
+from typing import List, Optional
+
+
+@dataclass
+class Transcript:
+    """
+    Store transcript annotation parsed from genePred format.
+
+    Coordinates follow the UCSC genePred convention:
+    - 0-based
+    - half-open intervals
+    """
+
+    transcript_id: str
+    chrom: str
+    strand: str
+    tx_start: int
+    tx_end: int
+    cds_start: int
+    cds_end: int
+    exon_starts: List[int]
+    exon_ends: List[int]
+    gene_id: str = "."
+
+    # Reconstructed spliced transcript sequence.
+    tx_seq: str = ""
+
+    # CDS coordinates converted from genomic space to transcript space.
+    cds_tx_start: Optional[int] = None
+    cds_tx_end: Optional[int] = None
+
+    def is_coding(self) -> bool:
+        """
+        Check whether the transcript has a valid CDS region.
+
+        Returns
+        -------
+        bool
+            True if cds_end is greater than cds_start.
+        """
+
+        return self.cds_end > self.cds_start
+
+    def exon_count(self) -> int:
+        """
+        Return the number of exons in the transcript.
+
+        Returns
+        -------
+        int
+            Number of exon blocks.
+        """
+
+        return len(self.exon_starts)
+
+
+@dataclass
+class ORFRecord:
+    """
+    Store a predicted ORF and its derived annotation information.
+
+    This object is used by scanner, classifier, overlap marker, and writers.
+    """
+
+    orf_id: str
+    transcript_id: str
+    gene_id: str
+    chrom: str
+    strand: str
+
+    # Source strand relative to transcript sequence: sense or antisense.
+    source_strand: str
+
+    # Reading frame in the scanned sequence.
+    frame: int
+
+    # ORF coordinates in transcript coordinate system.
+    tx_orf_start: int
+    tx_orf_end: int
+
+    # ORF genomic boundary coordinates.
+    genomic_start: int
+    genomic_end: int
+
+    # ORF exon block coordinates in genomic coordinate system.
+    exon_starts: List[int]
+    exon_ends: List[int]
+
+    start_codon: str
+    stop_codon: str
+    nt_length: int
+    aa_length: int
+    nt_seq: str
+    pep_seq: str
+    kozak_seq: str
+
+    # Functional category, such as uORF, dORF, lncORF, iORF, or emORF.
+    category: str = "unknown"
+
+    # Priority flag used for nested ORFs.
+    priority: str = "primary"
+
+    # Overlap type among ORFs in the same transcript and frame.
+    overlap_type: str = "none"
+
+    # ORF completeness, such as complete or 3prime_partial.
+    completeness: str = "complete"
+
+    # Per-exon reading frame used in genePredExt output.
+    exon_frames: List[int] = field(default_factory=list)

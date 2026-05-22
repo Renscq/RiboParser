@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Author: Rensc
+date: 2026-05-23
+
+Profile extraction functions for smORF Ribo-seq evidence analysis.
+"""
+
+from typing import List
+
+import numpy as np
+import pandas as pd
+
+from .smorf_riboseq_constants import STOP_CODONS
+
+
+def extract_transcript_profile(
+    density: np.ndarray,
+    starts: List[int],
+    ends: List[int],
+    strand: str,
+) -> np.ndarray:
+    """Extract P-site density profile in transcript 5' to 3' order."""
+    pieces = []
+
+    if strand == "+":
+        block_iter = zip(starts, ends)
+        for start, end in block_iter:
+            start = max(0, int(start))
+            end = min(len(density), int(end))
+            if end > start:
+                pieces.append(density[start:end])
+    else:
+        block_iter = zip(reversed(starts), reversed(ends))
+        for start, end in block_iter:
+            start = max(0, int(start))
+            end = min(len(density), int(end))
+            if end > start:
+                pieces.append(density[start:end][::-1])
+
+    if not pieces:
+        return np.zeros(0, dtype=np.float32)
+
+    return np.concatenate(pieces).astype(np.float32, copy=False)
+
+
+def extract_downstream_profile(
+    density: np.ndarray,
+    genomic_start: int,
+    genomic_end: int,
+    strand: str,
+    nt_window: int,
+) -> np.ndarray:
+    """Extract immediate genomic downstream profile after the stop codon."""
+    chrom_size = len(density)
+
+    if strand == "+":
+        start = max(0, genomic_end)
+        end = min(chrom_size, genomic_end + nt_window)
+        return density[start:end].astype(np.float32, copy=False)
+
+    start = max(0, genomic_start - nt_window)
+    end = min(chrom_size, genomic_start)
+
+    if end <= start:
+        return np.zeros(0, dtype=np.float32)
+
+    return density[start:end][::-1].astype(np.float32, copy=False)
+
+
+def get_coding_nt_length(row: pd.Series, profile_length: int) -> int:
+    """Infer coding length excluding the stop codon for complete ORFs."""
+    nt_length = int(row["nt_length"])
+    nt_length = min(nt_length, profile_length)
+
+    stop_codon = str(row["stop_codon"]).upper() if "stop_codon" in row.index else ""
+    completeness = str(row["completeness"]).lower() if "completeness" in row.index else ""
+
+    has_stop = stop_codon in STOP_CODONS
+    is_complete = completeness in {"complete", "cmpl", "full", "true", "yes"} or completeness == ""
+
+    if has_stop and is_complete and nt_length >= 6:
+        return nt_length - 3
+
+    return nt_length
+
+
+def make_codon_profile(nt_profile: np.ndarray, coding_nt_length: int) -> np.ndarray:
+    """Convert nucleotide-level P-site density profile to codon-level profile."""
+    coding_nt_length = max(0, min(int(coding_nt_length), len(nt_profile)))
+    coding_nt_length = coding_nt_length - (coding_nt_length % 3)
+
+    if coding_nt_length <= 0:
+        return np.zeros(0, dtype=np.float32)
+
+    return nt_profile[:coding_nt_length].reshape(-1, 3).sum(axis=1)

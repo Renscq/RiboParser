@@ -1,0 +1,289 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Author: Rensc
+date: 2026-05-23
+
+Metric functions for smORF Ribo-seq evidence analysis.
+"""
+
+import math
+from typing import Dict
+
+import numpy as np
+
+from .smorf_riboseq_constants import EvidenceThresholds
+
+
+def safe_divide(a: float, b: float, default: float = 0.0) -> float:
+    """Safely divide two numbers."""
+    if b == 0 or np.isnan(b):
+        return default
+    return float(a) / float(b)
+
+
+def gini_index(values: np.ndarray) -> float:
+    """Calculate the Gini index for a non-negative vector."""
+    arr = np.asarray(values, dtype=np.float64)
+    arr = arr[np.isfinite(arr)]
+
+    if arr.size == 0:
+        return 0.0
+
+    if np.sum(arr) <= 0:
+        return 0.0
+
+    arr = np.sort(arr)
+    n = arr.size
+    cumulative = np.cumsum(arr)
+
+    return float((n + 1 - 2 * np.sum(cumulative) / cumulative[-1]) / n)
+
+
+def window_mean(values: np.ndarray, start: int, end: int) -> float:
+    """Calculate mean value for a clipped interval."""
+    n = len(values)
+    start = max(0, start)
+    end = min(n, end)
+
+    if end <= start:
+        return 0.0
+
+    return float(np.mean(values[start:end]))
+
+
+def quantify_profile(nt_profile: np.ndarray, codon_profile: np.ndarray) -> Dict[str, float]:
+    """Calculate basic RPF quantification metrics."""
+    rpf_sum = float(np.sum(nt_profile))
+    nt_len = int(len(nt_profile))
+    covered_nt = int(np.sum(nt_profile > 0))
+    covered_codon = int(np.sum(codon_profile > 0))
+    codon_len = int(len(codon_profile))
+
+    return {
+        "rpf_sum": rpf_sum,
+        "rpf_mean": safe_divide(rpf_sum, nt_len),
+        "covered_nt": covered_nt,
+        "coverage_ratio": safe_divide(covered_nt, nt_len),
+        "covered_codon": covered_codon,
+        "covered_codon_ratio": safe_divide(covered_codon, codon_len),
+        "max_density": float(np.max(nt_profile)) if nt_len > 0 else 0.0,
+    }
+
+
+def calculate_periodicity(nt_profile: np.ndarray, coding_nt_length: int, thresholds: EvidenceThresholds) -> Dict[str, float]:
+    """Calculate frame-specific periodicity scores from P-site density."""
+    coding_nt_length = max(0, min(coding_nt_length, len(nt_profile)))
+    coding_nt_length = coding_nt_length - (coding_nt_length % 3)
+
+    if coding_nt_length <= 0:
+        return {
+            "frame0_density": 0.0,
+            "frame1_density": 0.0,
+            "frame2_density": 0.0,
+            "frame0_ratio": 0.0,
+            "frame1_ratio": 0.0,
+            "frame2_ratio": 0.0,
+            "periodicity_label": "Weak",
+        }
+
+    coding = nt_profile[:coding_nt_length]
+    frame0 = float(np.sum(coding[0::3]))
+    frame1 = float(np.sum(coding[1::3]))
+    frame2 = float(np.sum(coding[2::3]))
+    total = frame0 + frame1 + frame2
+
+    frame0_ratio = safe_divide(frame0, total)
+    frame1_ratio = safe_divide(frame1, total)
+    frame2_ratio = safe_divide(frame2, total)
+
+    if frame0_ratio >= thresholds.strong_periodicity and total >= max(10, thresholds.min_rpf_sum):
+        label = "Strong"
+    elif frame0_ratio >= thresholds.moderate_periodicity and total >= thresholds.min_rpf_sum:
+        label = "Moderate"
+    else:
+        label = "Weak"
+
+    return {
+        "frame0_density": frame0,
+        "frame1_density": frame1,
+        "frame2_density": frame2,
+        "frame0_ratio": frame0_ratio,
+        "frame1_ratio": frame1_ratio,
+        "frame2_ratio": frame2_ratio,
+        "periodicity_label": label,
+    }
+
+
+def calculate_pausing(codon_profile: np.ndarray, thresholds: EvidenceThresholds, pseudocount: float) -> Dict[str, float]:
+    """Calculate start and pre-stop pausing signals."""
+    n = len(codon_profile)
+
+    if n == 0:
+        return {
+            "start_pause_mean": 0.0,
+            "body_mean": 0.0,
+            "pre_stop_mean": 0.0,
+            "start_pause_ratio": 0.0,
+            "stop_pause_ratio": 0.0,
+            "pausing_label": "Weak",
+        }
+
+    start_mean = window_mean(codon_profile, 0, min(3, n))
+    body_start = min(3, n)
+    body_end = max(body_start, n - 3)
+    body_mean = window_mean(codon_profile, body_start, body_end)
+
+    if body_mean <= 0:
+        body_mean = float(np.mean(codon_profile)) if np.sum(codon_profile) > 0 else 0.0
+
+    pre_stop_mean = window_mean(codon_profile, max(0, n - 3), n)
+
+    start_ratio = safe_divide(start_mean + pseudocount, body_mean + pseudocount)
+    stop_ratio = safe_divide(pre_stop_mean + pseudocount, body_mean + pseudocount)
+
+    if start_ratio >= thresholds.strong_start_pause or stop_ratio >= thresholds.strong_stop_pause:
+        label = "Strong"
+    elif start_ratio >= thresholds.moderate_start_pause or stop_ratio >= thresholds.moderate_stop_pause:
+        label = "Moderate"
+    else:
+        label = "Weak"
+
+    return {
+        "start_pause_mean": start_mean,
+        "body_mean": body_mean,
+        "pre_stop_mean": pre_stop_mean,
+        "start_pause_ratio": start_ratio,
+        "stop_pause_ratio": stop_ratio,
+        "pausing_label": label,
+    }
+
+
+def calculate_release(
+    codon_profile: np.ndarray,
+    downstream_nt_profile: np.ndarray,
+    post_stop_codons: int,
+    thresholds: EvidenceThresholds,
+    pseudocount: float,
+) -> Dict[str, float]:
+    """Calculate post-stop ribosome release signal."""
+    n = len(codon_profile)
+
+    if n == 0:
+        pre_stop_mean = 0.0
+    else:
+        pre_stop_mean = window_mean(codon_profile, max(0, n - post_stop_codons), n)
+
+    usable_nt = min(len(downstream_nt_profile), post_stop_codons * 3)
+    usable_nt = usable_nt - (usable_nt % 3)
+
+    if usable_nt > 0:
+        post_codon_profile = downstream_nt_profile[:usable_nt].reshape(-1, 3).sum(axis=1)
+        post_stop_mean = float(np.mean(post_codon_profile)) if len(post_codon_profile) > 0 else 0.0
+    else:
+        post_stop_mean = 0.0
+
+    release_ratio = safe_divide(pre_stop_mean + pseudocount, post_stop_mean + pseudocount)
+    drop_score = 1.0 - safe_divide(post_stop_mean, pre_stop_mean, default=1.0)
+    drop_score = max(0.0, min(1.0, drop_score))
+
+    if release_ratio >= thresholds.strong_release and pre_stop_mean > 0:
+        label = "Strong"
+    elif release_ratio >= thresholds.moderate_release and pre_stop_mean > 0:
+        label = "Moderate"
+    else:
+        label = "Weak"
+
+    return {
+        "post_stop_mean": post_stop_mean,
+        "release_ratio": release_ratio,
+        "release_drop_score": drop_score,
+        "release_label": label,
+    }
+
+
+def classify_coverage_shape(codon_profile: np.ndarray, thresholds: EvidenceThresholds) -> Dict[str, float]:
+    """Classify codon-level coverage shape."""
+    n = len(codon_profile)
+    total = float(np.sum(codon_profile))
+
+    if n == 0 or total <= 0:
+        return {
+            "codon_gini": 0.0,
+            "max_to_mean_ratio": 0.0,
+            "top10_fraction": 0.0,
+            "coverage_shape": "Disperse",
+        }
+
+    coverage_ratio = float(np.sum(codon_profile > 0)) / float(n)
+    mean_value = float(np.mean(codon_profile))
+    max_value = float(np.max(codon_profile))
+    max_to_mean = safe_divide(max_value, mean_value)
+
+    sorted_values = np.sort(codon_profile)
+    top_n = max(1, int(math.ceil(n * 0.10)))
+    top_fraction = safe_divide(float(np.sum(sorted_values[-top_n:])), total)
+
+    gini = gini_index(codon_profile)
+
+    if (
+        coverage_ratio >= thresholds.uniform_coverage_ratio
+        and gini <= thresholds.uniform_gini
+        and max_to_mean <= thresholds.uniform_max_to_mean
+    ):
+        label = "Uniform"
+    elif max_to_mean >= thresholds.skewed_max_to_mean or top_fraction >= thresholds.skewed_top_fraction:
+        label = "Skewed"
+    elif coverage_ratio < thresholds.disperse_coverage_ratio:
+        label = "Disperse"
+    else:
+        label = "Disperse"
+
+    return {
+        "codon_gini": gini,
+        "max_to_mean_ratio": max_to_mean,
+        "top10_fraction": top_fraction,
+        "coverage_shape": label,
+    }
+
+
+def classify_translation_evidence(
+    quant: Dict[str, float],
+    periodicity: Dict[str, float],
+    release: Dict[str, float],
+    coverage_shape: Dict[str, float],
+    thresholds: EvidenceThresholds,
+) -> str:
+    """Assign final translation evidence label."""
+    rpf_sum = quant["rpf_sum"]
+    coverage_ratio = quant["coverage_ratio"]
+    covered_codon = quant["covered_codon"]
+
+    if rpf_sum <= 0:
+        return "NoEvidence"
+
+    if rpf_sum < thresholds.min_rpf_sum or covered_codon < thresholds.min_covered_codon:
+        return "LowConfidence"
+
+    periodicity_label = periodicity["periodicity_label"]
+    release_label = release["release_label"]
+    shape_label = coverage_shape["coverage_shape"]
+
+    if (
+        rpf_sum >= max(10, thresholds.min_rpf_sum)
+        and coverage_ratio >= max(0.20, thresholds.min_coverage_ratio)
+        and periodicity_label in {"Strong", "Moderate"}
+        and release_label in {"Strong", "Moderate"}
+        and shape_label == "Uniform"
+    ):
+        return "HighConfidence"
+
+    if (
+        rpf_sum >= thresholds.min_rpf_sum
+        and coverage_ratio >= thresholds.min_coverage_ratio
+        and periodicity_label != "Weak"
+        and shape_label != "Skewed"
+    ):
+        return "MediumConfidence"
+
+    return "LowConfidence"

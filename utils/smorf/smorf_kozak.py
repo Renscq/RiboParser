@@ -1,0 +1,470 @@
+# Author: Rensc
+# date: 2026-05-22
+
+"""
+Kozak PWM scoring module.
+
+This module supports:
+1. Built-in Kozak consensus sequences.
+2. Built-in Kozak template PWMs.
+3. Custom PWM loading.
+4. PWM construction from annotated ORF Kozak sequences.
+5. Normalized PWM similarity scoring.
+
+The recommended mode is to build a species-specific PWM from annotated_ORF
+records in ORF.message.txt.
+"""
+
+import math
+from collections import Counter
+from typing import Dict, List, Optional
+
+
+BASES = ["A", "C", "G", "T"]
+
+
+BUILTIN_KOZAK_CONSENSUS = {
+    "vertebrate": "GCCRCCATGG",
+    "plant": "ACAACAATGGC",
+    "terrestrial_plant": "ACAACAATGGC",
+    "arabidopsis": "ACAACAATGGC",
+    "rice": "ACAACAATGGC",
+    "maize": "ACAACAATGGC",
+    "drosophila": "ATMAAMATGAMC",
+    "yeast": "AAAAAAATGTCT",
+}
+
+
+# Built-in template PWMs.
+# These are explicit PWM templates, not dynamically converted from consensus.
+# For rigorous analysis, use annotated_ORF-derived PWM from the current species.
+BUILTIN_KOZAK_PWMS = {
+    "vertebrate": [
+        {"A": 0.05, "C": 0.10, "G": 0.80, "T": 0.05},
+        {"A": 0.05, "C": 0.80, "G": 0.10, "T": 0.05},
+        {"A": 0.05, "C": 0.80, "G": 0.10, "T": 0.05},
+        {"A": 0.45, "C": 0.05, "G": 0.45, "T": 0.05},
+        {"A": 0.05, "C": 0.80, "G": 0.10, "T": 0.05},
+        {"A": 0.05, "C": 0.80, "G": 0.10, "T": 0.05},
+        {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+        {"A": 0.01, "C": 0.01, "G": 0.01, "T": 0.97},
+        {"A": 0.01, "C": 0.01, "G": 0.97, "T": 0.01},
+        {"A": 0.05, "C": 0.05, "G": 0.85, "T": 0.05},
+    ],
+    "plant": [
+        {"A": 0.45, "C": 0.35, "G": 0.10, "T": 0.10},
+        {"A": 0.10, "C": 0.65, "G": 0.15, "T": 0.10},
+        {"A": 0.70, "C": 0.10, "G": 0.15, "T": 0.05},
+        {"A": 0.55, "C": 0.35, "G": 0.05, "T": 0.05},
+        {"A": 0.55, "C": 0.25, "G": 0.10, "T": 0.10},
+        {"A": 0.65, "C": 0.15, "G": 0.10, "T": 0.10},
+        {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+        {"A": 0.01, "C": 0.01, "G": 0.01, "T": 0.97},
+        {"A": 0.01, "C": 0.01, "G": 0.97, "T": 0.01},
+        {"A": 0.05, "C": 0.05, "G": 0.85, "T": 0.05},
+        {"A": 0.10, "C": 0.65, "G": 0.15, "T": 0.10},
+    ],
+    "terrestrial_plant": None,
+    "arabidopsis": None,
+    "rice": None,
+    "maize": None,
+    "drosophila": [
+        {"A": 0.75, "C": 0.05, "G": 0.10, "T": 0.10},
+        {"A": 0.10, "C": 0.05, "G": 0.10, "T": 0.75},
+        {"A": 0.45, "C": 0.45, "G": 0.05, "T": 0.05},
+        {"A": 0.75, "C": 0.05, "G": 0.10, "T": 0.10},
+        {"A": 0.75, "C": 0.05, "G": 0.10, "T": 0.10},
+        {"A": 0.45, "C": 0.45, "G": 0.05, "T": 0.05},
+        {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+        {"A": 0.01, "C": 0.01, "G": 0.01, "T": 0.97},
+        {"A": 0.01, "C": 0.01, "G": 0.97, "T": 0.01},
+        {"A": 0.75, "C": 0.05, "G": 0.10, "T": 0.10},
+        {"A": 0.45, "C": 0.45, "G": 0.05, "T": 0.05},
+        {"A": 0.05, "C": 0.75, "G": 0.10, "T": 0.10},
+    ],
+    "yeast": [
+        {"A": 0.80, "C": 0.05, "G": 0.05, "T": 0.10},
+        {"A": 0.80, "C": 0.05, "G": 0.05, "T": 0.10},
+        {"A": 0.80, "C": 0.05, "G": 0.05, "T": 0.10},
+        {"A": 0.80, "C": 0.05, "G": 0.05, "T": 0.10},
+        {"A": 0.80, "C": 0.05, "G": 0.05, "T": 0.10},
+        {"A": 0.80, "C": 0.05, "G": 0.05, "T": 0.10},
+        {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+        {"A": 0.01, "C": 0.01, "G": 0.01, "T": 0.97},
+        {"A": 0.01, "C": 0.01, "G": 0.97, "T": 0.01},
+        {"A": 0.05, "C": 0.05, "G": 0.05, "T": 0.85},
+        {"A": 0.05, "C": 0.75, "G": 0.10, "T": 0.10},
+        {"A": 0.05, "C": 0.10, "G": 0.10, "T": 0.75},
+    ],
+}
+
+# Use the plant template for plant aliases.
+BUILTIN_KOZAK_PWMS["terrestrial_plant"] = BUILTIN_KOZAK_PWMS["plant"]
+BUILTIN_KOZAK_PWMS["arabidopsis"] = BUILTIN_KOZAK_PWMS["plant"]
+BUILTIN_KOZAK_PWMS["rice"] = BUILTIN_KOZAK_PWMS["plant"]
+BUILTIN_KOZAK_PWMS["maize"] = BUILTIN_KOZAK_PWMS["plant"]
+
+
+class KozakPWM:
+    """
+    Kozak PWM model.
+    """
+
+    def __init__(
+        self,
+        pwm: List[Dict[str, float]],
+        name: str = "custom",
+        consensus: str = "NA",
+        source: str = "custom",
+        pseudocount: float = 0.001,
+    ):
+        """
+        Initialize Kozak PWM.
+        """
+
+        self.pwm = self._normalize_pwm(pwm, pseudocount)
+        self.name = name
+        self.consensus = consensus
+        self.source = source
+        self.length = len(self.pwm)
+        self.pseudocount = pseudocount
+
+    @staticmethod
+    def _normalize_pwm(
+        pwm: List[Dict[str, float]],
+        pseudocount: float,
+    ) -> List[Dict[str, float]]:
+        """
+        Normalize each PWM row to probability.
+        """
+
+        normalized = []
+
+        for row in pwm:
+            values = {}
+
+            for base in BASES:
+                values[base] = float(row.get(base, 0.0)) + pseudocount
+
+            total = sum(values.values())
+
+            normalized.append({
+                base: values[base] / total
+                for base in BASES
+            })
+
+        return normalized
+
+    @classmethod
+    def from_builtin(cls, name: str):
+        """
+        Load built-in explicit PWM.
+        """
+
+        key = name.lower()
+
+        if key not in BUILTIN_KOZAK_PWMS:
+            available = ",".join(sorted(BUILTIN_KOZAK_PWMS.keys()))
+            raise ValueError(
+                "Unknown built-in Kozak PWM: {}. Available: {}".format(
+                    name,
+                    available,
+                )
+            )
+
+        return cls(
+            pwm=BUILTIN_KOZAK_PWMS[key],
+            name=key,
+            consensus=BUILTIN_KOZAK_CONSENSUS.get(key, "NA"),
+            source="builtin_pwm",
+        )
+
+    @classmethod
+    def from_pwm_file(cls, path: str, name: str = "custom_pwm"):
+        """
+        Load PWM from a tab-delimited matrix file.
+
+        Expected format:
+            position    A    C    G    T
+            -6          0.2  0.3  0.3  0.2
+        """
+
+        pwm = []
+
+        with open(path, "r") as handle:
+            header = handle.readline().strip().split("\t")
+            header_index = {col: idx for idx, col in enumerate(header)}
+
+            for base in BASES:
+                if base not in header_index:
+                    raise ValueError("PWM file must contain A, C, G, T columns.")
+
+            for line in handle:
+                line = line.strip()
+
+                if not line:
+                    continue
+
+                fields = line.split("\t")
+
+                pwm.append({
+                    base: float(fields[header_index[base]])
+                    for base in BASES
+                })
+
+        if not pwm:
+            raise ValueError("Empty PWM file: {}".format(path))
+
+        return cls(
+            pwm=pwm,
+            name=name,
+            consensus="NA",
+            source="custom_pwm",
+        )
+
+    @classmethod
+    def from_sequences(
+        cls,
+        sequences: List[str],
+        name: str = "sequence_pwm",
+        pseudocount: float = 1.0,
+    ):
+        """
+        Build PWM from aligned Kozak sequences.
+        """
+
+        clean_sequences = [
+            seq.strip().upper().replace("U", "T")
+            for seq in sequences
+            if seq.strip()
+        ]
+
+        if not clean_sequences:
+            raise ValueError("No valid Kozak sequences were provided.")
+
+        lengths = Counter(len(seq) for seq in clean_sequences)
+        target_len = lengths.most_common(1)[0][0]
+
+        clean_sequences = [
+            seq for seq in clean_sequences
+            if len(seq) == target_len
+        ]
+
+        counts = [
+            {base: pseudocount for base in BASES}
+            for _ in range(target_len)
+        ]
+
+        for seq in clean_sequences:
+            for idx, base in enumerate(seq):
+                if base in BASES:
+                    counts[idx][base] += 1.0
+
+        pwm = []
+
+        for row in counts:
+            total = sum(row.values())
+            pwm.append({
+                base: row[base] / total
+                for base in BASES
+            })
+
+        consensus = cls.consensus_from_pwm(pwm)
+
+        return cls(
+            pwm=pwm,
+            name=name,
+            consensus=consensus,
+            source="sequence_derived_pwm",
+        )
+
+    @classmethod
+    def from_annotated_orf_records(
+        cls,
+        records: List[Dict[str, str]],
+        category_field: str = "category",
+        kozak_field: str = "kozak_seq",
+        annotated_categories: str = "annotated_ORF,annotated_mORF",
+        name: str = "annotated_ORF_pwm",
+        min_sequences: int = 100,
+    ):
+        """
+        Build PWM from annotated ORF Kozak sequences in ORF.message.txt.
+        """
+
+        categories = {
+            x.strip()
+            for x in annotated_categories.split(",")
+            if x.strip()
+        }
+
+        sequences = []
+
+        for record in records:
+            category = record.get(category_field, "")
+            kozak_seq = record.get(kozak_field, "")
+
+            if category in categories and kozak_seq:
+                sequences.append(kozak_seq)
+
+        if len(sequences) < min_sequences:
+            raise ValueError(
+                "Too few annotated ORF Kozak sequences: {} < {}".format(
+                    len(sequences),
+                    min_sequences,
+                )
+            )
+
+        return cls.from_sequences(
+            sequences=sequences,
+            name=name,
+            pseudocount=1.0,
+        )
+
+    @staticmethod
+    def consensus_from_pwm(pwm: List[Dict[str, float]]) -> str:
+        """
+        Generate consensus sequence from PWM.
+        """
+
+        consensus = []
+
+        for row in pwm:
+            best_base = sorted(
+                BASES,
+                key=lambda base: row.get(base, 0.0),
+                reverse=True,
+            )[0]
+            consensus.append(best_base)
+
+        return "".join(consensus)
+
+    def score(self, seq: str) -> float:
+        """
+        Calculate normalized PWM similarity score.
+
+        The returned score ranges from 0 to 1.
+        """
+
+        aligned_seq = self._align_sequence(seq)
+        raw_score = self._raw_log_score(aligned_seq)
+        min_score = self._min_log_score()
+        max_score = self._max_log_score()
+
+        if max_score == min_score:
+            return 0.0
+
+        score = (raw_score - min_score) / (max_score - min_score)
+
+        return max(0.0, min(1.0, score))
+
+    def identity_to_consensus(self, seq: str) -> float:
+        """
+        Calculate simple identity to consensus sequence.
+
+        This is only an auxiliary metric. PWM score should be preferred.
+        """
+
+        if self.consensus == "NA":
+            return 0.0
+
+        aligned_seq = self._align_sequence(seq)
+        consensus = self._align_sequence(self.consensus)
+
+        matched = 0
+        valid = 0
+
+        for a, b in zip(aligned_seq, consensus):
+            if a not in BASES or b not in BASES:
+                continue
+            valid += 1
+            if a == b:
+                matched += 1
+
+        if valid == 0:
+            return 0.0
+
+        return matched / valid
+
+    def _align_sequence(self, seq: str) -> str:
+        """
+        Center-trim or pad sequence to PWM length.
+        """
+
+        seq = seq.upper().replace("U", "T")
+
+        if len(seq) == self.length:
+            return seq
+
+        if len(seq) > self.length:
+            extra = len(seq) - self.length
+            left_trim = extra // 2
+            return seq[left_trim:left_trim + self.length]
+
+        pad_len = self.length - len(seq)
+        left_pad = pad_len // 2
+        right_pad = pad_len - left_pad
+
+        return ("N" * left_pad) + seq + ("N" * right_pad)
+
+    def _raw_log_score(self, seq: str) -> float:
+        """
+        Calculate raw log-likelihood score.
+        """
+
+        score = 0.0
+
+        for idx, base in enumerate(seq):
+            if base not in BASES:
+                score += math.log(0.25)
+            else:
+                score += math.log(self.pwm[idx][base])
+
+        return score
+
+    def _max_log_score(self) -> float:
+        """
+        Calculate theoretical maximum log score.
+        """
+
+        return sum(math.log(max(row.values())) for row in self.pwm)
+
+    def _min_log_score(self) -> float:
+        """
+        Calculate theoretical minimum log score.
+        """
+
+        return sum(math.log(min(row.values())) for row in self.pwm)
+
+    @staticmethod
+    def level(score: float) -> str:
+        """
+        Convert normalized score to level.
+        """
+
+        if score >= 0.75:
+            return "strong"
+
+        if score >= 0.50:
+            return "moderate"
+
+        return "weak"
+
+    def export_pwm(self, path: str) -> None:
+        """
+        Export PWM to tab-delimited file.
+        """
+
+        with open(path, "w") as out:
+            out.write("position\tA\tC\tG\tT\n")
+
+            for idx, row in enumerate(self.pwm, start=1):
+                out.write(
+                    "{}\t{:.6f}\t{:.6f}\t{:.6f}\t{:.6f}\n".format(
+                        idx,
+                        row["A"],
+                        row["C"],
+                        row["G"],
+                        row["T"],
+                    )
+                )

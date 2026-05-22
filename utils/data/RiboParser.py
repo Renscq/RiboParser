@@ -4,16 +4,16 @@
 # @Script  : riboparser.py
 
 
-import pkg_resources
+from importlib.metadata import version, PackageNotFoundError
 
 
 class RiboParserInfo:
     try:
-        version = pkg_resources.get_distribution("RiboParser").version
-    except Exception:
+        version = version("RiboParser")
+    except PackageNotFoundError:
         version = "unknown"
     
-    update_date = "2024-06-10"
+    update_date = "2026-05-21"
     citation = (
         '''
         Shuchao Ren, Yinan Li, Zhipeng Zhou. 
@@ -42,8 +42,8 @@ class RiboParserInfo:
         missing = []
         for pkg in cls.required_packages:
             try:
-                pkg_resources.get_distribution(pkg)
-            except pkg_resources.DistributionNotFound:
+                version(pkg)
+            except PackageNotFoundError:
                 missing.append(pkg)
         if missing:
             print(f"Missing dependencies: {', '.join(missing)}")
@@ -54,115 +54,82 @@ class RiboParserInfo:
         return True
 
     @classmethod
-    def check_package_modules(cls):
-
+    def check_package_modules(cls, module_type: str = "all"):
         from pathlib import Path
+        import sys
+        import importlib
 
-        project_path = Path(__file__).resolve()
-        # check the root directory（directory contains include pyproject.toml / README.md / .git）
-        for _ in range(8):
-            if any((project_path / name).exists() for name in ("pyproject.toml", "README.md", ".git")):
+        script_path = Path(__file__).resolve()
+
+        # Find project root
+        root = script_path.parent
+        for _ in range(10):
+            if any((root / name).exists() for name in ("pyproject.toml", "README.md", ".git", "utils", "scripts")):
                 break
-            if project_path.parent == project_path:
+            if root.parent == root:
                 break
-            project_path = project_path.parent
-        root = project_path
+            root = root.parent
+
+        # Make local modules importable
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
 
         utils_dir = root / "utils"
         scripts_dir = root / "scripts"
 
-        @staticmethod
-        def module_name_from_path(p: Path):
-            try:
-                rel = p.relative_to(root)
-            except Exception:
-                rel = p
+        modules = {
+            "ribo": [],
+            "serp": [],
+            "smorf": [],
+            "scripts": []
+        }
+
+        def module_name_from_path(p: Path) -> str:
+            rel = p.relative_to(root)
             return ".".join(rel.with_suffix("").parts)
 
-        rpf = []
-        serp = []
-        classes = []
-        others = []
+        def add_module(p: Path):
+            if p.name.startswith("_") or p.name == "__init__.py":
+                return
+
+            mod = module_name_from_path(p)
+            parts = p.relative_to(root).parts
+            stem = p.stem
+
+            if "smorf" in parts or stem.startswith("smorf_"):
+                modules["smorf"].append(mod)
+            elif "serp" in parts or stem.startswith("serp_"):
+                modules["serp"].append(mod)
+            elif "ribo" in parts or stem.startswith(("rpf_", "rna_")):
+                modules["ribo"].append(mod)
+            elif "scripts" in parts:
+                modules["scripts"].append(mod)
 
         if utils_dir.exists():
-            for now_path in utils_dir.iterdir():
-                if now_path.is_file() and now_path.suffix == ".py" and not now_path.name.startswith("_"):
-                    mod = module_name_from_path(now_path)
-                    name = now_path.stem
-                    if name.startswith("rpf_") or name.startswith("rna_"):
-                        rpf.append(mod)
-                    elif name.startswith("serp_"):
-                        serp.append(mod)
-                    else:
-                        others.append(mod)
-                elif now_path.is_dir():
-                    for sub in now_path.rglob("*.py"):
-                        if sub.name.startswith("_") or sub.name == "__init__.py":
-                            continue
-                        mod = module_name_from_path(sub)
-                        if sub.stem.startswith("rpf_"):
-                            rpf.append(mod)
-                        elif sub.stem.startswith("serp_"):
-                            serp.append(mod)
-                        else:
-                            classes.append(mod)
+            for p in utils_dir.rglob("*.py"):
+                add_module(p)
 
         if scripts_dir.exists():
-            for now_path in scripts_dir.rglob("*.py"):
-                if now_path.name.startswith("_") or now_path.name == "__init__.py":
-                    continue
-                mod = module_name_from_path(now_path)
-                if now_path.stem.startswith("rpf_"):
-                    rpf.append(mod)
-                elif now_path.stem.startswith("serp_"):
-                    serp.append(mod)
-                else:
-                    others.append(mod)
+            for p in scripts_dir.rglob("*.py"):
+                add_module(p)
 
-        # sort and unique
-        rpf = sorted(set(rpf))
-        serp = sorted(set(serp))
-        classes = sorted(set(classes))
-        others = sorted(set(others))
+        for key in modules:
+            modules[key] = sorted(set(modules[key]))
 
-        @staticmethod
         def try_import(module_name: str) -> bool:
             try:
-                import importlib
-
                 importlib.import_module(module_name)
                 return True
-            except Exception:
+            except Exception as e:
                 return False
 
-        print("RPF modules:")
-        if rpf:
-            for now_module in rpf:
-                status = "[import OK]" if try_import(now_module) else "[import FAILED]"
-                print(f" - {now_module} {status}")
-        else:
-            print(" - (not found)")
+        show_keys = modules.keys() if module_type == "all" else [module_type]
 
-        print("SERP modules:")
-        if serp:
-            for now_module in serp:
-                status = "[import OK]" if try_import(now_module) else "[import FAILED]"
-                print(f" - {now_module} {status}")
-        else:
-            print(" - (not found)")
-
-        print("Classes:")
-        if classes:
-            for now_module in classes:
-                status = "[import OK]" if try_import(now_module) else "[import FAILED]"
-                print(f" - {now_module} {status}")
-        else:
-            print(" - (not found)")
-
-        print("Other scripts:")
-        if others:
-            for now_module in others:
-                status = "[import OK]" if try_import(now_module) else "[import FAILED]"
-                print(f" - {now_module} {status}")
-        else:
-            print(" - (not found)")
+        for key in show_keys:
+            print(f"{key} modules:")
+            if modules.get(key):
+                for mod in modules[key]:
+                    status = "[import OK]" if try_import(mod) else "[import FAILED]"
+                    print(f" - {mod} {status}")
+            else:
+                print(" - (not found)")

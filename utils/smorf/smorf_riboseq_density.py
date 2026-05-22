@@ -1,0 +1,185 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Author: Rensc
+date: 2026-05-23
+
+P-site density readers for WIG and bedGraph files.
+"""
+
+from collections import defaultdict
+from typing import Dict
+
+import numpy as np
+
+from .smorf_riboseq_io import infer_density_format, smart_open
+
+
+def parse_wig_attrs(line: str) -> Dict[str, str]:
+    """Parse attributes in fixedStep or variableStep WIG header lines."""
+    attrs = {}
+    for item in line.split()[1:]:
+        if "=" in item:
+            key, value = item.split("=", 1)
+            attrs[key] = value
+    return attrs
+
+
+def scan_density_max_positions(path: str, file_format: str) -> Dict[str, int]:
+    """Scan a density file to infer maximum coordinate per chromosome."""
+    fmt = infer_density_format(path, file_format)
+    max_pos = defaultdict(int)
+
+    if fmt == "bedgraph":
+        with smart_open(path, "rt") as handle:
+            for line in handle:
+                if not line.strip() or line.startswith(("#", "track", "browser")):
+                    continue
+
+                fields = line.split()
+                if len(fields) < 4:
+                    continue
+
+                chrom = fields[0]
+                end = int(fields[2])
+                if end > max_pos[chrom]:
+                    max_pos[chrom] = end
+
+    elif fmt == "wig":
+        current_chrom = None
+        mode = None
+        pos = None
+        step = 1
+        span = 1
+
+        with smart_open(path, "rt") as handle:
+            for line in handle:
+                text = line.strip()
+                if not text or text.startswith(("#", "track", "browser")):
+                    continue
+
+                if text.startswith("fixedStep"):
+                    mode = "fixed"
+                    attrs = parse_wig_attrs(text)
+                    current_chrom = attrs.get("chrom")
+                    pos = int(attrs.get("start", 1)) - 1
+                    step = int(attrs.get("step", 1))
+                    span = int(attrs.get("span", 1))
+                    continue
+
+                if text.startswith("variableStep"):
+                    mode = "variable"
+                    attrs = parse_wig_attrs(text)
+                    current_chrom = attrs.get("chrom")
+                    span = int(attrs.get("span", 1))
+                    continue
+
+                if current_chrom is None:
+                    continue
+
+                if mode == "fixed":
+                    end = pos + span
+                    max_pos[current_chrom] = max(max_pos[current_chrom], end)
+                    pos += step
+
+                elif mode == "variable":
+                    fields = text.split()
+                    if len(fields) >= 2:
+                        start = int(fields[0]) - 1
+                        end = start + span
+                        max_pos[current_chrom] = max(max_pos[current_chrom], end)
+
+    else:
+        raise ValueError(f"Unsupported density format: {fmt}")
+
+    return dict(max_pos)
+
+
+def load_chrom_density(path: str, file_format: str, chrom: str, chrom_size: int, dtype=np.float32) -> np.ndarray:
+    """Load one chromosome density vector from WIG or bedGraph."""
+    fmt = infer_density_format(path, file_format)
+    density = np.zeros(chrom_size, dtype=dtype)
+
+    if fmt == "bedgraph":
+        _load_bedgraph_chrom(path, chrom, chrom_size, density)
+    elif fmt == "wig":
+        _load_wig_chrom(path, chrom, chrom_size, density)
+    else:
+        raise ValueError(f"Unsupported density format: {fmt}")
+
+    return density
+
+
+def _load_bedgraph_chrom(path: str, chrom: str, chrom_size: int, density: np.ndarray) -> None:
+    """Load bedGraph records for one chromosome."""
+    with smart_open(path, "rt") as handle:
+        for line in handle:
+            if not line.strip() or line.startswith(("#", "track", "browser")):
+                continue
+
+            fields = line.split()
+            if len(fields) < 4 or fields[0] != chrom:
+                continue
+
+            start = max(0, int(fields[1]))
+            end = min(chrom_size, int(fields[2]))
+            value = float(fields[3])
+
+            if end > start:
+                density[start:end] = value
+
+
+def _load_wig_chrom(path: str, chrom: str, chrom_size: int, density: np.ndarray) -> None:
+    """Load WIG records for one chromosome."""
+    current_chrom = None
+    mode = None
+    pos = None
+    step = 1
+    span = 1
+
+    with smart_open(path, "rt") as handle:
+        for line in handle:
+            text = line.strip()
+            if not text or text.startswith(("#", "track", "browser")):
+                continue
+
+            if text.startswith("fixedStep"):
+                mode = "fixed"
+                attrs = parse_wig_attrs(text)
+                current_chrom = attrs.get("chrom")
+                pos = int(attrs.get("start", 1)) - 1
+                step = int(attrs.get("step", 1))
+                span = int(attrs.get("span", 1))
+                continue
+
+            if text.startswith("variableStep"):
+                mode = "variable"
+                attrs = parse_wig_attrs(text)
+                current_chrom = attrs.get("chrom")
+                span = int(attrs.get("span", 1))
+                continue
+
+            if current_chrom != chrom:
+                if mode == "fixed" and pos is not None:
+                    pos += step
+                continue
+
+            if mode == "fixed":
+                value = float(text.split()[0])
+                start = max(0, pos)
+                end = min(chrom_size, pos + span)
+
+                if end > start:
+                    density[start:end] = value
+
+                pos += step
+
+            elif mode == "variable":
+                fields = text.split()
+                if len(fields) >= 2:
+                    start = int(fields[0]) - 1
+                    end = min(chrom_size, start + span)
+                    value = float(fields[1])
+
+                    if end > start:
+                        density[max(0, start):end] = value

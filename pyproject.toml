@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "RiboParser"
-version = "0.1.15"
+version = "0.2.4"
 authors = [{ name = "Ren Shuchao", email = "rensc0718@163.com" }]
 description = "A pipeline for ribosome profiling data analysis"
 readme = "README.md"
@@ -52,6 +52,7 @@ rpf_Coverage = "utils.rpf_Coverage:main"
 rpf_Corr = "utils.rpf_Corr:main"
 rpf_Quant = "utils.rpf_Quant:main"
 rpf_Percent = "utils.rpf_Percent:main"
+
 # Ribo-pausing
 rpf_Pausing = "utils.rpf_Pausing:main"
 rpf_Occupancy = "utils.rpf_Occupancy:main"
@@ -61,24 +62,34 @@ rpf_CDT = "utils.rpf_CDT:main"
 rpf_CST = "utils.rpf_CST:main"
 rpf_Odd_Ratio = "utils.rpf_Odd_Ratio:main"
 rpf_Meta_Codon = "utils.rpf_Meta_Codon:main"
+
 # Ribo-utils
 rpf_Shuffle = "utils.rpf_Shuffle:main"
 rpf_Shift = "utils.rpf_Shift:main"
 rpf_Retrieve = "utils.rpf_Retrieve:main"
 rpf_Bam2bw = "utils.rpf_Bam2bw:main"
 rpf_Geneplot = "utils.rpf_Geneplot:main"
+
 # RNA
 rna_Density = "utils.rna_Density:main"
 rna_Offset = "utils.rna_Offset:main"
+
 # SeRP
 serp_overlap = "utils.serp_overlap:main"
 serp_peak = "utils.serp_peak:main"
 serp_properties = "utils.serp_properties:main"
+
+# smORF
+smorf_scanner = "utils.smorf_scanner:main"
+smorf_filter = "utils.smorf_filter:main"
+
 # bedgraph
 bg2meta = "scripts.bedgraph.bg2meta:main"
 rpm_smooth = "scripts.bedgraph.rpm_smooth:main"
+
 # bowtie
 merge_bwt_log = "scripts.bowtie.merge_bwt_log:main"
+
 # fasta
 fa_gc_sum = "scripts.fasta.fa_gc_sum:main"
 fa_len_flt = "scripts.fasta.fa_len_flt:main"
@@ -89,6 +100,7 @@ nt2aa = "scripts.fasta.nt2aa:main"
 rand_seq = "scripts.fasta.rand_seq:main"
 retrieve_seq = "scripts.fasta.retrieve_seq:main"
 revs = "scripts.fasta.revs:main"
+
 # fastq
 fq_len_flt = "scripts.fastq.fq_len_flt:main"
 fq_len_sum = "scripts.fastq.fq_len_sum:main"
@@ -99,6 +111,7 @@ fq2fa = "scripts.fastq.fq2fa:main"
 fq2txt = "scripts.fastq.fq2txt:main"
 phred_quality = "scripts.fastq.phred_quality:main"
 simulate_fastq = "scripts.fastq.simulate_fastq:main"
+
 # merge_ribo
 merge_cdt = "scripts.merge_ribo.merge_cdt:main"
 merge_coverage = "scripts.merge_ribo.merge_coverage:main"
@@ -115,16 +128,21 @@ merge_pausing = "scripts.merge_ribo.merge_pausing:main"
 merge_period = "scripts.merge_ribo.merge_period:main"
 merge_quant = "scripts.merge_ribo.merge_quant:main"
 merge_saturation = "scripts.merge_ribo.merge_saturation:main"
+
 # oligo
 get_overlap_seq = "scripts.oligo.get_overlap_seq:main"
 get_tissue_freq = "scripts.oligo.get_tissue_freq:main"
 get_win_seq = "scripts.oligo.get_win_seq:main"
+
 # ribocode
 ribocode_bed_format = "scripts.ribocode.ribocode_bed_format:main"
+
 # ribotish
 ribotish_format = "scripts.ribotish.ribotish_format:main"
+
 # rsem
 merge_rsem = "scripts.rsem.merge_rsem:main"
+
 # unix
 dos2unix = "scripts.unix.dos2unix:main"
 
@@ -134,6 +152,7 @@ packages = [
     'utils.data',
     'utils.ribo',
     'utils.serp',
+    'utils.smorf',
     'scripts',
     'scripts.bedgraph',
     'scripts.bowtie',

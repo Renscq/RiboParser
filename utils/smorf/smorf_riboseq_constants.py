@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Author: Rensc
+date: 2026-05-23
+
+Constants and data classes for smORF Ribo-seq evidence analysis.
+"""
+
+from dataclasses import dataclass
+
+
+@dataclass
+class DensityTrack:
+    """Store one P-site density track."""
+    sample: str
+    strand: str
+    path: str
+    file_format: str = "auto"
+
+
+@dataclass
+class EvidenceThresholds:
+    """Store evidence scoring thresholds."""
+    min_rpf_sum: float
+    min_covered_codon: int
+    min_coverage_ratio: float
+
+    strong_periodicity: float
+    moderate_periodicity: float
+
+    strong_start_pause: float
+    moderate_start_pause: float
+    strong_stop_pause: float
+    moderate_stop_pause: float
+
+    strong_release: float
+    moderate_release: float
+
+    uniform_coverage_ratio: float
+    uniform_gini: float
+    uniform_max_to_mean: float
+    skewed_max_to_mean: float
+    skewed_top_fraction: float
+    disperse_coverage_ratio: float
+
+
+SUPPORTED_DENSITY_FORMATS = {"auto", "wig", "bedgraph"}
+VALID_STRANDS = {"+", "-", "."}
+STOP_CODONS = {"TAA", "TAG", "TGA", "UAA", "UAG", "UGA"}
