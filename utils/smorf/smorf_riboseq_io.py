@@ -9,6 +9,7 @@ Input and output functions for smORF Ribo-seq evidence analysis.
 
 import gzip
 import os
+import re
 import sys
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
@@ -78,27 +79,101 @@ def read_chrom_sizes(path: Optional[str]) -> Dict[str, int]:
     return chrom_sizes
 
 
+
+def normalize_density_strand(value, path: str = "") -> str:
+    """Normalize strand values from density list and infer strand from filename if needed."""
+    if pd.isna(value):
+        text = ""
+    else:
+        text = str(value).strip()
+
+    text_lower = text.lower()
+
+    plus_values = {"+", "plus", "forward", "fwd", "sense", "pos", "positive"}
+    minus_values = {"-", "minus", "reverse", "rev", "antisense", "neg", "negative"}
+    unstranded_values = {".", "both", "all", "unstranded", "none", "na", "nan"}
+
+    if text_lower in plus_values:
+        return "+"
+
+    if text_lower in minus_values:
+        return "-"
+
+    if text_lower in unstranded_values:
+        return "."
+
+    path_lower = os.path.basename(str(path)).lower()
+
+    if re.search(r"(^|[._-])(plus|pos|positive|forward|fwd|sense|\\+)([._-]|$)", path_lower):
+        return "+"
+
+    if re.search(r"(^|[._-])(minus|neg|negative|reverse|rev|antisense|-)([._-]|$)", path_lower):
+        return "-"
+
+    if text == "":
+        return "."
+
+    raise ValueError(f"Invalid strand value: {value}. Allowed values include +, -, ., plus, minus, forward, reverse, unstranded.")
+
+
+def normalize_optional_text(value, default: str = "") -> str:
+    """Normalize optional table values and replace NaN-like values."""
+    if pd.isna(value):
+        return default
+
+    text = str(value).strip()
+
+    if text.lower() in {"", "nan", "none", "na", "null"}:
+        return default
+
+    return text
+
+
 def read_density_list(args) -> List[DensityTrack]:
     """Read density tracks from command-line arguments or a list file."""
     tracks = []
 
     if args.density_list:
-        table = pd.read_csv(args.density_list, sep="\t", comment="#")
-        required = {"sample", "strand", "path"}
+        table = pd.read_csv(
+            args.density_list,
+            sep="\t",
+            comment="#",
+            dtype=str,
+            keep_default_na=False,
+        )
+
+        table.columns = [str(col).strip() for col in table.columns]
+
+        required = {"sample", "path"}
         missing = required - set(table.columns)
         if missing:
-            raise ValueError(f"--density-list requires columns: sample, strand, path. Missing: {missing}")
+            raise ValueError(f"--density-list requires at least columns: sample, path. Missing: {missing}")
 
-        for _, row in table.iterrows():
-            fmt = "auto"
-            if "format" in table.columns and not pd.isna(row["format"]):
-                fmt = str(row["format"])
+        if "strand" not in table.columns:
+            table["strand"] = "."
+
+        if "format" not in table.columns:
+            table["format"] = "auto"
+
+        # Remove fully empty rows and rows without a valid path.
+        table = table.replace(r"^\\s*$", pd.NA, regex=True)
+        table = table.dropna(how="all")
+        table = table.dropna(subset=["path"])
+
+        for row_index, row in table.iterrows():
+            path = normalize_optional_text(row.get("path"), default="")
+            if path == "":
+                continue
+
+            sample = normalize_optional_text(row.get("sample"), default="sample1")
+            strand = normalize_density_strand(row.get("strand"), path=path)
+            fmt = normalize_optional_text(row.get("format"), default="auto")
 
             tracks.append(
                 DensityTrack(
-                    sample=str(row["sample"]),
-                    strand=str(row["strand"]),
-                    path=str(row["path"]),
+                    sample=sample,
+                    strand=strand,
+                    path=path,
                     file_format=fmt,
                 )
             )
@@ -115,13 +190,36 @@ def read_density_list(args) -> List[DensityTrack]:
     if not tracks:
         raise ValueError("No density file was provided.")
 
-    for track in tracks:
-        if track.strand not in VALID_STRANDS:
-            raise ValueError(f"Invalid strand in density track: {track.strand}")
-        if not os.path.exists(track.path):
-            raise FileNotFoundError(track.path)
+    valid_tracks = []
 
-    return tracks
+    for track in tracks:
+        sample = normalize_optional_text(track.sample, default="sample1")
+        path = normalize_optional_text(track.path, default="")
+        strand = normalize_density_strand(track.strand, path=path)
+        fmt = normalize_optional_text(track.file_format, default="auto")
+
+        if path == "":
+            continue
+
+        if strand not in VALID_STRANDS:
+            raise ValueError(f"Invalid strand in density track: {strand}")
+
+        if not os.path.exists(path):
+            raise FileNotFoundError(path)
+
+        valid_tracks.append(
+            DensityTrack(
+                sample=sample,
+                strand=strand,
+                path=path,
+                file_format=fmt,
+            )
+        )
+
+    if not valid_tracks:
+        raise ValueError("No valid density track was found after filtering empty rows.")
+
+    return valid_tracks
 
 
 def read_orf_table(path: str, coord_mode: str) -> pd.DataFrame:
@@ -178,7 +276,10 @@ def read_genepred(path: Optional[str], coord_mode: str) -> Dict[str, Tuple[List[
     table = pd.read_csv(path, sep="\t", header=None, names=columns, dtype=str)
     block_map = {}
 
-    for _, row in table.iterrows():
+    for idx, (_, row) in enumerate(table.iterrows(), start=1):
+        if idx % 10000 == 0:
+            eprint(f"Read {idx} genePred lines")
+
         starts = parse_comma_ints(row["exonStarts"])
         ends = parse_comma_ints(row["exonEnds"])
 

@@ -4,13 +4,17 @@
 Author: Rensc
 date: 2026-05-23
 
-Command-line interface for smORF Ribo-seq evidence analysis.
+@Project : smORF
+@Script  : smorf_evidence.py
+
+Entry script for smORF Ribo-seq evidence analysis.
 """
+
 
 import argparse
 
-from .smorf_riboseq_io import eprint, write_output
-from .smorf_riboseq_pipeline import run_riboseq_evidence
+from utils.smorf.smorf_riboseq_io import eprint, write_output
+from utils.smorf.smorf_riboseq_pipeline import run_riboseq_evidence
 
 
 def get_parser() -> argparse.ArgumentParser:
@@ -26,7 +30,7 @@ def get_parser() -> argparse.ArgumentParser:
 
     # Optional annotation
     parser.add_argument("--genepred", default=None, help="Optional genePred file for ORF exon blocks.")
-    parser.add_argument("--chrom-sizes", default=None, help="Two-column chromosome size file.")
+    parser.add_argument("--chrom-sizes", default=None, help="Optional two-column chromosome size file. If not provided, chromosome sizes will be inferred from density files.")
 
     # Density input
     parser.add_argument("--density-list", default=None, help="TSV with columns: sample, strand, path, optional format.")
@@ -89,6 +93,6 @@ def main() -> None:
 
     output_table = run_riboseq_evidence(args)
 
-    eprint(f"[Info] Writing output: {args.output}")
+    eprint(f"[smORFEvidence] Writing output: {args.output}")
     write_output(output_table, args.output)
-    eprint("[Info] Done.")
+    eprint("[smORFEvidence] Done.")

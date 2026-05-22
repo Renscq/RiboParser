@@ -74,5 +74,6 @@ serp_overlap = utils.serp_overlap:main
 serp_peak = utils.serp_peak:main
 serp_properties = utils.serp_properties:main
 simulate_fastq = scripts.fastq.simulate_fastq:main
+smorf_evidence = utils.smorf_evidence:main
 smorf_filter = utils.smorf_filter:main
 smorf_scanner = utils.smorf_scanner:main

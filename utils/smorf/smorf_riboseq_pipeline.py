@@ -39,10 +39,10 @@ def process_one_track(
     args,
 ) -> pd.DataFrame:
     """Process one density track and return an ORF-level evidence table."""
-    eprint(f"[Info] Processing sample={track.sample}, strand={track.strand}, file={track.path}")
+    eprint(f"[smORFEvidence] Processing sample={track.sample}, strand={track.strand}, file={track.path}")
 
     if not chrom_sizes:
-        eprint("[Info] No chromosome sizes provided. Scanning density file to infer chromosome sizes.")
+        eprint("[smORFEvidence] No chromosome sizes provided. Scanning density file to infer chromosome sizes.")
         chrom_sizes = scan_density_max_positions(track.path, track.file_format)
 
     if not chrom_sizes:
@@ -62,12 +62,12 @@ def process_one_track(
             continue
 
         chrom_size = int(chrom_sizes[chrom])
-        eprint(f"[Info] Loading chromosome {chrom} ({chrom_size:,} bp), ORFs={len(chrom_orfs):,}")
+        eprint(f"[smORFEvidence] Loading chromosome {chrom} ({chrom_size:,} bp), ORFs={len(chrom_orfs):,}")
         density = load_chrom_density(track.path, track.file_format, chrom, chrom_size)
 
         for idx, (_, row) in enumerate(chrom_orfs.iterrows(), start=1):
             if args.progress_every > 0 and idx % args.progress_every == 0:
-                eprint(f"[Info] {track.sample}:{chrom}: processed {idx:,}/{len(chrom_orfs):,} ORFs")
+                eprint(f"[smORFEvidence] {track.sample}:{chrom}: processed {idx:,}/{len(chrom_orfs):,} ORFs")
 
             result = score_one_orf(
                 row=row,
@@ -156,18 +156,19 @@ def run_riboseq_evidence(args) -> pd.DataFrame:
         read_orf_table,
     )
 
-    eprint("[Info] Reading ORF table.")
+    eprint("[smORFEvidence] Reading ORF table.")
     orf_table = read_orf_table(args.orf_table, args.coord_mode)
-    eprint(f"[Info] Loaded PASS ORFs: {len(orf_table):,}")
+    eprint(f"[smORFEvidence] Loaded PASS ORFs: {len(orf_table):,}")
 
-    eprint("[Info] Reading chromosome sizes.")
+    eprint("[smORFEvidence] Reading chromosome sizes.")
     chrom_sizes = read_chrom_sizes(args.chrom_sizes)
 
-    eprint("[Info] Reading genePred blocks.")
+    eprint("[smORFEvidence] Reading genePred blocks.")
     genepred_blocks = read_genepred(args.genepred, args.coord_mode)
     if genepred_blocks:
-        eprint(f"[Info] Loaded genePred blocks: {len(genepred_blocks):,}")
+        eprint(f"[smORFEvidence] Loaded genePred blocks: {len(genepred_blocks):,}")
 
+    eprint("[smORFEvidence] Reading P-site density files.")
     tracks = read_density_list(args)
     thresholds = build_thresholds(args)
 

@@ -7,4 +7,4 @@ Initialize the smORF analysis module.
 This module exposes the main SmORFPipeline class for external scripts.
 """
 
-from .pipeline import SmORFPipeline
+from .smorf_pipeline import SmORFPipeline
