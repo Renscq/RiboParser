@@ -1,11 +1,10 @@
 site_name: RiboParser
-site_description: Documentation for RiboParser v0.2.5
+site_description: Documentation for RiboParser
 site_author: Shuchao Ren
 site_url: https://renscq.github.io/RiboParser/
 repo_url: https://github.com/Renscq/RiboParser
 repo_name: Renscq/RiboParser
 edit_uri: edit/main/docs/
-
 theme:
   name: material
   language: en
@@ -34,7 +33,6 @@ theme:
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode
-
 markdown_extensions:
   - admonition
   - attr_list
@@ -48,10 +46,8 @@ markdown_extensions:
       anchor_linenums: true
   - pymdownx.tabbed:
       alternate_style: true
-
 plugins:
   - search
-
 nav:
   - Home: index.md
   - "1 Overview":
@@ -73,33 +69,40 @@ nav:
           - "4.5 Quality control overview": workflow/quality-control/index.md
           - "4.5.1 Check": workflow/quality-control/check.md
           - "4.5.2 Enzymatic bias": workflow/quality-control/enzymatic-bias.md
-          - "4.5.3 P-site offset": workflow/quality-control/psite-offset.md
-          - "4.5.4 RPF density": workflow/quality-control/rpf-density.md
+          - "4.5.3 Offset table": workflow/quality-control/offset-table.md
+          - "4.5.4 Read density": workflow/quality-control/read-density.md
           - "4.5.5 Merge density": workflow/quality-control/merge-density.md
           - "4.5.6 Periodicity": workflow/quality-control/periodicity.md
           - "4.5.7 Metaplot": workflow/quality-control/metaplot.md
           - "4.5.8 Coverage": workflow/quality-control/coverage.md
           - "4.5.9 Correlation": workflow/quality-control/correlation.md
-          - "4.5.10 Quantification": workflow/quality-control/quantification.md
-          - "4.5.11 Codon pausing score": workflow/quality-control/codon-pausing-score.md
-          - "4.5.12 Codon occupancy": workflow/quality-control/codon-occupancy.md
-          - "4.5.13 Codon decoding time": workflow/quality-control/codon-decoding-time.md
-          - "4.5.14 Codon selection time": workflow/quality-control/codon-selection-time.md
-          - "4.5.15 Coefficient of Variation": workflow/quality-control/coefficient-of-variation.md
-          - "4.5.16 Meta-codon analysis": workflow/quality-control/meta-codon-analysis.md
-      - "4.6 Gene-level analysis": workflow/gene-level-analysis.md
-      - "4.7 Codon-level analysis": workflow/codon-level-analysis.md
-      - "4.8 smORF analysis": workflow/smorf-analysis.md
+      - "4.6 Gene-level analysis":
+          - "4.6 Gene-level overview": workflow/gene-level/index.md
+          - "4.6.1 Gene quantification": workflow/gene-level/quantification.md
+          - "4.6.2 Gene coverage": workflow/gene-level/coverage.md
+          - "4.6.3 Gene correlation": workflow/gene-level/correlation.md
+          - "4.6.4 Gene density retrieval": workflow/gene-level/retrieve.md
+      - "4.7 Codon-level analysis":
+          - "4.7 Codon-level overview": workflow/codon-level/index.md
+          - "4.7.1 Codon pausing score": workflow/codon-level/codon-pausing-score.md
+          - "4.7.2 Codon occupancy": workflow/codon-level/codon-occupancy.md
+          - "4.7.3 Codon decoding time": workflow/codon-level/codon-decoding-time.md
+          - "4.7.4 Codon selection time": workflow/codon-level/codon-selection-time.md
+          - "4.7.5 Coefficient of Variation": workflow/codon-level/coefficient-of-variation.md
+          - "4.7.6 Meta-codon analysis": workflow/codon-level/meta-codon-analysis.md
+          - "4.7.7 Codon odds ratio": workflow/codon-level/codon-odds-ratio.md
+      - "4.8 smORF analysis":
+          - "4.8 smORF overview": workflow/smorf/index.md
+          - "4.8.1 smORF scanner": workflow/smorf/scanner.md
+          - "4.8.2 smORF filter": workflow/smorf/filter.md
+          - "4.8.3 smORF evidence": workflow/smorf/evidence.md
+          - "4.8.4 smORF integrate": workflow/smorf/integrate.md
   - "5 Other toolkits":
       - "5.1 Toolkit overview": toolkits/index.md
-      - "5.2 Ribo-quality commands": toolkits/ribo-quality.md
-      - "5.3 Ribo-pausing commands": toolkits/ribo-pausing.md
-      - "5.4 Ribo-utils commands": toolkits/ribo-utils.md
-      - "5.5 RNA commands": toolkits/rna.md
-      - "5.6 SeRP commands": toolkits/serp.md
-      - "5.7 smORF commands": toolkits/smorf.md
-      - "5.8 Helper scripts": toolkits/helper-scripts.md
+      - "5.2 Remaining Ribo-utils commands": toolkits/ribo-utils.md
+      - "5.3 Helper scripts": toolkits/helper-scripts.md
+      - "5.4 Merge result helpers": toolkits/merge-results.md
+      - "5.5 SeRP commands": toolkits/serp.md
   - "6 Performance": performance.md
   - "7 License": license.md
   - "8 Acknowledgements": acknowledgements.md
-  - Deployment: deployment.md

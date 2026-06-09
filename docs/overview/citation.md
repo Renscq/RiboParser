@@ -8,9 +8,3 @@ RiboParser/RiboShiny: An integrated platform for comprehensive analysis and visu
 Journal of Genetics and Genomics (2025).
 doi:10.1016/j.jgg.2025.04.010.
 ```
-
-## DOI
-
-```text
-10.1016/j.jgg.2025.04.010
-```
