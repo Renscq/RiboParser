@@ -2412,9 +2412,278 @@ RIBO_AAA.pdf # Metaplot of AAA codon
 RIBO_AAA.png # Metaplot of AAA codon
 ```
 
+## 6. smORF 鉴定
+### 6.1 全转录组扫描 ORF
 
-## 6. 其他工具包
-### 6.1 Data shuffling
+1. `smorf_scanner` 的解释
+
+使用全部的转录组序列，从头扫描所有潜在的 ORF，结果会输出所有已知和未知的 ORF。
+
+```bash
+$ smorf_scanner -h
+
+usage: smorf_scanner 
+[-h] -g GENOME -a ANNOTATION [-o OUT_PREFIX] [--orf-prefix ORF_PREFIX] [--start-codons START_CODONS]
+[--min-aa MIN_AA] [--max-aa MAX_AA] [--scan-strand {sense,antisense,both}] [--kozak-up KOZAK_UP]
+[--kozak-down KOZAK_DOWN] [-t THREADS] [--mark-overlap] [--remove-discarded] [--include-stop]
+
+Scan transcript-centric smORFs from genome FASTA and genePred annotation.
+
+options:
+  -h, --help            show this help message and exit
+  -g, --genome GENOME   Input genome FASTA file.
+  -a, --annotation ANNOTATION
+                        Input genePred annotation file.
+  -o, --out-prefix OUT_PREFIX
+                        Output prefix.
+  --orf-prefix ORF_PREFIX
+                        Prefix for ORF IDs.
+  --start-codons START_CODONS
+                        Comma-separated start codons, such as ATG,CTG,GTG,TTG.
+  --min-aa MIN_AA       Minimum ORF length in amino acids.
+  --max-aa MAX_AA       Maximum ORF length in amino acids.
+  --scan-strand {sense,antisense,both}
+                        Scan sense, antisense, or both strands.
+  --kozak-up KOZAK_UP   Number of upstream nucleotides for Kozak sequence.
+  --kozak-down KOZAK_DOWN
+                        Number of downstream nucleotides after start codon for Kozak sequence.
+  -t, --threads THREADS
+                        Number of worker processes for parallel ORF scanning.
+  --mark-overlap        Mark nested or overlapping ORFs.
+  --remove-discarded    Remove same-frame internal ORFs.
+  --include-stop        Keep stop codon symbol in peptide sequence.
+
+# example
+smorf_scanner \
+  --genome ../genome/GCF_mine_genomic.fna \
+  --annotation ../norm/mine.genepred \
+  --out-prefix mine \
+  --start-codons ATG \
+  --min-aa 8 \
+  --max-aa 10000 \
+  --scan-strand both \
+  --kozak-up 6 \
+  --kozak-down 6 \
+  --mark-overlap \
+  --threads 20
+
+```
+
+
+2. 使用 `smorf_filter` 对扫描的 ORF 过滤
+
+全转录组扫描的结果仅基于开放阅读框的位置，因此存在大量的假阳性结果。所以需要进行假阳性的过滤。
+同时可以筛选一些 smORF 用于研究。
+
+```bash
+$ smorf_filter -h
+usage: smorf_filter 
+[-h] -i INPUT [-o OUT_PREFIX] [--keep-start-codons KEEP_START_CODONS] [--min-aa MIN_AA] [--max-aa MAX_AA]
+[--keep-categories KEEP_CATEGORIES] [--remove-categories REMOVE_CATEGORIES] [--keep-antisense] [--keep-secondary]
+[--keep-partial] [--kozak-mode {none,annotated,builtin,pwm,sequence}]
+[--builtin-kozak {arabidopsis,drosophila,maize,plant,rice,terrestrial_plant,vertebrate,yeast}]
+[--kozak-pwm KOZAK_PWM] [--kozak-seq KOZAK_SEQ] [--annotated-categories ANNOTATED_CATEGORIES]
+[--min-annotated-kozak MIN_ANNOTATED_KOZAK]
+[--fallback-builtin-kozak {arabidopsis,drosophila,maize,plant,rice,terrestrial_plant,vertebrate,yeast}]
+[--no-kozak-fallback] [--min-kozak-pwm-score MIN_KOZAK_PWM_SCORE] [--export-kozak-pwm EXPORT_KOZAK_PWM]
+[--list-builtin-kozak]
+
+Filter ORF.message.txt using rule-based criteria and Kozak PWM scoring.
+
+options:
+  -h, --help            show this help message and exit
+  -i, --input INPUT     Input ORF.message.txt file.
+  -o, --out-prefix OUT_PREFIX
+                        Output prefix. (default: ORF.filtered).
+  --keep-start-codons KEEP_START_CODONS
+                        Comma-separated start codons to keep. (default: ATG,CTG,GTG,TTG).
+  --min-aa MIN_AA       Minimum ORF peptide length. (default: 8).
+  --max-aa MAX_AA       Maximum ORF peptide length. (default: 10000).
+  --keep-categories KEEP_CATEGORIES
+                        Comma-separated ORF categories to keep. (default:
+                        uORF,dORF,lncORF,iORF,emORF,overlap_uORF,overlap_dORF,other_ORF,annotated_ORF).
+  --remove-categories REMOVE_CATEGORIES
+                        Comma-separated ORF categories to remove. (default: same_frame_iORF,antisense_ORF).
+  --keep-antisense      Keep antisense ORFs. (default: False).
+  --keep-secondary      Keep secondary ORFs. (default: False).
+  --keep-partial        Keep incomplete ORFs. (default: False).
+  --kozak-mode {none,annotated,builtin,pwm,sequence}
+                        Kozak PWM mode. (default: annotated).
+  --builtin-kozak {arabidopsis,drosophila,maize,plant,rice,terrestrial_plant,vertebrate,yeast}
+                        Built-in Kozak PWM name. (default: plant).
+  --kozak-pwm KOZAK_PWM
+                        Custom Kozak PWM matrix file. (default: None).
+  --kozak-seq KOZAK_SEQ
+                        Aligned Kozak sequence file used to build PWM. (default: None).
+  --annotated-categories ANNOTATED_CATEGORIES
+                        Categories used to build annotated ORF Kozak PWM. (default: annotated_ORF).
+  --min-annotated-kozak MIN_ANNOTATED_KOZAK
+                        Minimum annotated ORF Kozak sequences required to build PWM. (default: 100).
+  --fallback-builtin-kozak {arabidopsis,drosophila,maize,plant,rice,terrestrial_plant,vertebrate,yeast}
+                        Fallback built-in Kozak PWM if annotated mode fails. (default: plant).
+  --no-kozak-fallback   Do not fallback to built-in PWM if annotated PWM construction fails. (default: False).
+  --min-kozak-pwm-score MIN_KOZAK_PWM_SCORE
+                        Minimum normalized Kozak PWM score. Range: 0-1. (default: 0.0).
+  --export-kozak-pwm EXPORT_KOZAK_PWM
+                        Export loaded or constructed Kozak PWM. (default: None).
+  --list-builtin-kozak  List built-in Kozak PWM models and exit.
+
+# example
+smorf_filter \
+ -i mine.message.txt \
+ -o mine.reliable \
+ --min-aa 8 \
+ --max-aa 10000 \
+ --kozak-mode annotated \
+ --keep-categories uORF,dORF,lncORF,overlap_uORF,overlap_dORF
+
+```
+
+3. 使用 `smorf_evidence` 检查 smORF 的翻译情况
+
+通常情况下，稳定存在的 smORF 可以被灵敏的 Ribo-seq 捕获到，因此可以使用 Ribo-seq 的数据对 smORF 进行检查，搜索可靠的 smORF。这里兼容多个数据的输入，用以检测不同时间稳定存在的 smORF。
+
+```bash
+$ smorf_evidence -h
+usage: smorf_evidence 
+[-h] -i ORF_TABLE -o OUTPUT [--genepred GENEPRED] [--chrom-sizes CHROM_SIZES] [--density-list DENSITY_LIST]
+[--density-plus DENSITY_PLUS] [--density-minus DENSITY_MINUS] [--density DENSITY] [--sample SAMPLE]
+[--density-format {auto,wig,bedgraph}] [--coord-mode {0based-half-open,1based-closed}]
+[--post-stop-codons POST_STOP_CODONS] [--pseudocount PSEUDOCOUNT] [--min-rpf-sum MIN_RPF_SUM]
+[--min-covered-codon MIN_COVERED_CODON] [--min-coverage-ratio MIN_COVERAGE_RATIO]
+[--strong-periodicity STRONG_PERIODICITY] [--moderate-periodicity MODERATE_PERIODICITY]
+[--strong-start-pause STRONG_START_PAUSE] [--moderate-start-pause MODERATE_START_PAUSE]
+[--strong-stop-pause STRONG_STOP_PAUSE] [--moderate-stop-pause MODERATE_STOP_PAUSE]
+[--strong-release STRONG_RELEASE] [--moderate-release MODERATE_RELEASE]
+[--uniform-coverage-ratio UNIFORM_COVERAGE_RATIO] [--uniform-gini UNIFORM_GINI]
+[--uniform-max-to-mean UNIFORM_MAX_TO_MEAN] [--skewed-max-to-mean SKEWED_MAX_TO_MEAN]
+[--skewed-top-fraction SKEWED_TOP_FRACTION] [--disperse-coverage-ratio DISPERSE_COVERAGE_RATIO]
+[--progress-every PROGRESS_EVERY] [--keep-no-evidence]
+
+Evaluate smORF translation evidence using Ribo-seq P-site density.
+
+options:
+  -h, --help            show this help message and exit
+  -i, --orf-table ORF_TABLE
+                        Filtered smORF table from smorf_filter.
+  -o, --output OUTPUT   Output evidence table in TSV format.
+  --genepred GENEPRED   Optional genePred file for ORF exon blocks. (default: None)
+  --chrom-sizes CHROM_SIZES
+                        Optional two-column chromosome size file. If not provided, chromosome sizes will be inferred from density files.
+                        (default: None)
+  --density-list DENSITY_LIST
+                        TSV with columns: sample, strand, path, optional format. (default: None)
+  --density-plus DENSITY_PLUS
+                        Plus-strand P-site density file. (default: None)
+  --density-minus DENSITY_MINUS
+                        Minus-strand P-site density file. (default: None)
+  --density DENSITY     Unstranded P-site density file. (default: None)
+  --sample SAMPLE       Sample name for direct density input. (default: sample1)
+  --density-format {auto,wig,bedgraph}
+                        Density file format. (default: auto)
+  --coord-mode {0based-half-open,1based-closed}
+                        Coordinate mode for ORF table and genePred-like blocks. (default: 0based-half-open)
+  --post-stop-codons POST_STOP_CODONS
+                        Number of codons after stop codon used for release signal. (default: 10)
+  --pseudocount PSEUDOCOUNT
+                        Pseudocount for ratio calculation. (default: 0.1)
+  --min-rpf-sum MIN_RPF_SUM
+                        Minimum ORF-level RPF sum for evidence scoring. (default: 3.0)
+  --min-covered-codon MIN_COVERED_CODON
+                        Minimum covered codon count. (default: 2)
+  --min-coverage-ratio MIN_COVERAGE_RATIO
+                        Minimum nucleotide-level coverage ratio. (default: 0.1)
+  --strong-periodicity STRONG_PERIODICITY
+                        Frame-0 ratio threshold for strong periodicity. (default: 0.7)
+  --moderate-periodicity MODERATE_PERIODICITY
+                        Frame-0 ratio threshold for moderate periodicity. (default: 0.55)
+  --strong-start-pause STRONG_START_PAUSE
+                        Start pausing ratio threshold for strong signal. (default: 1.5)
+  --moderate-start-pause MODERATE_START_PAUSE
+                        Start pausing ratio threshold for moderate signal. (default: 1.2)
+  --strong-stop-pause STRONG_STOP_PAUSE
+                        Pre-stop pausing ratio threshold for strong signal. (default: 1.5)
+  --moderate-stop-pause MODERATE_STOP_PAUSE
+                        Pre-stop pausing ratio threshold for moderate signal. (default: 1.2)
+  --strong-release STRONG_RELEASE
+                        Release ratio threshold for strong signal. (default: 3.0)
+  --moderate-release MODERATE_RELEASE
+                        Release ratio threshold for moderate signal. (default: 1.5)
+  --uniform-coverage-ratio UNIFORM_COVERAGE_RATIO
+                        Coverage ratio threshold for Uniform shape. (default: 0.4)
+  --uniform-gini UNIFORM_GINI
+                        Gini threshold for Uniform shape. (default: 0.5)
+  --uniform-max-to-mean UNIFORM_MAX_TO_MEAN
+                        Max/mean threshold for Uniform shape. (default: 5.0)
+  --skewed-max-to-mean SKEWED_MAX_TO_MEAN
+                        Max/mean threshold for Skewed shape. (default: 10.0)
+  --skewed-top-fraction SKEWED_TOP_FRACTION
+                        Top 10 percent density fraction threshold for Skewed shape. (default: 0.7)
+  --disperse-coverage-ratio DISPERSE_COVERAGE_RATIO
+                        Coverage ratio threshold below which coverage is Disperse. (default: 0.2)
+  --progress-every PROGRESS_EVERY
+                        Print progress every N ORFs per chromosome. (default: 10000)
+  --keep-no-evidence    Keep ORFs with no RPF evidence in output. (default: False)
+
+
+# example
+smorf_evidence \
+  -i mine.reliable.passed.message.txt \
+  --genepred mine.genePred \
+  --density-list ribo.bedgraph.list \
+  -o mine.smorf.riboseq_evidence.txt
+
+# cat ribo.bedgraph.list
+# sample	strand	path	format
+# ribo1	+	/project/mine/ribo/bedgraph/ribo1_plus.rpf.bedgraph	bedgraph
+# ribo1	-	/project/mine/ribo/bedgraph/ribo1_minus.rpf.bedgraph	bedgraph
+# ribo2	+	/project/mine/ribo/bedgraph/ribo2_plus.rpf.bedgraph	bedgraph
+# ribo2	-	/project/mine/ribo/bedgraph/ribo2_minus.rpf.bedgraph	bedgraph
+
+# 上面的 bedgraph 文件通过命令 rpf_Bam2bw 生成。
+
+```
+
+4. 使用 `smorf_integrate` 整合所有高置信度的 smORF
+
+把通过了不同样本 Ribo-seq 数据过滤的结果进行整合，合并为一张大表。
+后续可以通过对输出表格和第一步扫描的注释文件的筛选，然后通过 RiboParser 的 rpf 函数模块进行完整的质控和定量分析。
+
+```bash
+$ smorf_integrate -h
+usage: smorf_integrate 
+[-h] -i INPUT [--output-matrix OUTPUT_MATRIX] [--output-integrated OUTPUT_INTEGRATED] 
+[--capture-labels CAPTURE_LABELS] [--pass-labels PASS_LABELS] [--excellent-min-samples EXCELLENT_MIN_SAMPLES]
+
+Integrate long-format smORF Ribo-seq evidence into matrices and ORF-level summary tables.
+
+options:
+  -h, --help            show this help message and exit
+  -i, --input INPUT     Long-format smORF Ribo-seq evidence table generated by smorf_evidence.py.
+  --output-matrix OUTPUT_MATRIX
+                        Output ORF-by-sample matrix table for frame density and selected sample metrics. (default: None)
+  --output-integrated OUTPUT_INTEGRATED
+                        Output integrated ORF-level evidence table. (default: None)
+  --capture-labels CAPTURE_LABELS
+                        Translation evidence labels used to define captured samples. (default: LowConfidence,MediumConfidence,HighConfidence)
+  --pass-labels PASS_LABELS
+                        Translation evidence labels used to define reliable/pass samples. (default: MediumConfidence,HighConfidence)
+  --excellent-min-samples EXCELLENT_MIN_SAMPLES
+                        Minimum number of pass samples required to mark an ORF as Excellent. (default: 2)
+
+# example
+smorf_integrate \
+ -i mine.smorf.riboseq_evidence.txt \
+ --output-matrix mine.smorf.frame_density_matrix.txt \
+ --output-integrated mine.smorf.integrated_evidence.txt
+
+```
+
+
+
+
+## 7. 其他工具包
+### 7.1 Data shuffling
 
 一些分析过程需要随机分配的数据进行控制，所以这里添加了一个步骤来重新排列rfp密度文件。
 
@@ -2483,7 +2752,7 @@ RIBO_shuffle.txt # Shuffled RPFs density file
 ```
 
 
-### 6.2 检索并格式化基因密度
+### 7.2 检索并格式化基因密度
 
 在许多情况下，需要对rfp密度文件中的基因集进行一些额外的操作。
 
@@ -2563,7 +2832,7 @@ RIBO.log
 RIBO_retrieve.txt
 ```
 
-### 6.3 过滤移码基因
+### 7.3 过滤移码基因
 
 当核糖体在mRNA序列中移动一个或多个核苷酸时，翻译中的移码发生，导致密码子的误读。
 这导致下游的氨基酸序列完全改变，通常导致过早终止或无功能的蛋白质。
@@ -2630,9 +2899,9 @@ RIBO_gene_periodicity.txt
 RIBO_SRR1944912_gene_frame_shift.txt
 ```
 
-## 7. shell 包装流程
+## 8. shell 包装流程
 
-### 7.0 为项目准备目录结构和实验设计文件
+### 8.0 为项目准备目录结构和实验设计文件
 
 1. 创建用于存储原始数据和分析结果的目录结构
 
@@ -2664,7 +2933,7 @@ SRR1944917      ncs2d_ribo_YPD
 ```
 
 
-### 7.1 run_step1.sh
+### 8.1 run_step1.sh
 
 此步骤用于构建数据库，这是进行 reads 比对及后续使用 `RiboParser` 进行分析的关键步骤。  
 
@@ -2676,7 +2945,7 @@ SRR1944917      ncs2d_ribo_YPD
 $ nohup sh run_step1.sh &
 ```
 
-### 7.2 run_step2.sh
+### 8.2 run_step2.sh
 
 此步骤用于分析 `RNA-seq` 数据，包括数据清洗、比对和表达定量。  
 
@@ -2686,7 +2955,7 @@ $ nohup sh run_step1.sh &
 $ nohup sh run_step2.sh &
 ```
 
-### 7.3 run_step3.sh
+### 8.3 run_step3.sh
 
 此步骤用于分析 `Ribo-seq` 数据，包括数据清洗、比对和表达定量。  
 
@@ -2696,7 +2965,7 @@ $ nohup sh run_step2.sh &
 $ nohup sh run_step3.sh &
 ```
 
-### 7.4 run_step4.sh
+### 8.4 run_step4.sh
 
 此步骤用于分析 `RNA-seq` 数据，利用 `RiboParser` 检查 `RNA-seq` 数据的测序质量，并准备格式化文件，以便与 `Ribo-seq` 进行后续联合分析。  
 
@@ -2706,7 +2975,7 @@ $ nohup sh run_step3.sh &
 $ nohup sh run_step4.sh &
 ```
 
-### 7.5 run_step5.sh
+### 8.5 run_step5.sh
 
 此步骤用于分析 `Ribo-seq` 数据，利用 `RiboParser` 检查 `Ribo-seq` 数据的测序质量。
 
@@ -2718,7 +2987,7 @@ $ nohup sh run_step5.sh &
 ```
 
 
-## 8. Computational performance of the RiboParser
+## 9. Computational performance of the RiboParser
 我们在CentOS 7系统上使用12个线程评估工作流，使用来自三个不同物种（S. cerevisiae， M. musus和H. sapiens）的RNA-seq和Ribo-seq数据。
 软件中的多线程使用 python 开发，因为众所周知的原因，不建议使用太高的线程，收益较低。
 
@@ -2747,7 +3016,7 @@ RiboParser系统推荐：
 - Storage: ≥ 512 GB NVMe SSD for rapid I/O and 2 TB HDD (SATA III)
 
 
-## 9. 贡献
+## 10. 贡献
 
 感谢在这个过程中使用的所有开源工具。
 
@@ -2757,6 +3026,6 @@ RiboParser系统推荐：
 
 更多信息请联系 `rensc0718@163.com`。
 
-## 10. License
+## 11. License
 
 GPL License.
