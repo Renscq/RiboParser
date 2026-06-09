@@ -1,26 +1,34 @@
 # 2.3 GitHub
 
-Install RiboParser from GitHub source:
+Install the development version from GitHub:
 
 ```bash
 git clone https://github.com/Renscq/RiboParser.git
 cd RiboParser
+
 pip install build
 python -m build
 pip install .
 ```
 
-For development:
+For editable development mode:
 
 ```bash
-git clone https://github.com/Renscq/RiboParser.git
-cd RiboParser
 pip install -e .
 ```
 
-Check installation:
+## Run the test
 
 ```bash
+# check the version
 riboparser -v
+
+# check the citation
+riboparser -c
+
+# check the dependency
+riboparser -d
+
+# check the module
 riboparser -m
 ```

@@ -1,29 +1,25 @@
 # 1.1 Overview
 
-RiboParser is designed to support full RNA-seq and Ribo-seq workflows from raw data processing to codon-resolution translational analysis.
+RiboParser provides an integrated workflow for RNA-seq and ribosome profiling data analysis. The documentation is organized by practical workflow rather than by a single long README.
 
-## Major capabilities
+## Major functions
 
-- Ribo-seq reference file generation
-- RNA-seq and Ribo-seq preprocessing
-- contaminant classification using rRNA, tRNA, ncRNA, mRNA, and genome references
-- STAR alignment and RSEM quantification
+- software installation and dependency checking
+- reference genome and transcriptome preparation
+- Bowtie indexes for genome, mRNA, rRNA, tRNA, and ncRNA
+- STAR genome index construction
+- RSEM transcriptome index construction
+- RNA-seq raw data cleaning, classification, alignment, and quantification
+- Ribo-seq raw data cleaning, classification, alignment, and quantification
 - Ribo-seq quality control
-- P-site offset detection
-- RPF density generation
+- P-site offset prediction
+- RPF density generation and merging
+- periodicity, metagene, coverage, and correlation analysis
 - gene-level quantification
-- codon-level pausing and occupancy analysis
-- smORF evidence integration
-- SeRP-related analysis
-- visualization-ready output generation
+- codon-level pausing, occupancy, decoding time, selection time, CoV, and meta-codon analysis
+- smORF scanning, filtering, evidence evaluation, and integration
+- utility functions including shuffling, retrieval, and frame-shift detection
 
-## Typical use cases
+## Recommended strategy
 
-- evaluating Ribo-seq library quality
-- detecting reliable P-site offsets
-- calculating RPF density across CDS regions
-- comparing RNA-seq and Ribo-seq profiles
-- quantifying translation efficiency-related changes
-- identifying codon-level pausing patterns
-- screening translated smORFs
-- preparing outputs for RiboShiny
+Use the `Workflow` section as the main tutorial. Use `Other toolkits` as a command reference.

@@ -1,8 +1,8 @@
 # 8 Acknowledgements
 
-RiboParser integrates common tools and workflows used in RNA-seq and Ribo-seq data analysis.
+RiboParser integrates common tools and workflows used in RNA-seq and Ribo-seq analysis.
 
-Common dependencies and related tools include:
+Related tools include:
 
 - Bowtie
 - SAMtools

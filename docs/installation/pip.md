@@ -6,7 +6,7 @@ Install RiboParser with pip:
 pip install riboparser
 ```
 
-Check installation:
+Check the installation:
 
 ```bash
 riboparser -v
@@ -15,10 +15,17 @@ riboparser -d
 riboparser -m
 ```
 
-## Recommended isolated environment
+## GitHub build + pip install
 
 ```bash
-conda create -n ribo python=3.12
-conda activate ribo
-pip install riboparser
+cd RiboParser
+
+# install build dependency
+pip install build
+
+# build the package
+python -m build
+
+# install local package
+pip install .
 ```

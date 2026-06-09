@@ -1,36 +1,69 @@
 # 4.5.11 Codon pausing score
 
-## Scope
+Ribosome profiling can capture ribosome pausing. If a codon is translated more slowly, increased ribosome occupancy is expected around that codon.
 
-Ribo-seq
+Pause scores are calculated by normalizing codon-level read counts against each gene's mean read density.
 
-## Purpose
-
-Calculate codon pausing scores.
-
-## Main command
+## Command help
 
 ```bash
 rpf_Pausing -h
 ```
 
-## Recommended page content
+```text
+usage: rpf_Pausing [-h] -r RPF [-l LIST] -o OUTPUT [-s {E,P,A}]
+                   [-f {0,1,2,all}] [-b BACKGROUND] [-m MIN]
+                   [--tis TIS] [--tts TTS] [-n]
+                   [--scale {zscore,minmax}] [--stop]
+                   [--fig {none,png,pdf}] [--all]
 
-A complete command page should include:
+Required arguments:
+  -r RPF       input RPF density file
+  -l LIST      gene list; default: whole
+  -o OUTPUT    output prefix
 
-1. input files
-2. core parameters
-3. command example
-4. output files
-5. result interpretation
-6. common errors and troubleshooting
+Options:
+  -s           E/P/A site
+  -f           reading frame
+  -b           background codon number
+  -m MIN       minimum RPF count
+  --tis        discard codons after TIS
+  --tts        discard codons before TTS
+  --scale      zscore or minmax
+  --stop       remove stop codon
+  --all        output all gene-level pausing scores
+```
 
-## Example skeleton
+## Example
 
 ```bash
-# Show help
-rpf_Pausing -h
+cd ./4.ribo-seq/5.riboparser/11.pausing_score/
 
-# Run with project-specific input files
-# Replace file paths and parameters according to your dataset.
+for sites in E P A
+do
+  rpf_Pausing \
+    -l ../../../1.reference/norm/gene.norm.txt \
+    -r ../05.merge/RIBO_merged.txt \
+    -b 0 \
+    --stop \
+    -m 30 \
+    -s $sites \
+    -f 0 \
+    --scale minmax \
+    -o "$sites"_site \
+    &>> "$sites"_site.log
+done
+```
+
+## Output files
+
+```text
+A_site_cds_codon_pausing_score.txt
+A_site_cds_pausing_score.txt
+A_site_sum_codon_pausing_score.txt
+A_site_total_pausing_heatplot.pdf
+A_site_total_pausing_heatplot.png
+A_site_valid_pausing_heatplot.pdf
+A_site_valid_pausing_heatplot.png
+A_site.log
 ```

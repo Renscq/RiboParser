@@ -2,17 +2,23 @@
 
 | Command | Function |
 |---|---|
-| `riboparser` | Main package entry point |
+| `riboparser` | Main entry point |
 | `rpf_Reference` | Build normalized reference files |
-| `rpf_Check` | Basic quality check |
-| `rpf_Digest` | Enzymatic digestion bias analysis |
-| `rpf_Offset` | P-site offset detection |
-| `rpf_Offset_RSBM` | RSBM-based offset detection |
-| `rpf_Density` | Generate RPF density |
+| `rpf_Check` | BAM quality check, length distribution, saturation |
+| `rpf_Digest` | Digestion and ligation bias analysis |
+| `rpf_Offset` | P-site offset prediction |
+| `rpf_Offset_RSBM` | RSBM offset prediction |
+| `rpf_Density` | Convert BAM to RPF density |
 | `rpf_Merge` | Merge density files |
-| `rpf_Periodicity` | Analyze 3-nt periodicity |
-| `rpf_Metaplot` | Generate metagene plots |
-| `rpf_Coverage` | Analyze coverage |
-| `rpf_Corr` | Calculate sample correlation |
-| `rpf_Quant` | Quantify RPFs |
-| `rpf_Percent` | Calculate RPF percentage metrics |
+| `rpf_Periodicity` | 3-nt periodicity analysis |
+| `rpf_Metaplot` | Metagene analysis |
+| `rpf_Coverage` | Gene body coverage analysis |
+| `rpf_Corr` | Sample correlation |
+| `rpf_Quant` | RPF quantification |
+| `rpf_Percent` | RPF percentage analysis |
+
+Use:
+
+```bash
+command_name -h
+```

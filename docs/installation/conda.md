@@ -1,27 +1,25 @@
 # 2.2 conda
 
-Create an environment:
+First install `miniconda` or `micromamba`.
+
+## Create environment
 
 ```bash
-conda create -n ribo python=3.12
+conda create -n ribo
 conda activate ribo
 ```
 
-Install RiboParser:
+## Install RiboParser directly
 
 ```bash
+# conda
 conda install riboparser -c rensc
-```
 
-Or use micromamba:
-
-```bash
-micromamba create -n ribo python=3.12
-micromamba activate ribo
+# micromamba
 micromamba install riboparser -c rensc
 ```
 
-## Common external dependencies
+## Install software dependencies step by step
 
 ```bash
 conda install bowtie samtools cutadapt star bedtools subread rsem gffread sra-tools \
@@ -29,4 +27,10 @@ conda install bowtie samtools cutadapt star bedtools subread rsem gffread sra-to
   -c bioconda
 
 conda install pigz -c conda-forge
+```
+
+Then install RiboParser:
+
+```bash
+pip install riboparser
 ```

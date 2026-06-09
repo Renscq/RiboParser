@@ -1,46 +1,33 @@
-# RiboParser
+# RiboParser documentation
 
-**RiboParser** is a modular toolkit for comprehensive RNA-seq and Ribo-seq data analysis.
+**RiboParser** is a modular command-line toolkit for comprehensive RNA-seq and Ribo-seq data analysis.
 
-It provides a reproducible workflow for:
+This documentation restores the detailed workflow originally described in the long README and reorganizes it into a multi-page website. The goal is to keep the GitHub repository homepage readable while preserving complete command examples, parameter descriptions, expected outputs, and result interpretation in `docs/`.
 
-- reference preparation
-- raw data download
-- raw data cleaning
-- alignment and quantification
-- RNA-seq and Ribo-seq quality control
-- RPF density construction
-- gene-level analysis
-- codon-level analysis
-- SeRP analysis
-- smORF analysis
-- downstream visualization with RiboShiny
+## Complete analysis workflow
 
-## Documentation structure
+1. Software installation
+2. Reference file creation
+3. Raw data download
+4. Raw data cleaning
+5. Data alignment
+6. Sequencing quality analysis
+7. Gene-level analysis
+8. Codon-level analysis
+9. smORF identification
+10. Other utility modules
 
-The documentation is organized according to the analysis workflow:
+## Example dataset
 
-1. Overview
-2. Installation
-3. Quick start
-4. Workflow
-5. Other toolkits
-6. Performance
-7. License
-8. Acknowledgements
-
-## Recommended workflow
+The original tutorial uses public RNA-seq and Ribo-seq data from `GSE67387` as the demonstration dataset.
 
 ```text
-Reference preparation
-→ Raw data download
-→ Raw data cleaning
-→ Alignment and quantification
-→ Quality control
-→ Gene-level analysis
-→ Codon-level analysis
-→ smORF / SeRP analysis
-→ RiboShiny visualization
+Dataset: GSE67387
+Reference:
+Nedialkova DD, Leidel SA.
+Optimization of Codon Translation Rates via tRNA Modifications Maintains Proteome Integrity.
+Cell 2015 Jun 18;161(7):1606-18.
+PMID: 26052047
 ```
 
 ## Quick test

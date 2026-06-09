@@ -1,36 +1,63 @@
 # 4.5.10 Quantification
 
-## Scope
+Ribo-seq quantification differs from RNA-seq because Ribo-seq measures ribosome occupancy within CDS regions.
 
-Ribo-seq
+## Recommended principle
 
-## Purpose
+To reduce artifacts from translation initiation and termination, the standard workflow excludes:
 
-Quantify RPFs in CDS and related regions.
+- first 15 codons downstream of the start codon
+- last 5 codons upstream of the stop codon
 
-## Main command
+In-frame filtering can further remove out-of-frame reads that likely represent noise.
+
+## Command help
 
 ```bash
 rpf_Quant -h
 ```
 
-## Recommended page content
+```text
+usage: rpf_Quant [-h] -r RPF -o OUTPUT [-f {0,1,2,all}]
+                 [--tis TIS] [--tts TTS] [--utr5] [--utr3]
 
-A complete command page should include:
+Required arguments:
+  -r RPF       input RPF density file
+  -o OUTPUT    output prefix
 
-1. input files
-2. core parameters
-3. command example
-4. output files
-5. result interpretation
-6. common errors and troubleshooting
+Options:
+  -f           reading frame
+  --tis TIS    discard codons after TIS
+  --tts TTS    discard codons before TES
+  --utr5       quantify 5'UTR
+  --utr3       quantify 3'UTR
+```
 
-## Example skeleton
+## Ribo-seq quantification
 
 ```bash
-# Show help
-rpf_Quant -h
+cd ./4.ribo-seq/5.riboparser/10.quantification/
 
-# Run with project-specific input files
-# Replace file paths and parameters according to your dataset.
+rpf_Quant \
+  -r ../05.merge/RIBO_merged.txt \
+  --tis 15 \
+  --tts 5 \
+  -o RIBO \
+  &>> RIBO.log
+```
+
+## Output files
+
+```text
+RIBO_cds_rpf_quant.txt
+RIBO_cds_rpm_quant.txt
+RIBO_cds_rpkm_quant.txt
+RIBO_cds_tpm_quant.txt
+RIBO_cds_rpm_bar_plot.pdf
+RIBO_cds_rpm_cdf_plot.pdf
+RIBO_cds_rpm_heatmap.pdf
+RIBO_cds_rpm_pca_plot.pdf
+RIBO_cds_rpm_pca.txt
+RIBO_total.txt
+RIBO.log
 ```

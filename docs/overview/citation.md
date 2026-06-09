@@ -1,6 +1,6 @@
 # 1.2 Citation
 
-If you use RiboParser or RiboShiny, please cite:
+If you use RiboParser or RiboShiny in your research, please cite:
 
 ```text
 Ren, S., Li, Y. & Zhou, Z.
