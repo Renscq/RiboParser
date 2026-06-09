@@ -83,6 +83,7 @@ serp_properties = "utils.serp_properties:main"
 smorf_scanner = "utils.smorf_scanner:main"
 smorf_filter = "utils.smorf_filter:main"
 smorf_evidence = "utils.smorf_evidence:main"
+smorf_integrate = "utils.smorf_integrate:main"
 
 # bedgraph
 bg2meta = "scripts.bedgraph.bg2meta:main"
