@@ -2673,8 +2673,8 @@ smorf_integrate \
 ```
 
 
-## 6. Other toolkits
-### 6.1 Data shuffling
+## 7. Other toolkits
+### 7.1 Data shuffling
 
 Some analysis processes require randomly assigned data for control,
  so a step is added here to reshuffling the RPFs density file.
@@ -2744,7 +2744,7 @@ RIBO_shuffle.txt # Shuffled RPFs density file
 ```
 
 
-### 6.2 Retrieve and format the gene density
+### 7.2 Retrieve and format the gene density
 
 In many cases, it is necessary to perform some additional operations on the gene set in the RPFs density file, 
 such as filtering, RPM standardization, long and width data format conversion, etc. 
@@ -2822,7 +2822,7 @@ RIBO.log
 RIBO_retrieve.txt
 ```
 
-### 6.3 Filter the frame shifting genes
+### 7.3 Filter the frame shifting genes
 
 A frameshift in translation occurs when the ribosome shifts by one or more nucleotides in the mRNA sequence, causing a misreading of the codons.
 This results in a completely altered amino acid sequence downstream of the shift,
@@ -2889,9 +2889,9 @@ RIBO_SRR1944912_gene_frame_shift.txt
 ```
 
 
-## 7. one step for pipeline
+## 8. one step for pipeline
 
-### 7.0 Prepare the directories and design file for your project
+### 8.0 Prepare the directories and design file for your project
 
 1. create the directories to store the raw-data and results
 
@@ -2922,7 +2922,7 @@ SRR1944917      ncs2d_ribo_YPD
 ```
 
 
-### 7.1 run_step1.sh
+### 8.1 run_step1.sh
 
 This step is used for constructing the database, which is essential for the alignment of reads and subsequent analysis using `RiboParser`.
 
@@ -2934,7 +2934,7 @@ This step is suitable for most genome and gene annotation files derived from `NC
 $ nohup sh run_step1.sh &
 ```
 
-### 7.2 run_step2.sh
+### 8.2 run_step2.sh
 
 This step is used for analyzing `RNA-seq` data, including data cleaning, 
 alignment, and expression quantification.
@@ -2946,7 +2946,7 @@ method used in your project!
 $ nohup sh run_step2.sh &
 ```
 
-### 7.3 run_step3.sh
+### 8.3 run_step3.sh
 
 This step is used for analyzing `Ribo-seq` data, including data cleaning, 
 alignment, and expression quantification.
@@ -2958,7 +2958,7 @@ sequencing method used in your project!
 $ nohup sh run_step3.sh &
 ```
 
-### 7.4 run_step4.sh
+### 8.4 run_step4.sh
 
 This step is used for analyzing `RNA-seq` data, utilizing `RiboParser` to check the 
 sequencing quality of the `RNA-seq` data and prepare formatted files for subsequent 
@@ -2971,7 +2971,7 @@ modified according to the files defined for your project!
 $ nohup sh run_step4.sh &
 ```
 
-### 7.5 run_step5.sh
+### 8.5 run_step5.sh
 
 This step is used for analyzing `Ribo-seq` data, utilizing `RiboParser` to check the 
 sequencing quality of the `Ribo-seq` data.
@@ -2984,7 +2984,7 @@ $ nohup sh run_step5.sh &
 ```
 
 
-## 8. Computational performance of the RiboParser
+## 9. Computational performance of the RiboParser
 We assessed the workflow on a CentOS 7 system using 12 threads, with RNA-seq and Ribo-seq data from three different species (S. cerevisiae, M. musculus, and H. sapiens). 
 
 | | | | | | | | | | | |
@@ -3012,7 +3012,7 @@ Optimal Configuration
 - Storage: ≥ 512 GB NVMe SSD for rapid I/O and 2 TB HDD (SATA III)
 
 
-## 9. Contribution
+## 10. Contribution
 
 Thanks for all the open source tools used in the process.
 
@@ -3023,6 +3023,6 @@ Contribute to our open-source project by submitting questions and code.
 Contact `rensc0718@163.com` for more information.
 
 
-## 10. License
+## 11. License
 
 GPL License.
