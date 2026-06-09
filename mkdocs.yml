@@ -1,0 +1,105 @@
+site_name: RiboParser
+site_description: Documentation for RiboParser v0.2.5
+site_author: Shuchao Ren
+site_url: https://renscq.github.io/RiboParser/
+repo_url: https://github.com/Renscq/RiboParser
+repo_name: Renscq/RiboParser
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - "1 Overview":
+      - "1.1 Overview": overview/index.md
+      - "1.2 Citation": overview/citation.md
+      - "1.3 Suggested documentation layout": overview/documentation-layout.md
+  - "2 Installation":
+      - "2.1 pip": installation/pip.md
+      - "2.2 conda": installation/conda.md
+      - "2.3 GitHub": installation/github.md
+  - "3 Quick start": quick-start.md
+  - "4 Workflow":
+      - "Workflow overview": workflow/index.md
+      - "4.1 Reference preparation": workflow/reference-preparation.md
+      - "4.2 Raw data download": workflow/raw-data-download.md
+      - "4.3 Raw data cleaning": workflow/raw-data-cleaning.md
+      - "4.4 Alignment and quantification": workflow/alignment-and-quantification.md
+      - "4.5 Quality control":
+          - "4.5 Quality control overview": workflow/quality-control/index.md
+          - "4.5.1 Check": workflow/quality-control/check.md
+          - "4.5.2 Enzymatic bias": workflow/quality-control/enzymatic-bias.md
+          - "4.5.3 P-site offset": workflow/quality-control/psite-offset.md
+          - "4.5.4 RPF density": workflow/quality-control/rpf-density.md
+          - "4.5.5 Merge density": workflow/quality-control/merge-density.md
+          - "4.5.6 Periodicity": workflow/quality-control/periodicity.md
+          - "4.5.7 Metaplot": workflow/quality-control/metaplot.md
+          - "4.5.8 Coverage": workflow/quality-control/coverage.md
+          - "4.5.9 Correlation": workflow/quality-control/correlation.md
+          - "4.5.10 Quantification": workflow/quality-control/quantification.md
+          - "4.5.11 Codon pausing score": workflow/quality-control/codon-pausing-score.md
+          - "4.5.12 Codon occupancy": workflow/quality-control/codon-occupancy.md
+          - "4.5.13 Codon decoding time": workflow/quality-control/codon-decoding-time.md
+          - "4.5.14 Codon selection time": workflow/quality-control/codon-selection-time.md
+          - "4.5.15 Coefficient of Variation": workflow/quality-control/coefficient-of-variation.md
+          - "4.5.16 Meta-codon analysis": workflow/quality-control/meta-codon-analysis.md
+      - "4.6 Gene-level analysis": workflow/gene-level-analysis.md
+      - "4.7 Codon-level analysis": workflow/codon-level-analysis.md
+      - "4.8 smORF analysis": workflow/smorf-analysis.md
+  - "5 Other toolkits":
+      - "5.1 Toolkit overview": toolkits/index.md
+      - "5.2 Ribo-quality commands": toolkits/ribo-quality.md
+      - "5.3 Ribo-pausing commands": toolkits/ribo-pausing.md
+      - "5.4 Ribo-utils commands": toolkits/ribo-utils.md
+      - "5.5 RNA commands": toolkits/rna.md
+      - "5.6 SeRP commands": toolkits/serp.md
+      - "5.7 smORF commands": toolkits/smorf.md
+      - "5.8 Helper scripts": toolkits/helper-scripts.md
+  - "6 Performance": performance.md
+  - "7 License": license.md
+  - "8 Acknowledgements": acknowledgements.md
+  - Deployment: deployment.md

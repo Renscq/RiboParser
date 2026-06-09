@@ -4,7 +4,9 @@
     "editor.wordWrapColumn": 200,
     "editor.wordWrap": "wordWrapColumn",
     // pylint
-    "python.linting.pylintEnabled": true,
+    "python.analysis.typeCheckingMode": "off",
+    "python.linting.pylintEnabled": false,
+    "python.linting.enabled": false,
     // yapf
     "python.formatting.provider": "yapf",
     "python.formatting.yapfArgs": [
