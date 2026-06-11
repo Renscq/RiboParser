@@ -10,7 +10,26 @@ import pandas as pd
 import polars as pl
 import seaborn as sns
 
-from utils.ribo import ArgsParser
+import argparse
+from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+
+def rpf_corr_args_parser():
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     description="This script is used to draw the correlation of rpf density.")
+
+    # arguments for the Required arguments
+    input_group = parser.add_argument_group('Required arguments')
+    input_group.add_argument('-r', dest="rpf", required=True, type=str,
+                             help="the name of input RPFs file in TXT format.")
+    input_group.add_argument('-o', dest="output", required=True, type=str,
+                             help="the prefix of output file. (prefix + _rpf_merged.txt)")
+
+    args = parser.parse_args()
+    args_print(args)
+
+    return args
+
 
 
 def read_rpf(rpf_file):
@@ -117,10 +136,10 @@ def draw_corr_plot(frame, frame0, frame1, frame2, types, out_prefix):
 
 
 def main():
-    ArgsParser.now_time()
+    now_time()
     print('\nDraw the correlation of samples.', flush=True)
     print('\nStep1: Checking the input Arguments.', flush=True)
-    args = ArgsParser.rpf_corr_args_parser()
+    args = rpf_corr_args_parser()
 
     print('\nStep2: Import the RPFs file.', flush=True)
     rpf, sample_name, frame_rpm, frame0_rpm, frame1_rpm, frame2_rpm = read_rpf(args.rpf)
@@ -139,7 +158,7 @@ def main():
     draw_corr_plot(rpf_corr_f, rpf_corr_f0, rpf_corr_f1, rpf_corr_f2, 'rpf', args.output)
 
     print('\nAll done.', flush=True)
-    ArgsParser.now_time()
+    now_time()
 
 
 if __name__ == '__main__':

@@ -8,7 +8,31 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from utils.ribo import ArgsParser
+import argparse
+from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+
+def rpf_gene_plot_args_parser():
+    parser = argparse.ArgumentParser(description="This script is used to draw the gene rpf plot.")
+
+    # arguments for the Required arguments
+    input_group = parser.add_argument_group('Required arguments')
+    input_group.add_argument('-r', dest="rpf", required=True, type=str,
+                             help="the name of input RPFs file in TXT format.")
+    gene_name = parser.add_mutually_exclusive_group()
+    gene_name.add_argument('-l', dest="list", required=False, type=str, help="the gene name list in TXT format.")
+    gene_name.add_argument('-g', dest="gene", required=False, type=str, help="the gene name.")
+
+    # arguments for the RPFs calculation
+    parser.add_argument('--log', dest="log", required=False, choices=['2', '10'], type=str, default='Not',
+                        help="set the y-axis to log scaling. (default: %(default)s).")
+
+    args = parser.parse_args()
+    file_check(args.rpf)
+    args_print(args)
+
+    return args
+
 
 
 def read_gene_list(gene_list):
@@ -148,10 +172,10 @@ def draw_density_plot(log_type, sample_num, sample_name, merged_rpm, merged_dst,
 
 
 def main():
-    ArgsParser.now_time()
+    now_time()
     print('\nDraw the gene RPFs plot.', flush=True)
     print('\nStep1: Checking the input Arguments.', flush=True)
-    args = ArgsParser.rpf_gene_plot_args_parser()
+    args = rpf_gene_plot_args_parser()
 
     print('\nStep2: Import the gene name.', flush=True)
 
@@ -167,7 +191,7 @@ def main():
     draw_density_plot(args.log, sample_num, sample_name, merged_rpm, merged_dst, gene_name)
 
     print('\nAll done.', flush=True)
-    ArgsParser.now_time()
+    now_time()
 
 
 if __name__ == '__main__':

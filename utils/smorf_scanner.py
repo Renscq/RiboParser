@@ -21,118 +21,54 @@ PROJECT_DIR = os.path.dirname(CURRENT_DIR)
 if PROJECT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_DIR)
 
+from utils.ribo.ArgsParser import args_print, file_check, now_time
 from utils.smorf import SmORFPipeline
 
 
 def parse_args():
     """
     Parse command-line arguments.
-
-    Returns
-    -------
-    argparse.Namespace
-        Parsed command-line arguments.
     """
 
     parser = argparse.ArgumentParser(
-        description="Scan transcript-centric smORFs from genome FASTA and genePred annotation."
+        description="This script is used to scan transcript-centric smORFs."
     )
 
-    parser.add_argument(
-        "-g",
-        "--genome",
-        required=True,
-        help="Input genome FASTA file."
-    )
+    input_group = parser.add_argument_group('Required arguments')
+    input_group.add_argument('-g', '--genome', dest="genome", required=True, type=str,
+                             help="the input genome sequence file in FASTA format.")
+    input_group.add_argument('-a', '--annotation', dest="annotation", required=True, type=str,
+                             help="the input transcript annotation file in genePred format.")
 
-    parser.add_argument(
-        "-a",
-        "--annotation",
-        required=True,
-        help="Input genePred annotation file."
-    )
+    parser.add_argument('-o', '--out-prefix', dest="out_prefix", required=False, type=str, default="ORF",
+                        help="the prefix of output files. (default: %(default)s).")
+    parser.add_argument('-p', '--orf-prefix', dest="orf_prefix", required=False, type=str, default="ORF",
+                        help="the prefix of generated ORF identifiers. (default: %(default)s).")
+    parser.add_argument('-s', '--start-codons', dest="start_codons", required=False, type=str, default="ATG",
+                        help="comma-separated start codons used for ORF scanning. (default: %(default)s).")
+    parser.add_argument('-m', '--min-aa', dest="min_aa", required=False, type=int, default=8,
+                        help="the minimum ORF length to keep. (default: %(default)s aa).")
+    parser.add_argument('-M', '--max-aa', dest="max_aa", required=False, type=int, default=10000,
+                        help="the maximum ORF length to keep. (default: %(default)s aa).")
+    parser.add_argument('-x', '--scan-strand', dest="scan_strand", required=False, type=str,
+                        choices=["sense", "antisense", "both"], default="sense",
+                        help="specify which transcript strand will be scanned. (default: %(default)s).")
+    parser.add_argument('-u', '--kozak-up', dest="kozak_up", required=False, type=int, default=6,
+                        help="the upstream nucleotides extracted for Kozak sequence. (default: %(default)s nt).")
+    parser.add_argument('-d', '--kozak-down', dest="kozak_down", required=False, type=int, default=6,
+                        help="the downstream nucleotides after start codon extracted for Kozak sequence. (default: %(default)s nt).")
+    parser.add_argument('-t', '--threads', dest="threads", required=False, type=int, default=1,
+                        help="the number of worker processes for ORF scanning. (default: %(default)s).")
+    parser.add_argument('-O', '--mark-overlap', dest="mark_overlap", action="store_true", required=False, default=False,
+                        help="mark nested or overlapping ORFs after scanning. (default: %(default)s).")
+    parser.add_argument('-R', '--remove-discarded', dest="remove_discarded", action="store_true", required=False, default=False,
+                        help="remove same-frame internal ORFs from the final output. (default: %(default)s).")
+    parser.add_argument('-I', '--include-stop', dest="include_stop", action="store_true", required=False, default=False,
+                        help="keep the stop codon symbol in peptide sequence. (default: %(default)s).")
 
-    parser.add_argument(
-        "-o",
-        "--out-prefix",
-        default="ORF",
-        help="Output prefix."
-    )
+    args = parser.parse_args()
 
-    parser.add_argument(
-        "--orf-prefix",
-        default="ORF",
-        help="Prefix for ORF IDs."
-    )
-
-    parser.add_argument(
-        "--start-codons",
-        default="ATG",
-        help="Comma-separated start codons, such as ATG,CTG,GTG,TTG."
-    )
-
-    parser.add_argument(
-        "--min-aa",
-        type=int,
-        default=8,
-        help="Minimum ORF length in amino acids."
-    )
-
-    parser.add_argument(
-        "--max-aa",
-        type=int,
-        default=10000,
-        help="Maximum ORF length in amino acids."
-    )
-
-    parser.add_argument(
-        "--scan-strand",
-        choices=["sense", "antisense", "both"],
-        default="sense",
-        help="Scan sense, antisense, or both strands."
-    )
-
-    parser.add_argument(
-        "--kozak-up",
-        type=int,
-        default=6,
-        help="Number of upstream nucleotides for Kozak sequence."
-    )
-
-    parser.add_argument(
-        "--kozak-down",
-        type=int,
-        default=6,
-        help="Number of downstream nucleotides after start codon for Kozak sequence."
-    )
-
-    parser.add_argument(
-        "-t",
-        "--threads",
-        type=int,
-        default=1,
-        help="Number of worker processes for parallel ORF scanning."
-    )
-
-    parser.add_argument(
-        "--mark-overlap",
-        action="store_true",
-        help="Mark nested or overlapping ORFs."
-    )
-
-    parser.add_argument(
-        "--remove-discarded",
-        action="store_true",
-        help="Remove same-frame internal ORFs."
-    )
-
-    parser.add_argument(
-        "--include-stop",
-        action="store_true",
-        help="Keep stop codon symbol in peptide sequence."
-    )
-
-    return parser.parse_args()
+    return args
 
 
 def main():
@@ -141,6 +77,13 @@ def main():
     """
 
     args = parse_args()
+
+    now_time()
+
+    print('\nScan transcript-centric smORFs.', flush=True)
+    print('\nStep1: Checking the input Arguments.', flush=True)
+    file_check(args.genome, args.annotation)
+    args_print(args)
 
     pipeline = SmORFPipeline(
         genome=args.genome,
@@ -159,7 +102,11 @@ def main():
         threads=args.threads,
     )
 
+    print('\nStep2: Scan ORFs from transcript sequences.', flush=True)
     pipeline.run()
+
+    print('\nAll done.', flush=True)
+    now_time()
 
 
 if __name__ == "__main__":

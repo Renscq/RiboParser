@@ -4,16 +4,48 @@
 # @Script  : serp_properties.py
 
 
-from utils.ribo import ArgsParser
 from utils.serp import Properties
+
+import argparse
+import textwrap
+from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+
+def serp_properties():
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     description="This script is used to evaluate the different properties of sequence.",
+                                     epilog=textwrap.dedent('''
+        Properties contain the following patrs:
+        Part1:
+            CAI  - codon adaptation index
+            RSCU - Relative Synonymous Codon Usage
+            Obsi - Observed number of occurrences of codon (per 1000 codon)
+        Part2:
+            gravy             - according to Kyte and Doolittle
+            structure         - fraction of helix, turn and sheet
+            flexibility       - according to Vihinen, 1994
+            instability       - according to Guruprasad et al 1990
+            isoelectric_point - use module IsoelectricPoint
+        '''))
+
+    # arguments for the Required arguments
+    input_group = parser.add_argument_group('Required arguments')
+    input_group.add_argument('-f', dest="fasta", required=True, type=str,
+                             help="the name of input RNA sequence in fasta format.")
+    input_group.add_argument('-o', dest="output", required=True, type=str, help="the prefix of output file,.")
+    args = parser.parse_args()
+    file_check(args.fasta)
+    args_print(args)
+
+    return args
 
 
 def main():
-    ArgsParser.now_time()
+    now_time()
     
     print('\nEvaluate the different properties of sequence.', flush=True)
     print('\nStep1: Checking the input Arguments.', flush=True)
-    args = ArgsParser.serp_properties()
+    args = serp_properties()
 
     print('\nStep2: Import the sequence.', flush=True)
     seq = Properties.Sequence(args)
@@ -29,7 +61,7 @@ def main():
     seq.protein_analysis()
 
     print('\nAll done.', flush=True)
-    ArgsParser.now_time()
+    now_time()
 
 
 if __name__ == '__main__':

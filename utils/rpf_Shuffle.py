@@ -3,15 +3,41 @@
 # @Script  : rpf_Shuffle.py
 
 
-from utils.ribo import ArgsParser
 from utils.ribo.Shuffle import *
+
+import argparse
+from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+
+def shuffle_args_parser():
+    parser = argparse.ArgumentParser(description="This script is used to shuffle the RPFs data.")
+
+    # arguments for the Required arguments
+    input_group = parser.add_argument_group('Required arguments')
+    input_group.add_argument('-r', dest="rpf", required=True, type=str,
+                             help="the name of input RPFs density file in TXT format.")
+    input_group.add_argument('-o', dest="output", required=True, type=str,
+                             help="the prefix of output file. (prefix + _shuffle.txt)")
+
+    # arguments for the ribo-seq parsing
+    parser.add_argument('-l', dest="list", required=False, type=str,
+                        help="the list of input genes for transcript id.")
+    parser.add_argument('-s', dest="seed", required=False, type=int, default=0,
+                        help="the random seed for shuffle. (default: %(default)s).")
+    parser.add_argument('-i', dest="individual", action='store_true', required=False, default=False,
+                        help="shuffle the RPFs data for each samples. (default: %(default)s).")
+    args = parser.parse_args()
+    file_check(args.rpf)
+    args_print(args)
+
+    return args
 
 
 def main():
-    ArgsParser.now_time()
+    now_time()
     print('\nShuffle the RPFs data.', flush=True)
     print('\nStep1: Checking the input Arguments.', flush=True)
-    args = ArgsParser.shuffle_args_parser()
+    args = shuffle_args_parser()
     rpfs = Shuffle(args)
 
     print('\nStep2: Import the RPFs.', flush=True)
@@ -23,7 +49,7 @@ def main():
     print('\nStep4: Output the RPFs table.', flush=True)
     rpfs.output_rpfs()
 
-    ArgsParser.now_time()
+    now_time()
     print('\nAll done.', flush=True)
 
 

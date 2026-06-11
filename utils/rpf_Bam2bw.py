@@ -4,15 +4,50 @@
 # @Script  : rpf_bam2bw.py
 
 
-from utils.ribo import ArgsParser
 from utils.ribo import Bam2Wig
+
+import argparse
+from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+
+def rpf_bam2bw_args_parser():
+    parser = argparse.ArgumentParser(description="This script is used to convert the bam to bedgraph.")
+
+    # arguments for the Required arguments
+    input_group = parser.add_argument_group('Required arguments')
+    input_group.add_argument('-b', dest="bam", required=True, type=str,
+                             help="name of input genome alignment file (bam/sam format).")
+    input_group.add_argument('-p', dest="psite", required=True, type=str,
+                            help="p-site offset file in TXT format. (default: %(default)s).")
+
+    # arguments for the RPFs calculation
+    parser.add_argument('-t', dest="times", required=False, type=int, default=3,
+                        help="set the reads multiple aligned times. (default: %(default)s).")
+    parser.add_argument('--second', dest="secondary", required=False, action='store_true', default=False,
+                        help="discard the reads aligned secondary loci. (default: %(default)s).")
+    parser.add_argument('--supply', dest="supplementary", required=False, action='store_true', default=False,
+                        help="discard the supplementary reads (default: %(default)s ).")    
+    parser.add_argument('-f', dest="format", required=False, choices=['bedgraph', 'wig'], type=str, default='bedgraph',
+                        help="output the bed file. (default: %(default)s).")
+    parser.add_argument('-n', dest="norm", required=False, action='store_true', default=False,
+                        help="normalise the RPFs to RPM. (default: %(default)s).")
+    parser.add_argument('-m', dest="merge", required=False, action='store_true', default=False,
+                        help="merge minus and plus strand to one file. (default: %(default)s).")
+    parser.add_argument('-o', dest="output", required=False, type=str,
+                        help="output the bed file. (default: prefix + .bedgraph).")
+
+    args = parser.parse_args()
+    file_check(args.bam, args.psite)
+    args_print(args)
+
+    return args
 
 
 def main():
-    ArgsParser.now_time()
+    now_time()
     print('\nConvert genome bam reads to bedgraph.', flush=True)
     print('\nStep1: Checking the input Arguments.', flush=True)
-    args = ArgsParser.rpf_bam2bw_args_parser()
+    args = rpf_bam2bw_args_parser()
 
     bam_attr = Bam2Wig.Bam2Wig(args)
 
@@ -33,7 +68,7 @@ def main():
     bam_attr.output_bed()
 
     print('\nAll done.', flush=True)
-    ArgsParser.now_time()
+    now_time()
 
 
 if __name__ == '__main__':

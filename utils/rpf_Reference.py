@@ -4,15 +4,45 @@
 # @Script  : make_ribo_ref.py
 
 
-from utils.ribo import ArgsParser
 from utils.ribo.GenePred import *
+
+import argparse
+from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+
+def make_ribo_ref():
+    parser = argparse.ArgumentParser(description="This script is used to build the references.")
+
+    # arguments for the Required arguments
+    input_group = parser.add_argument_group('Required arguments')
+    input_group.add_argument('-g', dest="genome", required=True, type=str,
+                             help="the input file name of genome sequence")
+    input_group.add_argument('-t', dest="gtf", required=True, type=str, help="the input file name of gtf file")
+    input_group.add_argument('-o', dest="output", required=True, type=str,
+                             help="the prefix of output file. (prefix + _norm.gtf)")
+
+    # arguments for the modification
+    parser.add_argument('-u', dest="utr", required=False, type=int, default=0,
+                        help="add the pseudo UTR to the leaderless transcripts (default: %(default)s nt).")
+    parser.add_argument('-c', dest="coding", required=False, action="store_true", default=False,
+                        help="only retain the protein coding transcripts (default: %(default)s).")
+    parser.add_argument('-l', dest="longest", required=False, action="store_true", default=False,
+                        help="only retain the longest protein coding transcripts (default: %(default)s).")
+    parser.add_argument('-w', dest="whole", required=False, action="store_true", default=False,
+                        help="output whole message (default: %(default)s).")
+    
+    args = parser.parse_args()
+    file_check(args.genome, args.gtf)
+    args_print(args)
+
+    return args
 
 
 def main():
-    ArgsParser.now_time()
+    now_time()
     print('\nMake the reference for riboParser.', flush=True)
     print('\nStep1: Checking the input Arguments.', flush=True)
-    args = ArgsParser.make_ribo_ref()
+    args = make_ribo_ref()
     ribo_ref = GenePred(args)
 
     print('\nStep2: Import genome sequence.', flush=True)

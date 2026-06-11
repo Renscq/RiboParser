@@ -4,15 +4,46 @@
 # @Script  : rpf_Retrieve.py
 
 
-from utils.ribo import ArgsParser
 from utils.ribo.Retrieve import *
+
+import argparse
+from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+
+def retrieve_args_parser():
+    parser = argparse.ArgumentParser(description="This script is used to retrieve density files.")
+
+    # arguments for the required arguments
+    input_group = parser.add_argument_group('Required arguments')
+    input_group.add_argument('-r', dest="rpf", required=True, type=str,
+                             help="the name of input RPFs density file in TXT format.")
+    input_group.add_argument('-o', dest="output", required=False, type=str, 
+                             help="prefix of output file name (default: filename + '_retrieve.txt'.")
+
+    # arguments for the ribo-seq parsing
+    parser.add_argument('-l', dest="list", required=False, type=str,
+                        help="the list of input genes for transcript id.")
+    parser.add_argument('-m', dest="min", required=False, type=int, default=0,
+                        help="retain transcript with more than minimum RPFs (default: %(default)s).")
+    parser.add_argument('-n', dest="normal", action='store_true', required=False, default=False,
+                        help="normalize the RPFs count to RPM (default: %(default)s).")
+    parser.add_argument('-f', dest="format", action='store_true', required=False, default=False,
+                        help="melt three column data of each sample to one column (default: %(default)s).")
+    parser.add_argument('-s', dest="split", action='store_true', required=False, default=False,
+                        help="split gene rpf to each TXT file (default: %(default)s).")
+
+    args = parser.parse_args()
+    file_check(args.rpf)
+    args_print(args)
+
+    return args
 
 
 def main():
-    ArgsParser.now_time()
+    now_time()
     print('\nRetrieve the RPFs with gene list.', flush=True)
     print('\nStep1: Checking the input Arguments.', flush=True)
-    args = ArgsParser.retrieve_args_parser()
+    args = retrieve_args_parser()
     rpfs = Retrieve(args)
 
     # print('Step2: Import gene list.\n', flush=True)
@@ -29,7 +60,7 @@ def main():
     rpfs.output_rpf_table()
 
     print('\nAll done.', flush=True)
-    ArgsParser.now_time()
+    now_time()
 
 
 if __name__ == '__main__':

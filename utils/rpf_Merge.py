@@ -8,7 +8,24 @@ from collections import OrderedDict
 import pandas as pd
 import polars as pl
 
-from utils.ribo import ArgsParser
+import argparse
+from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+
+def rpf_merge_args_parser():
+    parser = argparse.ArgumentParser(description="This script is used to merge the density file.")
+
+    # arguments for the Required arguments
+    input_group = parser.add_argument_group('Required arguments')
+    input_group.add_argument('-l', dest="list", required=True, type=str, help="the sample list in TXT format.")
+    input_group.add_argument('-o', dest="output", required=True, type=str,
+                             help="the prefix of output file. (prefix + _rpf_merged.txt)")
+
+    args = parser.parse_args()
+    args_print(args)
+
+    return args
+
 
 
 def read_sample_list(sample_list):
@@ -47,10 +64,10 @@ def merge_rpf(sp_dict, output_prefix):
 
 
 def main():
-    ArgsParser.now_time()
+    now_time()
     print('\nMerge RPFs files from different samples.', flush=True)
     print('\nStep1: Checking the input Arguments.', flush=True)
-    args = ArgsParser.rpf_merge_args_parser()
+    args = rpf_merge_args_parser()
 
     print('\nStep2: Import the sample list.', flush=True)
     sp_list = read_sample_list(args.list)
@@ -59,7 +76,7 @@ def main():
     merge_rpf(sp_list, args.output)
 
     print('\nAll done.', flush=True)
-    ArgsParser.now_time()
+    now_time()
 
 
 if __name__ == '__main__':

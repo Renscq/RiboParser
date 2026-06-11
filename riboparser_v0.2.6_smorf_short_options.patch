@@ -1,0 +1,345 @@
+diff --git a/utils/smorf_evidence.py b/utils/smorf_evidence.py
+index 201947f..14b08dd 100644
+--- a/utils/smorf_evidence.py
++++ b/utils/smorf_evidence.py
+@@ -12,6 +12,16 @@ Entry script for smORF Ribo-seq evidence analysis.
+ 
+ 
+ import argparse
++import os
++import sys
++
++
++# Add the project root directory to Python import path.
++CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
++PROJECT_DIR = os.path.dirname(CURRENT_DIR)
++
++if PROJECT_DIR not in sys.path:
++    sys.path.insert(0, PROJECT_DIR)
+ 
+ from utils.ribo.ArgsParser import args_print, file_check, now_time
+ from utils.smorf.smorf_riboseq_io import eprint, write_output
+@@ -33,38 +43,38 @@ def get_parser() -> argparse.ArgumentParser:
+     input_group.add_argument('-o', '--output', dest="output", required=True, type=str,
+                              help="the output evidence table in TSV format.")
+ 
+-    parser.add_argument('--genepred', dest="genepred", required=False, type=str, default=None,
++    parser.add_argument('-a', '--genepred', dest="genepred", required=False, type=str, default=None,
+                         help="the optional genePred file used for ORF exon blocks. (default: %(default)s).")
+-    parser.add_argument('--chrom-sizes', dest="chrom_sizes", required=False, type=str, default=None,
++    parser.add_argument('-z', '--chrom-sizes', dest="chrom_sizes", required=False, type=str, default=None,
+                         help="the optional two-column chromosome size file. (default: infer from density files).")
+ 
+-    parser.add_argument('--density-list', dest="density_list", required=False, type=str, default=None,
++    parser.add_argument('-l', '--density-list', dest="density_list", required=False, type=str, default=None,
+                         help="the density file list with columns: sample, strand, path and optional format. (default: %(default)s).")
+-    parser.add_argument('--density-plus', dest="density_plus", required=False, type=str, default=None,
++    parser.add_argument('-p', '--density-plus', dest="density_plus", required=False, type=str, default=None,
+                         help="the plus-strand P-site density file. (default: %(default)s).")
+-    parser.add_argument('--density-minus', dest="density_minus", required=False, type=str, default=None,
++    parser.add_argument('-n', '--density-minus', dest="density_minus", required=False, type=str, default=None,
+                         help="the minus-strand P-site density file. (default: %(default)s).")
+-    parser.add_argument('--density', dest="density", required=False, type=str, default=None,
++    parser.add_argument('-d', '--density', dest="density", required=False, type=str, default=None,
+                         help="the unstranded P-site density file. (default: %(default)s).")
+-    parser.add_argument('--sample', dest="sample", required=False, type=str, default="sample1",
++    parser.add_argument('-s', '--sample', dest="sample", required=False, type=str, default="sample1",
+                         help="the sample name used for direct density input. (default: %(default)s).")
+-    parser.add_argument('--density-format', dest="density_format", required=False, type=str,
++    parser.add_argument('-f', '--density-format', dest="density_format", required=False, type=str,
+                         choices=["auto", "wig", "bedgraph"], default="auto",
+                         help="the density file format. (default: %(default)s).")
+-    parser.add_argument('--coord-mode', dest="coord_mode", required=False, type=str,
++    parser.add_argument('-c', '--coord-mode', dest="coord_mode", required=False, type=str,
+                         choices=["0based-half-open", "1based-closed"], default="0based-half-open",
+                         help="the coordinate mode for ORF table and genePred-like blocks. (default: %(default)s).")
+ 
+-    parser.add_argument('--post-stop-codons', dest="post_stop_codons", required=False, type=int, default=10,
++    parser.add_argument('-r', '--post-stop-codons', dest="post_stop_codons", required=False, type=int, default=10,
+                         help="the number of codons after stop codon used for release signal. (default: %(default)s).")
+-    parser.add_argument('--pseudocount', dest="pseudocount", required=False, type=float, default=0.1,
++    parser.add_argument('-P', '--pseudocount', dest="pseudocount", required=False, type=float, default=0.1,
+                         help="the pseudocount used for ratio calculation. (default: %(default)s).")
+ 
+-    parser.add_argument('--min-rpf-sum', dest="min_rpf_sum", required=False, type=float, default=3.0,
++    parser.add_argument('-R', '--min-rpf-sum', dest="min_rpf_sum", required=False, type=float, default=3.0,
+                         help="the minimum ORF-level RPF sum required for evidence scoring. (default: %(default)s).")
+-    parser.add_argument('--min-covered-codon', dest="min_covered_codon", required=False, type=int, default=2,
++    parser.add_argument('-C', '--min-covered-codon', dest="min_covered_codon", required=False, type=int, default=2,
+                         help="the minimum covered codon count required for evidence scoring. (default: %(default)s).")
+-    parser.add_argument('--min-coverage-ratio', dest="min_coverage_ratio", required=False, type=float, default=0.10,
++    parser.add_argument('-v', '--min-coverage-ratio', dest="min_coverage_ratio", required=False, type=float, default=0.10,
+                         help="the minimum nucleotide-level coverage ratio required for evidence scoring. (default: %(default)s).")
+ 
+     parser.add_argument('--strong-periodicity', dest="strong_periodicity", required=False, type=float, default=0.70,
+@@ -96,9 +106,9 @@ def get_parser() -> argparse.ArgumentParser:
+                         help="the top 10 percent density fraction threshold for Skewed shape. (default: %(default)s).")
+     parser.add_argument('--disperse-coverage-ratio', dest="disperse_coverage_ratio", required=False, type=float, default=0.20,
+                         help="the coverage ratio threshold below which coverage is Disperse. (default: %(default)s).")
+-    parser.add_argument('--progress-every', dest="progress_every", required=False, type=int, default=10000,
++    parser.add_argument('-E', '--progress-every', dest="progress_every", required=False, type=int, default=10000,
+                         help="print progress every N ORFs per chromosome. (default: %(default)s).")
+-    parser.add_argument('--keep-no-evidence', dest="keep_no_evidence", action="store_true", required=False, default=False,
++    parser.add_argument('-N', '--keep-no-evidence', dest="keep_no_evidence", action="store_true", required=False, default=False,
+                         help="keep ORFs with no RPF evidence in output. (default: %(default)s).")
+ 
+     return parser
+@@ -106,12 +116,13 @@ def get_parser() -> argparse.ArgumentParser:
+ 
+ def main() -> None:
+     """Run command-line workflow."""
++    parser = get_parser()
++    args = parser.parse_args()
++
+     now_time()
+ 
+     print('\nEvaluate smORF translation evidence.', flush=True)
+     print('\nStep1: Checking the input Arguments.', flush=True)
+-    parser = get_parser()
+-    args = parser.parse_args()
+ 
+     if args.density_list is None and args.density is None and (args.density_plus is None or args.density_minus is None):
+         parser.error("Please provide --density-list, --density, or both --density-plus and --density-minus.")
+diff --git a/utils/smorf_filter.py b/utils/smorf_filter.py
+index db2b607..87c93f1 100644
+--- a/utils/smorf_filter.py
++++ b/utils/smorf_filter.py
+@@ -47,51 +47,51 @@ def parse_args():
+ 
+     parser.add_argument('-o', '--out-prefix', dest="out_prefix", required=False, type=str, default="ORF.filtered",
+                         help="the prefix of output files. (default: %(default)s).")
+-    parser.add_argument('--keep-start-codons', dest="keep_start_codons", required=False, type=str,
++    parser.add_argument('-s', '--keep-start-codons', dest="keep_start_codons", required=False, type=str,
+                         default="ATG,CTG,GTG,TTG",
+                         help="comma-separated start codons retained in the output. (default: %(default)s).")
+-    parser.add_argument('--min-aa', dest="min_aa", required=False, type=int, default=8,
++    parser.add_argument('-m', '--min-aa', dest="min_aa", required=False, type=int, default=8,
+                         help="the minimum ORF peptide length to keep. (default: %(default)s aa).")
+-    parser.add_argument('--max-aa', dest="max_aa", required=False, type=int, default=10000,
++    parser.add_argument('-M', '--max-aa', dest="max_aa", required=False, type=int, default=10000,
+                         help="the maximum ORF peptide length to keep. (default: %(default)s aa).")
+-    parser.add_argument('--keep-categories', dest="keep_categories", required=False, type=str,
++    parser.add_argument('-c', '--keep-categories', dest="keep_categories", required=False, type=str,
+                         default="uORF,dORF,lncORF,iORF,emORF,overlap_uORF,overlap_dORF,other_ORF,annotated_ORF",
+                         help="comma-separated ORF categories retained before filtering. (default: %(default)s).")
+-    parser.add_argument('--remove-categories', dest="remove_categories", required=False, type=str,
++    parser.add_argument('-r', '--remove-categories', dest="remove_categories", required=False, type=str,
+                         default="same_frame_iORF,antisense_ORF",
+                         help="comma-separated ORF categories removed before filtering. (default: %(default)s).")
+-    parser.add_argument('--keep-antisense', dest="keep_antisense", action="store_true", required=False, default=False,
++    parser.add_argument('-A', '--keep-antisense', dest="keep_antisense", action="store_true", required=False, default=False,
+                         help="keep antisense ORFs. (default: %(default)s).")
+-    parser.add_argument('--keep-secondary', dest="keep_secondary", action="store_true", required=False, default=False,
++    parser.add_argument('-S', '--keep-secondary', dest="keep_secondary", action="store_true", required=False, default=False,
+                         help="keep secondary or lower-priority overlapping ORFs. (default: %(default)s).")
+-    parser.add_argument('--keep-partial', dest="keep_partial", action="store_true", required=False, default=False,
++    parser.add_argument('-P', '--keep-partial', dest="keep_partial", action="store_true", required=False, default=False,
+                         help="keep incomplete ORFs without a complete start-stop structure. (default: %(default)s).")
+ 
+-    parser.add_argument('--kozak-mode', dest="kozak_mode", required=False, type=str,
++    parser.add_argument('-k', '--kozak-mode', dest="kozak_mode", required=False, type=str,
+                         choices=["none", "annotated", "builtin", "pwm", "sequence"], default="annotated",
+                         help="specify the Kozak model source. (default: %(default)s).")
+-    parser.add_argument('--builtin-kozak', dest="builtin_kozak", required=False, type=str,
++    parser.add_argument('-b', '--builtin-kozak', dest="builtin_kozak", required=False, type=str,
+                         choices=sorted(BUILTIN_KOZAK_PWMS.keys()), default="plant",
+                         help="the built-in Kozak PWM used when --kozak-mode builtin. (default: %(default)s).")
+-    parser.add_argument('--kozak-pwm', dest="kozak_pwm", required=False, type=str, default=None,
++    parser.add_argument('-p', '--kozak-pwm', dest="kozak_pwm", required=False, type=str, default=None,
+                         help="the custom Kozak PWM matrix file used when --kozak-mode pwm. (default: %(default)s).")
+-    parser.add_argument('--kozak-seq', dest="kozak_seq", required=False, type=str, default=None,
++    parser.add_argument('-q', '--kozak-seq', dest="kozak_seq", required=False, type=str, default=None,
+                         help="the aligned Kozak sequence file used when --kozak-mode sequence. (default: %(default)s).")
+-    parser.add_argument('--annotated-categories', dest="annotated_categories", required=False, type=str,
++    parser.add_argument('-C', '--annotated-categories', dest="annotated_categories", required=False, type=str,
+                         default="annotated_ORF",
+                         help="ORF categories used to build annotated ORF Kozak PWM. (default: %(default)s).")
+-    parser.add_argument('--min-annotated-kozak', dest="min_annotated_kozak", required=False, type=int, default=100,
++    parser.add_argument('-n', '--min-annotated-kozak', dest="min_annotated_kozak", required=False, type=int, default=100,
+                         help="the minimum annotated ORF Kozak sequences required to build PWM. (default: %(default)s).")
+-    parser.add_argument('--fallback-builtin-kozak', dest="fallback_builtin_kozak", required=False, type=str,
++    parser.add_argument('-B', '--fallback-builtin-kozak', dest="fallback_builtin_kozak", required=False, type=str,
+                         choices=sorted(BUILTIN_KOZAK_PWMS.keys()), default="plant",
+                         help="fallback built-in Kozak PWM if annotated PWM construction fails. (default: %(default)s).")
+-    parser.add_argument('--no-kozak-fallback', dest="no_kozak_fallback", action="store_true", required=False, default=False,
++    parser.add_argument('-F', '--no-kozak-fallback', dest="no_kozak_fallback", action="store_true", required=False, default=False,
+                         help="disable fallback to built-in PWM if annotated PWM construction fails. (default: %(default)s).")
+-    parser.add_argument('--min-kozak-pwm-score', dest="min_kozak_pwm_score", required=False, type=float, default=0.0,
++    parser.add_argument('-w', '--min-kozak-pwm-score', dest="min_kozak_pwm_score", required=False, type=float, default=0.0,
+                         help="the minimum normalized Kozak PWM score to keep. (default: %(default)s).")
+-    parser.add_argument('--export-kozak-pwm', dest="export_kozak_pwm", required=False, type=str, default=None,
++    parser.add_argument('-e', '--export-kozak-pwm', dest="export_kozak_pwm", required=False, type=str, default=None,
+                         help="export the loaded or constructed Kozak PWM to this file. (default: %(default)s).")
+-    parser.add_argument('--list-builtin-kozak', dest="list_builtin_kozak", action="store_true", required=False, default=False,
++    parser.add_argument('-L', '--list-builtin-kozak', dest="list_builtin_kozak", action="store_true", required=False, default=False,
+                         help="list built-in Kozak PWM models and exit. (default: %(default)s).")
+ 
+     args = parser.parse_args()
+@@ -108,14 +108,6 @@ def parse_args():
+     if args.kozak_mode == "sequence" and args.kozak_seq is None:
+         parser.error("--kozak-seq is required when --kozak-mode sequence.")
+ 
+-    check_files = [args.input]
+-    if args.kozak_pwm is not None:
+-        check_files.append(args.kozak_pwm)
+-    if args.kozak_seq is not None:
+-        check_files.append(args.kozak_seq)
+-    file_check(*check_files)
+-    args_print(args)
+-
+     return args
+ 
+ 
+@@ -202,11 +194,12 @@ def main():
+     Run ORF filtering.
+     """
+ 
++    args = parse_args()
++
+     now_time()
+ 
+     print('\nFilter smORF records.', flush=True)
+     print('\nStep1: Checking the input Arguments.', flush=True)
+-    args = parse_args()
+ 
+     if args.list_builtin_kozak:
+         print('\nStep2: List built-in Kozak PWM models.', flush=True)
+@@ -215,6 +208,14 @@ def main():
+         now_time()
+         return
+ 
++    check_files = [args.input]
++    if args.kozak_pwm is not None:
++        check_files.append(args.kozak_pwm)
++    if args.kozak_seq is not None:
++        check_files.append(args.kozak_seq)
++    file_check(*check_files)
++    args_print(args)
++
+     print('\nStep2: Reading ORF records', flush=True)
+     header, records = ORFFilter.read_table(args.input)
+ 
+diff --git a/utils/smorf_integrate.py b/utils/smorf_integrate.py
+index a8e27da..d0767cd 100644
+--- a/utils/smorf_integrate.py
++++ b/utils/smorf_integrate.py
+@@ -11,6 +11,16 @@ Command-line entry for integrating smORF Ribo-seq evidence tables.
+ """
+ 
+ import argparse
++import os
++import sys
++
++
++# Add the project root directory to Python import path.
++CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
++PROJECT_DIR = os.path.dirname(CURRENT_DIR)
++
++if PROJECT_DIR not in sys.path:
++    sys.path.insert(0, PROJECT_DIR)
+ 
+ from utils.ribo.ArgsParser import args_print, file_check, now_time
+ from utils.smorf.smorf_riboseq_integrate import run_integration
+@@ -29,17 +39,17 @@ def get_parser() -> argparse.ArgumentParser:
+     input_group.add_argument('-i', '--input', dest="input", required=True, type=str,
+                              help="the long-format smORF Ribo-seq evidence table generated by smorf_evidence.")
+ 
+-    parser.add_argument('--output-matrix', dest="output_matrix", required=False, type=str, default=None,
++    parser.add_argument('-m', '--output-matrix', dest="output_matrix", required=False, type=str, default=None,
+                         help="the output ORF-by-sample matrix table. (default: %(default)s).")
+-    parser.add_argument('--output-integrated', dest="output_integrated", required=False, type=str, default=None,
++    parser.add_argument('-o', '--output-integrated', dest="output_integrated", required=False, type=str, default=None,
+                         help="the output integrated ORF-level evidence table. (default: %(default)s).")
+-    parser.add_argument('--capture-labels', dest="capture_labels", required=False, type=str,
++    parser.add_argument('-c', '--capture-labels', dest="capture_labels", required=False, type=str,
+                         default="LowConfidence,MediumConfidence,HighConfidence",
+                         help="translation evidence labels used to define captured samples. (default: %(default)s).")
+-    parser.add_argument('--pass-labels', dest="pass_labels", required=False, type=str,
++    parser.add_argument('-p', '--pass-labels', dest="pass_labels", required=False, type=str,
+                         default="MediumConfidence,HighConfidence",
+                         help="translation evidence labels used to define reliable samples. (default: %(default)s).")
+-    parser.add_argument('--excellent-min-samples', dest="excellent_min_samples", required=False, type=int, default=2,
++    parser.add_argument('-n', '--excellent-min-samples', dest="excellent_min_samples", required=False, type=int, default=2,
+                         help="the minimum number of reliable samples required to mark an ORF as Excellent. (default: %(default)s).")
+ 
+     return parser
+@@ -47,12 +57,13 @@ def get_parser() -> argparse.ArgumentParser:
+ 
+ def main() -> None:
+     """Run command-line workflow."""
++    parser = get_parser()
++    args = parser.parse_args()
++
+     now_time()
+ 
+     print('\nIntegrate smORF Ribo-seq evidence tables.', flush=True)
+     print('\nStep1: Checking the input Arguments.', flush=True)
+-    parser = get_parser()
+-    args = parser.parse_args()
+ 
+     if not args.output_matrix and not args.output_integrated:
+         parser.error("At least one of --output-matrix or --output-integrated must be provided.")
+diff --git a/utils/smorf_scanner.py b/utils/smorf_scanner.py
+index ffd3139..c47b09b 100644
+--- a/utils/smorf_scanner.py
++++ b/utils/smorf_scanner.py
+@@ -42,33 +42,31 @@ def parse_args():
+ 
+     parser.add_argument('-o', '--out-prefix', dest="out_prefix", required=False, type=str, default="ORF",
+                         help="the prefix of output files. (default: %(default)s).")
+-    parser.add_argument('--orf-prefix', dest="orf_prefix", required=False, type=str, default="ORF",
++    parser.add_argument('-p', '--orf-prefix', dest="orf_prefix", required=False, type=str, default="ORF",
+                         help="the prefix of generated ORF identifiers. (default: %(default)s).")
+-    parser.add_argument('--start-codons', dest="start_codons", required=False, type=str, default="ATG",
++    parser.add_argument('-s', '--start-codons', dest="start_codons", required=False, type=str, default="ATG",
+                         help="comma-separated start codons used for ORF scanning. (default: %(default)s).")
+-    parser.add_argument('--min-aa', dest="min_aa", required=False, type=int, default=8,
++    parser.add_argument('-m', '--min-aa', dest="min_aa", required=False, type=int, default=8,
+                         help="the minimum ORF length to keep. (default: %(default)s aa).")
+-    parser.add_argument('--max-aa', dest="max_aa", required=False, type=int, default=10000,
++    parser.add_argument('-M', '--max-aa', dest="max_aa", required=False, type=int, default=10000,
+                         help="the maximum ORF length to keep. (default: %(default)s aa).")
+-    parser.add_argument('--scan-strand', dest="scan_strand", required=False, type=str,
++    parser.add_argument('-x', '--scan-strand', dest="scan_strand", required=False, type=str,
+                         choices=["sense", "antisense", "both"], default="sense",
+                         help="specify which transcript strand will be scanned. (default: %(default)s).")
+-    parser.add_argument('--kozak-up', dest="kozak_up", required=False, type=int, default=6,
++    parser.add_argument('-u', '--kozak-up', dest="kozak_up", required=False, type=int, default=6,
+                         help="the upstream nucleotides extracted for Kozak sequence. (default: %(default)s nt).")
+-    parser.add_argument('--kozak-down', dest="kozak_down", required=False, type=int, default=6,
++    parser.add_argument('-d', '--kozak-down', dest="kozak_down", required=False, type=int, default=6,
+                         help="the downstream nucleotides after start codon extracted for Kozak sequence. (default: %(default)s nt).")
+     parser.add_argument('-t', '--threads', dest="threads", required=False, type=int, default=1,
+                         help="the number of worker processes for ORF scanning. (default: %(default)s).")
+-    parser.add_argument('--mark-overlap', dest="mark_overlap", action="store_true", required=False, default=False,
++    parser.add_argument('-O', '--mark-overlap', dest="mark_overlap", action="store_true", required=False, default=False,
+                         help="mark nested or overlapping ORFs after scanning. (default: %(default)s).")
+-    parser.add_argument('--remove-discarded', dest="remove_discarded", action="store_true", required=False, default=False,
++    parser.add_argument('-R', '--remove-discarded', dest="remove_discarded", action="store_true", required=False, default=False,
+                         help="remove same-frame internal ORFs from the final output. (default: %(default)s).")
+-    parser.add_argument('--include-stop', dest="include_stop", action="store_true", required=False, default=False,
++    parser.add_argument('-I', '--include-stop', dest="include_stop", action="store_true", required=False, default=False,
+                         help="keep the stop codon symbol in peptide sequence. (default: %(default)s).")
+ 
+     args = parser.parse_args()
+-    file_check(args.genome, args.annotation)
+-    args_print(args)
+ 
+     return args
+ 
+@@ -78,11 +76,14 @@ def main():
+     Run smORF scanner from command-line arguments.
+     """
+ 
++    args = parse_args()
++
+     now_time()
+ 
+     print('\nScan transcript-centric smORFs.', flush=True)
+     print('\nStep1: Checking the input Arguments.', flush=True)
+-    args = parse_args()
++    file_check(args.genome, args.annotation)
++    args_print(args)
+ 
+     pipeline = SmORFPipeline(
+         genome=args.genome,

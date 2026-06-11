@@ -4,14 +4,42 @@
 # @Script  : rpf_Bam_Filter.py
 
 
-from utils.ribo import ArgsParser
+import argparse
+from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+
+def bam_filter_args_parser():
+    parser = argparse.ArgumentParser(description="This script is used to filter the reads length from bam file.")
+
+    # arguments for the Required arguments
+    input_group = parser.add_argument_group('Required arguments')
+    input_group.add_argument('-i', dest="ibam", required=True, type=str,
+                             help="the name of input bam file.")
+    input_group.add_argument('-o', dest="obam", required=True, type=str,
+                             help="the name of output bam file.")
+    
+    # arguments for the RPFs calculation
+    parser.add_argument('-l', dest="length", required=False, type=str, default="27,28,29,30,31,32",
+                        help="the minimum reads length to keep (default: %(default)s nt).")
+    parser.add_argument('-u', dest="unique", required=False, action='store_true', default=False,
+                        help="discard the secondary reads (default: %(default)s ).")
+    parser.add_argument('-s', dest="supplementary", required=False, action='store_true', default=False,
+                        help="discard the supplementary reads (default: %(default)s ).")
+    parser.add_argument('-q', dest="quality", required=False, type=int, default=28,
+                        help="discard the low mapping quality reads (default: %(default)s ).")
+
+    args = parser.parse_args()
+    file_check(args.ibam)
+    args_print(args)
+
+    return args
 
 
 def main():
-    ArgsParser.now_time()
+    now_time()
     print('\nFilter the specific length reads from bam file.', flush=True)
     print('\nStep1: Checking the input Arguments.', flush=True)
-    args = ArgsParser.bam_filter_args_parser()
+    args = bam_filter_args_parser()
 
     from ribo import BamFilter
     bam_attr = BamFilter.BamFilter(args)
@@ -20,7 +48,7 @@ def main():
     bam_attr.import_bam()
 
     print('\nAll done.', flush=True)
-    ArgsParser.now_time()
+    now_time()
 
 
 if __name__ == '__main__':

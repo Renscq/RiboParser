@@ -4,15 +4,55 @@
 # @Script  : rpf_Offset_RSBM.py
 
 
-from utils.ribo import ArgsParser
 from utils.ribo.Offset_RSBM import *
+
+import argparse
+from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+
+def offset_rsbm_args_parser():
+    parser = argparse.ArgumentParser(description="This script is used to detect the P-site offset.")
+
+    # arguments for the Required arguments
+    input_group = parser.add_argument_group('Required arguments')
+    input_group.add_argument('-t', dest="transcript", required=True, type=str,
+                             help="the name of input transcript filein TXT format.")
+    input_group.add_argument('-b', dest="bam", required=True, type=str, help="the name of mapping file in BAM format.")
+    input_group.add_argument('-o', dest="output", required=True, type=str,
+                             help="the prefix of output file. (prefix + _offset.txt)")
+
+    # arguments for the offset detection
+    # parser.add_argument('--mode', dest="mode", required=False, type=str, default='SSCBM',
+    #                     help="specify the mode of offset detect [RSBM, SSCBM]. (default: %(default)s).")
+    parser.add_argument('-l', dest="longest", action='store_true', required=False, default=False,
+                        help="only retain the transcript with longest CDS of each gene (default: %(default)s).")
+    parser.add_argument('-m', dest="min", required=False, type=int, default=27,
+                        help="the minimum reads length to keep (default: %(default)s nt).")
+    parser.add_argument('-M', dest="max", required=False, type=int, default=33,
+                        help="the maximum reads length to keep (default: %(default)s nt).")
+    parser.add_argument('-p', dest="exp_peak", required=False, type=int, default=29,
+                        help="RPFs peak length [~30 nt] (default: %(default)s nt).")
+    parser.add_argument('-e', dest="exp_offset", required=False, type=int, default=11,
+                        help="expected offset length (default: %(default)s).")
+    parser.add_argument('-s', dest="shift", required=False, type=int, default=2,
+                        help="psite shift for different RPFs length."
+                             "Empirical value: 2nt for Eukaryotes, 1nt for prokaryotes. (default: %(default)s nt).")
+    parser.add_argument('--silence', dest="silence", required=False, action='store_true', default=True,
+                        help="discard the warning information. (default: %(default)s).")
+    parser.add_argument('-d', dest="detail", action='store_true', required=False, default=False,
+                        help="output the details of offset (default: %(default)s).")
+    args = parser.parse_args()
+    file_check(args.transcript, args.bam)
+    args_print(args)
+
+    return args
 
 
 def main():
-    ArgsParser.now_time()
+    now_time()
     print('\nDetect the p-site offset.', flush=True)
     print('\nStep1: Checking the input Arguments.', flush=True)
-    args = ArgsParser.offset_rsbm_args_parser()
+    args = offset_rsbm_args_parser()
     offset_attr = Offset(args)
 
     print('\nStep2: Import the transcripts annotation.', flush=True)
@@ -33,7 +73,7 @@ def main():
     offset_attr.draw_frame_heatmap()
 
     print('\nAll done.', flush=True)
-    ArgsParser.now_time()
+    now_time()
 
 
 if __name__ == '__main__':

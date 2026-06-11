@@ -4,15 +4,49 @@
 # @Script  : rpf_metaplot.py
 
 
-from utils.ribo import ArgsParser
 from utils.ribo import Metaplot
+
+import argparse
+from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+
+def metaplot_args_parser():
+    parser = argparse.ArgumentParser(description="This script is used to draw the meta plot.")
+
+    # arguments for the Required arguments
+    input_group = parser.add_argument_group('Required arguments')
+    input_group.add_argument('-t', dest="transcript", required=True, type=str,
+                             help="the name of input transcript filein TXT format.")
+    input_group.add_argument('-r', dest="rpf", required=True, type=str,
+                             help="the name of input RPFs file in TXT format.")
+    input_group.add_argument('-o', dest="output", required=True, type=str,
+                             help="the prefix name of output file.")
+    
+    # arguments for the ribo-seq parsing
+    parser.add_argument('-m', dest="min", required=False, type=int, default=50,
+                        help="delete transcript with less than minimum RPFs. (default: %(default)s).")
+    parser.add_argument('--utr5', dest="utr5", type=int, required=False, default=20,
+                        help="the codon number in 5-utr region (default: %(default)s AA).")
+    parser.add_argument('--cds', dest="cds", type=int, required=False, default=50,
+                        help="the codon number in cds region (default: %(default)s AA).")
+    parser.add_argument('--utr3', dest="utr3", type=int, required=False, default=20,
+                        help="the codon number in 3-utr region (default: %(default)s AA).")
+    parser.add_argument('-n', dest="normal", action='store_true', required=False, default=False,
+                        help="normalize the RPFs count to RPM. (default: %(default)s).")
+    parser.add_argument('--mode', dest="mode", required=False, choices=["line", "bar"], type=str, default='bar',
+                        help="specify the mode of metaplot. (default: %(default)s).")
+    args = parser.parse_args()
+    file_check(args.rpf)
+    args_print(args)
+
+    return args
 
 
 def main():
-    ArgsParser.now_time()
+    now_time()
     print('\nDraw the metaplot.', flush=True)
     print('\nStep1: Checking the input Arguments.', flush=True)
-    args = ArgsParser.metaplot_args_parser()
+    args = metaplot_args_parser()
     meta = Metaplot.Metaplot(args)
 
     print('\nStep2: Import the RPFs file.', flush=True)
@@ -27,7 +61,7 @@ def main():
         meta.draw_line_metaplot()
 
     print('\nAll done.', flush=True)
-    ArgsParser.now_time()
+    now_time()
 
 
 if __name__ == '__main__':

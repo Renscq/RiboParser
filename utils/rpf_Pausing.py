@@ -4,15 +4,62 @@
 # @Script  : rpf_pausing.py
 
 
-from utils.ribo import ArgsParser
 from utils.ribo import Pausing
+
+import argparse
+from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+
+def rpf_pausing_args_parser():
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     description="This script is used to calculate the relative pausing score.")
+
+    # arguments for the Required arguments
+    input_group = parser.add_argument_group('Required arguments')
+    input_group.add_argument('-r', dest="rpf", required=True, type=str,
+                             help="the name of input RPFs file in TXT format.")
+    input_group.add_argument('-l', dest="list", required=False, type=str, default=None,
+                             help="the gene name list in TXT format. (default: whole).")
+    input_group.add_argument('-o', dest="output", required=True, type=str, help="the prefix of output file.")
+
+    # arguments for the pausing calculation
+    parser.add_argument('-s', dest="site", choices=['E', 'P', 'A'], required=False, type=str, default='P',
+                        help="set the E/P/A-site for pausing calculation. (default: %(default)s).")
+    parser.add_argument('-f', dest="frame", choices=['0', '1', '2', 'all'], required=False, type=str, default='all',
+                        help="set the reading frame for pausing calculation. (default: %(default)s).")
+    parser.add_argument('-b', dest="background", required=False, type=int, default=2,
+                        help="set the codon number before and after p-site as the background. (default: %(default)s).")
+    parser.add_argument('-m', dest="min", required=False, type=int, default=50,
+                        help="retain transcript with more than minimum RPFs. (default: %(default)s).")
+    parser.add_argument('--tis', dest="tis", required=False, type=int, default=10,
+                        help="The number of codons after TIS will be discarded. (default: %(default)s AA).")
+    parser.add_argument('--tts', dest="tts", required=False, type=int, default=5,
+                        help="The number of codons before TTS will be discarded. (default: %(default)s AA).")
+    parser.add_argument('-n', dest="normal", action='store_true', required=False, default=False,
+                        help="normalize the RPFs count to RPM. (default: %(default)s).")
+    parser.add_argument('--scale', dest="scale",  choices=['zscore', 'minmax'], required=False, type=str, default='minmax',
+                        help="normalize the pausing score. (default: %(default)s).")
+    parser.add_argument('--stop', dest="stop",  action='store_true', required=False, default=False,
+                        help="remove the stop codon. (default: %(default)s).")
+    parser.add_argument('--ind', dest="individual", action='store_true', required=False, default=False,
+                        help="use the whole RPFs density of individual sample. (default: %(default)s).")
+    parser.add_argument('--fig', dest="figure", choices=['none', 'png', 'pdf'], required=False, default='none',
+                        help="draw the rpf pausing score of each gene (it will takes a lot of time). (default: %(default)s).")
+    parser.add_argument('--all', dest="all", action='store_true', required=False, default=False,
+                        help="output all pausing score of each gene. (default: %(default)s).")
+
+    args = parser.parse_args()
+    file_check(args.rpf)
+    args_print(args)
+
+    return args
 
 
 def main():
-    ArgsParser.now_time()
+    now_time()
     print('\nCalculate the relative codon pausing score.', flush=True)
     print('\nStep1: Checking the input Arguments.', flush=True)
-    args = ArgsParser.rpf_pausing_args_parser()
+    args = rpf_pausing_args_parser()
     pausing_score = Pausing.Pausing(args)
 
     print('\nStep2: Import the RPFs file.', flush=True)
@@ -40,7 +87,7 @@ def main():
         print('\nStep6: Do not draw figures.', flush=True)
 
     print('\nAll done.', flush=True)
-    ArgsParser.now_time()
+    now_time()
 
 
 if __name__ == '__main__':

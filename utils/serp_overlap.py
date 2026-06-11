@@ -8,9 +8,32 @@ import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib_venn import venn2
 import pandas as pd
+
+import argparse
+from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+
+def serp_overlap():
+    parser = argparse.ArgumentParser(description="This script is used to check the overlap of mock-IP and IP.")
+
+    # arguments for the Required arguments
+    input_group = parser.add_argument_group('Required arguments')
+    input_group.add_argument('-m', dest="mock", required=True, type=str,
+                             help="the name of input mock-IP peak file in TXT format.")
+    input_group.add_argument('-f', dest="flag", required=False, type=str,
+                             help="the name of input flag-IP peak file in TXT format.")
+    input_group.add_argument('--om', dest="out_mock", required=False, type=str,
+                             help="the prefix of mock peak output file (prefix + .overlap.txt).")
+    input_group.add_argument('--of', dest="out_flag", required=False, type=str,
+                             help="the prefix of flag peak output file (prefix + .overlap.txt).")
+    args = parser.parse_args()
+    file_check(args.mock)
+    file_check(args.flag)
+    args_print(args)
+
+    return args
 # from interval import Interval
 
-from utils.ribo import ArgsParser
 
 
 def import_peak_region(mock, flag):
@@ -122,10 +145,10 @@ def plot_venn2(sig_mock_anno, sig_flag_anno, out_mock, out_flag):
 
 
 def main():
-    ArgsParser.now_time()
+    now_time()
     print('\nRetrieve the sequence of peak region.', flush=True)
     print('\nStep1: Checking the input Arguments.', flush=True)
-    args = ArgsParser.serp_overlap()
+    args = serp_overlap()
 
     print('\nStep2: Import the peak region.', flush=True)
     sig_mock_peak, sig_flag_peak = import_peak_region(args.mock, args.flag)
@@ -145,7 +168,7 @@ def main():
     plot_venn2(sig_mock_anno, sig_flag_anno, args.out_mock, args.out_flag)
 
     print('\nAll done.', flush=True)
-    ArgsParser.now_time()
+    now_time()
 
 
 if __name__ == '__main__':
