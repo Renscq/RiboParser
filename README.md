@@ -5,10 +5,10 @@
 </p>
 
 <p align="center">
-  <a href="https://renscq.github.io/RiboParser/">Documentation</a> |
-  <a href="https://github.com/Renscq/RiboParser/issues">Issues</a> |
-  <a href="#citation">Citation</a> |
-  <a href="#license">License</a>
+  📖 <a href="https://renscq.github.io/RiboParser/">Documentation</a> |
+  🐞 <a href="https://github.com/Renscq/RiboParser/issues">Issues</a> |
+  📚 <a href="#citation">Citation</a> |
+  📝 <a href="#license">License</a>
 </p>
 
 ---
