@@ -1,6 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# @time    : 2021/4/19 8:29
-# @Project : riboParser
-# @Author  : Rensc
-# @E-mail  : rensc0718@163.com
+
+# Author: Rensc
+# Date: 2026-06-12
+# Version: 0.2.7
+# Function: Initialize the ribo package namespace.
+# Input: None.
+# Output: Initialized package namespace.
+
+

@@ -109,4 +109,6 @@ nav:
       - "5.3 Merge helpers": workflow/others/merge-helpers.md
   - "6. Performance": performance.md
   - "7. License": license.md
-  - "8. Acknowledgements": acknowledgements.md
+  - "8. Development":
+      - "8.1 Docstring template": development/docstring-template.md
+  - "9. Acknowledgements": acknowledgements.md
