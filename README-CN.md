@@ -2,8 +2,8 @@
  * @Author: 'rensc' 'rensc0718@163.com'
  * @Date: 2024-10-15 11:44:58
  * @LastEditors: 'rensc' 'rensc0718@163.com'
- * @LastEditTime: 2025-02-18 03:50
- * @FilePath: \RiboParser\README.md 
+ * @LastEditTime: 2026-06-10 17:04
+ * @FilePath: \RiboParser\README-CN.md 
  * 
 -->
 

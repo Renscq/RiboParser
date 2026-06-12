@@ -4,13 +4,16 @@ pandas
 pyarrow
 polars
 joblib
+
 # file formats
 biopython
 pysam
+
 # math and stats
 scipy
 scikit-learn
 statsmodels
+
 # visualization
 matplotlib
 matplotlib-venn
