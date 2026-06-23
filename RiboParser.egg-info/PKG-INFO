@@ -1,0 +1,82 @@
+Metadata-Version: 2.4
+Name: RiboParser
+Version: 0.2.7
+Summary: A pipeline for ribosome profiling data analysis
+Author-email: Ren Shuchao <rensc0718@163.com>
+License-Expression: GPL-3.0-or-later
+Project-URL: Homepage, https://github.com/renscq/RiboParser
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Topic :: Scientific/Engineering :: Bio-Informatics
+Classifier: Intended Audience :: Science/Research
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.26
+Requires-Dist: pandas>=2.2
+Requires-Dist: pyarrow>=15
+Requires-Dist: polars>=1.0
+Requires-Dist: biopython>=1.83
+Requires-Dist: scipy>=1.12
+Requires-Dist: scikit-learn>=1.4
+Requires-Dist: statsmodels>=0.14
+Requires-Dist: pysam>=0.23
+Requires-Dist: joblib>=1.3
+Requires-Dist: matplotlib>=3.8
+Requires-Dist: matplotlib-venn>=1.1
+Requires-Dist: seaborn>=0.13
+Requires-Dist: seqlogo>=5.29
+
+# RiboParser
+
+<p align="center">
+  <strong>RiboParser</strong> is a modular command-line toolkit for comprehensive RNA-seq and Ribo-seq data analysis.
+</p>
+
+<p align="center">
+  📖 <a href="https://renscq.github.io/RiboParser/">Documentation</a> |
+  🐞 <a href="https://github.com/Renscq/RiboParser/issues">Issues</a> |
+  📚 <a href="#citation">Citation</a> |
+  📝 <a href="#license">License</a>
+</p>
+
+---
+
+## Overview
+
+RiboParser provides an integrated workflow for RNA-seq and ribosome profiling (Ribo-seq) analysis, including reference preparation, raw data preprocessing, alignment, quantification, quality control, RPF density construction, gene-level analysis, codon-level analysis, SeRP analysis, smORF analysis, and downstream visualization with RiboShiny.
+
+The full documentation is available at:
+
+<https://renscq.github.io/RiboParser/>
+
+## Installation
+
+```bash
+conda install riboparser -c rensc
+# or
+micromamba install riboparser -c rensc
+```
+
+```bash
+pip install riboparser
+```
+
+## Quick test
+
+```bash
+riboparser -v
+riboparser -c
+riboparser -d
+riboparser -m
+```
+
+## Citation
+
+Ren, S., Li, Y. & Zhou, Z.  
+**RiboParser/RiboShiny: An integrated platform for comprehensive analysis and visualization of ribo-seq data.**  
+*Journal of Genetics and Genomics* (2025).  
+DOI: **10.1016/j.jgg.2025.04.010**
+
+## License
+
+GPL-3.0-or-later.

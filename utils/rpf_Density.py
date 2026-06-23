@@ -41,7 +41,7 @@ def ribo_args_parser():
                         help="the maximum reads length to keep (default: %(default)s nt).")
     input_group.add_argument('--period', dest='periodicity', required=False, type=float, default=40,
                              help="the minimum 3nt periodicity to keep. (default: %(default)s).")
-    parser.add_argument('--silence', dest="silence", required=False, action='store_true', default=True,
+    parser.add_argument('--silence', dest="silence", required=False, action='store_true', default=False,
                         help="discard the warning information. (default: %(default)s).")
     parser.add_argument('--thread', dest="thread", type=int, required=False, default=1,
                         help="the number of threads (default: %(default)s). It will take a lot of memory.")

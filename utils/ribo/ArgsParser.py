@@ -12,9 +12,15 @@
 import os
 import sys
 import time
+import logging
 import warnings
 
-warnings.filterwarnings('ignore')
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logging.captureWarnings(True)
+logger = logging.getLogger("RiboParser")
 
 
 def now_time():

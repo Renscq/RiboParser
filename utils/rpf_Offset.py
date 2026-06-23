@@ -41,7 +41,7 @@ def offset_args_parser():
                         help="Expected RPFs length fitted to ribosome structure [~30 nt] (default: %(default)s nt).")
     parser.add_argument('-s', dest="shift", required=False, type=int, default=2,
                         help="psite shift for different RPFs length. (default: %(default)s nt).")
-    parser.add_argument('--silence', dest="silence", required=False, action='store_true', default=True,
+    parser.add_argument('--silence', dest="silence", required=False, action='store_true', default=False,
                         help="discard the warning information. (default: %(default)s).")
     parser.add_argument('-d', dest="detail", action='store_true', required=False, default=False,
                         help="output the details of offset (default: %(default)s).")
