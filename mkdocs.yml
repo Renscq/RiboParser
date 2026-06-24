@@ -105,8 +105,21 @@ nav:
           - "4.9.3 SeRP properties": workflow/serp/properties.md
   - "5. Other toolkits":
       - "5.1 Groups": workflow/others/toolkits.md
-      - "5.2 Ribo utils": workflow/others/others-group.md
-      - "5.3 Merge helpers": workflow/others/merge-helpers.md
+      - "5.2 Ribo utils": 
+          - "5.2.1 rpf shuffle": workflow/others/shuffle.md
+          - "5.2.2 rpf shift": workflow/others/shift.md
+          - "5.2.3 rpf Bam2bw": workflow/others/Bam2bw.md
+          - "5.2.4 rpf retrieve": workflow/others/retrieve.md
+          - "5.2.5 rpf geneplot": workflow/others/geneplot.md
+          - "5.2.6 merge helpers" : workflow/others/merge-helpers.md
+      - "5.3 Others": 
+          - "5.3.1 FASTA helpers" : workflow/others/fasta-helpers.md
+          - "5.3.2 FASTQ helpers" : workflow/others/fastq-helpers.md
+          - "5.3.3 bedGraph helpers" : workflow/others/bedgraph-helpers.md
+          - "5.3.4 Bowtie/RSEM helpers" : workflow/others/bowtie-helpers.md
+          - "5.3.5 RiboCode/RiboTISH helpers" : workflow/others/RiboCode-helpers.md
+          - "5.3.6 oligo helpers" : workflow/others/oligo-helpers.md
+
   - "6. Performance": performance.md
   - "7. License": license.md
   - "8. Acknowledgements": acknowledgements.md
