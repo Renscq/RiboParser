@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "RiboParser"
-version = "0.2.7.4"
+version = "0.2.7.5"
 authors = [{ name = "Ren Shuchao", email = "rensc0718@163.com" }]
 description = "A pipeline for ribosome profiling data analysis"
 readme = "README.md"
@@ -30,7 +30,6 @@ dependencies = [
     "matplotlib>=3.8",
     "matplotlib-venn>=1.1",
     "seaborn>=0.13",
-    "seqlogo>=5.29",
 ]
 
 [project.urls]

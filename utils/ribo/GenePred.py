@@ -23,18 +23,6 @@ Main workflow
 6. Optionally add pseudo UTRs.
 7. Export normalized genePred, GTF, TXT, mRNA FASTA, and CDS FASTA files.
 
-Modified column
----------------
-The ``modified`` column records the actual pseudo-UTR extension information.
-
-Examples:
-
-- ``False``: no pseudo UTR was added.
-- ``5utr:+30``: 30 nt were added to the biological 5' UTR.
-- ``3utr:+30``: 30 nt were added to the biological 3' UTR.
-- ``5utr:+30;3utr:+30``: both biological UTRs were extended.
-- ``5utr:+8(boundary)``: only 8 nt were added because the transcript reached
-  the chromosome boundary.
 """
 
 from __future__ import annotations
