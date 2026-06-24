@@ -6,7 +6,7 @@ This section intentionally avoids duplicating commands already documented in the
 
 | Group | Commands | Purpose |
 |---|---|---|
-| Ribo-utils not covered above | `rpf_Shuffle`, `rpf_Bam2bw`, `rpf_Geneplot` | shuffled controls, signal track generation, gene plotting |
+| Ribo-utils not covered above | `rpf_Shuffle`, `rpf_Bam2bw`, `rpf_Retrieve` , `rpf_Geneplot` | shuffled controls, signal track generation, retrieve rpf density, gene plotting |
 | FASTA helpers | `fa_gc_sum`, `fa_len_flt`, `fa_len_sum`, `fa_split`, `line_feed`, `nt2aa`, `rand_seq`, `retrieve_seq`, `revs` | sequence preprocessing and extraction |
 | FASTQ helpers | `fq_len_flt`, `fq_len_sum`, `fq_length`, `fq_split`, `fq_trim`, `fq2fa`, `fq2txt`, `phred_quality`, `simulate_fastq` | read preprocessing and simulation |
 | bedGraph helpers | `bg2meta`, `rpm_smooth` | signal processing |

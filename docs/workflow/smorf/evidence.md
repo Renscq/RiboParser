@@ -54,6 +54,21 @@ smorf_evidence \
   -o mine.smorf.riboseq_evidence.txt
 ```
 
+File `ribo.bedgraph.list` contains these message:
+
+```bash
+sample	strand	path	format
+sample1 +	/project/ribo/bedgraph/sample1_plus.rpf.bedgraph	bedgraph
+sample1 -	/project/ribo/bedgraph/sample1_minus.rpf.bedgraph	bedgraph
+sample2 +	/project/ribo/bedgraph/sample2_plus.rpf.bedgraph	bedgraph
+sample2 -	/project/ribo/bedgraph/sample2_minus.rpf.bedgraph	bedgraph
+...
+
+```
+
+These `bedgraph` file are contain the rpf density can be generated with `rpf_Bam2Bw` function (see the 5. Other toolkits).
+
+
 ## Output files
 
 | Output | Description |
@@ -63,4 +78,4 @@ smorf_evidence \
 
 ## Result interpretation
 
-High-confidence translated smORFs should show sufficient RPF density, codon coverage, frame specificity, and reproducibility across samples. Treat single-evidence candidates cautiously.
+High-confidence translated smORFs should show sufficient RPF density, clear translational initiation and termination signatures, robust codon coverage, strong frame specificity, and reproducibility across samples. Treat single-evidence candidates cautiously.

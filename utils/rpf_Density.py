@@ -41,6 +41,12 @@ def ribo_args_parser():
                         help="the maximum reads length to keep (default: %(default)s nt).")
     input_group.add_argument('--period', dest='periodicity', required=False, type=float, default=40,
                              help="the minimum 3nt periodicity to keep. (default: %(default)s).")
+    parser.add_argument('--min-confidence', dest='min_confidence', required=False, type=float, default=50.0,
+                        help='minimum offset confidence to keep when the offset file contains a confidence column. '
+                             '(default: %(default)s).')
+    parser.add_argument('--drop-warning', dest='drop_warning', required=False, action='store_true', default=False,
+                        help='drop offset rows whose warning column is not PASS when the offset file contains '
+                             'a warning column. Default: %(default)s.')
     parser.add_argument('--silence', dest="silence", required=False, action='store_true', default=False,
                         help="discard the warning information. (default: %(default)s).")
     parser.add_argument('--thread', dest="thread", type=int, required=False, default=1,
