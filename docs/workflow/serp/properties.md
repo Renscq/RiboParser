@@ -1,47 +1,84 @@
 # 4.9.3 SeRP properties
 
-## Purpose
+## `serp_properties`
 
-`serp_properties` summarizes properties of SeRP peaks or signal regions.
+`serp_properties` calculates codon-usage statistics and translated-protein properties from nucleotide FASTA sequences.
 
-## Input files
+### Function
 
-| Input | Description |
-|---|---|
-| peak table | output from `serp_peak` or external peak file |
-| annotation | optional gene/transcript annotation |
-| signal file | optional signal file for intensity statistics |
+Use this command when you want to:
 
-## Parameters
+- summarize codon frequency for each sequence;
+- calculate RSCU and CAI-like codon-usage tables;
+- summarize whole-input codon usage;
+- translate nucleotide sequences and calculate protein properties such as GRAVY, flexibility, instability index, isoelectric point, and secondary-structure fractions.
 
-| Parameter | Meaning |
-|---|---|
-| `-i / --input` | input peak or region table |
-| `-a / --annotation` | annotation file |
-| `-s / --signal` | signal file |
-| `-o / --output` | output prefix |
-| `--strand` | strand-aware assignment |
-| `--distance-to-feature` | calculate distance to selected gene feature |
-| `--summary` | generate summary statistics |
+Although this page is placed under SeRP analysis, the command is sequence based. It does not read a SeRP peak table directly.
 
-## Example
+### Input
 
-```bash
-serp_properties \
-  -i serp_peak.txt \
-  -a gene.norm.txt \
-  -s serp_signal.bedgraph \
-  -o serp_properties
-```
+The input should be a nucleotide FASTA file containing coding sequences.
 
-## Output files
+Requirements:
+
+- each sequence length should be a multiple of 3;
+- sequences are translated in the current reading frame;
+- a terminal stop codon is removed before protein-property calculation;
+- sequences containing internal stop codons are skipped during protein-property output.
+
+### Parameters
+
+| Parameter | Required | Meaning |
+|---|---:|---|
+| `-f` | yes | Input nucleotide FASTA file. |
+| `-o` | yes | Output prefix. |
+
+### Output
 
 | Output | Description |
 |---|---|
-| `serp_properties.txt` | peak property table |
-| `serp_properties_summary.txt` | summary statistics |
-| `serp_properties.log` | running log |
+| `<prefix>_frequency.txt` | Per-sequence codon frequency table. |
+| `<prefix>_rscu.txt` | Per-sequence RSCU table. |
+| `<prefix>_cai.txt` | Per-sequence CAI-like codon usage table. |
+| `<prefix>_whole_codon_usage.txt` | Whole-input codon usage summary. |
+| `<prefix>.Properties.txt` | Translated-protein property table. |
 
-## Result interpretation
+The protein property table contains:
 
-Use property summaries to evaluate peak length, intensity, annotation class, positional enrichment, and sample-specific signal patterns.
+| Column | Description |
+|---|---|
+| `ID` | FASTA record ID. |
+| `Seq` | Translated amino-acid sequence. |
+| `Length` | Amino-acid sequence length after removing a terminal stop codon, if present. |
+| `Gravy` | Grand average of hydropathy. |
+| `Flexibility` | Average predicted flexibility. |
+| `Instability` | Instability index. |
+| `Isoelectric_Point` | Predicted isoelectric point. |
+| `Helix` | Predicted helix fraction. |
+| `Turn` | Predicted turn fraction. |
+| `Sheet` | Predicted sheet fraction. |
+
+### Examples
+
+Calculate sequence properties for CDS sequences:
+
+```bash
+serp_properties \
+  -f CDS_sequences.fa \
+  -o CDS_properties
+```
+
+Calculate properties for peak-associated sequences retrieved from a FASTA file:
+
+```bash
+serp_properties \
+  -f SeRP_peak_sequences.fa \
+  -o SeRP_peak_properties
+```
+
+### Notes
+
+- The command expects nucleotide sequences, not amino-acid FASTA input.
+- Sequence lengths that are not divisible by 3 will raise an error during codon counting.
+- Internal stop codons cause the affected sequence to be skipped in the protein-property table.
+- The generated `<prefix>.Properties.txt` uses a dot before `Properties`, while the codon-usage outputs use underscores.

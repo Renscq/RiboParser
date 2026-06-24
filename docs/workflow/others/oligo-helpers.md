@@ -1,4 +1,4 @@
-## oligo helpers
+# oligo helpers
 
 Oligo helpers provide utilities for overlap detection, non-redundant small-RNA/oligo frequency summarization, and sliding-window sequence generation.
 

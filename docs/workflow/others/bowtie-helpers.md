@@ -1,4 +1,4 @@
-## Bowtie/RSEM helpers
+# Bowtie/RSEM helpers
 
 Bowtie/RSEM helpers summarize alignment logs and merge quantification tables from external tools.
 

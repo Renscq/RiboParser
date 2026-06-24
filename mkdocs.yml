@@ -55,17 +55,29 @@ plugins:
 nav:
   - Home: index.md
   - "1. Overview": overview.md
+
   - "2. Installation":
+
       - "2.1 pip": installation/pip.md
+
       - "2.2 conda": installation/conda.md
+
       - "2.3 GitHub": installation/github.md
+
   - "3. Quick start": quick-start.md
+
   - "4. Workflow":
+
       - "Workflow overview": workflow/index.md
+
       - "4.1 Reference preparation": workflow/reference-preparation.md
+
       - "4.2 Raw data download": workflow/raw-data-download.md
+
       - "4.3 Raw data cleaning": workflow/raw-data-cleaning.md
+
       - "4.4 Alignment and quantification": workflow/alignment-and-quantification.md
+
       - "4.5 Quality control":
           - "4.5 Quality control overview": workflow/quality-control/index.md
           - "4.5.1 Check": workflow/quality-control/check.md
@@ -77,12 +89,14 @@ nav:
           - "4.5.7 Metaplot": workflow/quality-control/metaplot.md
           - "4.5.8 Coverage": workflow/quality-control/coverage.md
           - "4.5.9 Correlation": workflow/quality-control/correlation.md
+
       - "4.6 Gene-level analysis":
           - "4.6 Gene-level overview": workflow/gene-level/index.md
           - "4.6.1 Gene quantification": workflow/gene-level/quantification.md
           - "4.6.2 Gene coverage": workflow/gene-level/coverage.md
           - "4.6.3 Gene correlation": workflow/gene-level/correlation.md
           - "4.6.4 Gene density retrieval": workflow/gene-level/retrieve.md
+
       - "4.7 Codon-level analysis":
           - "4.7 Codon-level overview": workflow/codon-level/index.md
           - "4.7.1 Codon pausing score": workflow/codon-level/codon-pausing-score.md
@@ -92,34 +106,52 @@ nav:
           - "4.7.5 Coefficient of Variation": workflow/codon-level/coefficient-of-variation.md
           - "4.7.6 Meta-codon analysis": workflow/codon-level/meta-codon-analysis.md
           - "4.7.7 Codon odds ratio": workflow/codon-level/codon-odds-ratio.md
+
       - "4.8 smORF analysis":
           - "4.8 smORF overview": workflow/smorf/index.md
           - "4.8.1 smORF scanner": workflow/smorf/scanner.md
           - "4.8.2 smORF filter": workflow/smorf/filter.md
           - "4.8.3 smORF evidence": workflow/smorf/evidence.md
           - "4.8.4 smORF integrate": workflow/smorf/integrate.md
+
       - "4.9 SeRP analysis":
           - "4.9 SeRP overview": workflow/serp/index.md
           - "4.9.1 SeRP peak": workflow/serp/peak.md
           - "4.9.2 SeRP overlap": workflow/serp/overlap.md
           - "4.9.3 SeRP properties": workflow/serp/properties.md
-  - "5. Other toolkits":
-      - "5.1 Groups": workflow/others/toolkits.md
-      - "5.2 Ribo utils": 
-          - "5.2.1 rpf shuffle": workflow/others/shuffle.md
-          - "5.2.2 rpf shift": workflow/others/shift.md
-          - "5.2.3 rpf Bam2bw": workflow/others/Bam2bw.md
-          - "5.2.4 rpf retrieve": workflow/others/retrieve.md
-          - "5.2.5 rpf geneplot": workflow/others/geneplot.md
-          - "5.2.6 merge helpers" : workflow/others/merge-helpers.md
-      - "5.3 Others": 
-          - "5.3.1 FASTA helpers" : workflow/others/fasta-helpers.md
-          - "5.3.2 FASTQ helpers" : workflow/others/fastq-helpers.md
-          - "5.3.3 bedGraph helpers" : workflow/others/bedgraph-helpers.md
-          - "5.3.4 Bowtie/RSEM helpers" : workflow/others/bowtie-helpers.md
-          - "5.3.5 RiboCode/RiboTISH helpers" : workflow/others/RiboCode-helpers.md
-          - "5.3.6 oligo helpers" : workflow/others/oligo-helpers.md
 
-  - "6. Performance": performance.md
-  - "7. License": license.md
-  - "8. Acknowledgements": acknowledgements.md
+  - "5. Utility toolkits":
+      - "5.1 Toolkit overview": workflow/others/toolkits.md
+
+      - "5.2 RPF density utilities":
+          - "5.2.1 rpf retrieve": workflow/others/retrieve.md
+          - "5.2.2 rpf geneplot": workflow/others/geneplot.md
+          - "5.2.3 rpf shuffle": workflow/others/shuffle.md
+          - "5.2.4 rpf shift": workflow/others/shift.md
+
+      - "5.3 Signal track utilities":
+          - "5.3.1 rpf Bam2bw": workflow/others/Bam2bw.md
+          - "5.3.2 bg2meta": workflow/others/bg2meta.md
+          - "5.3.3 rpm smooth": workflow/others/rpm_smooth.md
+
+      - "5.4 Result merge helpers":
+          - "5.4.1 RiboParser merge helpers": workflow/others/merge-helpers.md
+          - "5.4.2 Bowtie/RSEM helpers": workflow/others/bowtie-helpers.md
+
+      - "5.5 Sequence helpers":
+          - "5.5.1 FASTA helpers": workflow/others/fasta-helpers.md
+          - "5.5.2 FASTQ helpers": workflow/others/fastq-helpers.md
+          - "5.5.3 oligo helpers": workflow/others/oligo-helpers.md
+
+      - "5.6 ORF-caller format helpers":
+          - "5.6.1 RiboCode helpers": workflow/others/RiboCode-helpers.md
+          - "5.6.2 RiboTISH helpers": workflow/others/RiboTish-helpers.md
+
+  - "6. Performance": 
+        performance.md
+
+  - "7. License": 
+        license.md
+
+  - "8. Acknowledgements":
+        acknowledgements.md

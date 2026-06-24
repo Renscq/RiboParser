@@ -1,4 +1,4 @@
-## FASTA helpers
+# FASTA helpers
 
 FASTA helpers provide small command-line utilities for sequence statistics, format conversion, sequence extraction, translation, and random sequence generation. All commands are installed as console scripts after installing `RiboParser`.
 

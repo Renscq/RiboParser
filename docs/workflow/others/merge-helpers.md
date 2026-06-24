@@ -1,4 +1,4 @@
-## Merge-result helpers
+# Merge-result helpers
 
 Most merge helpers follow this pattern:
 

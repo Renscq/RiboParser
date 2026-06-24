@@ -1,4 +1,4 @@
-## FASTQ helpers
+# FASTQ helpers
 
 FASTQ helpers provide utilities for format conversion, read-length filtering and summarization, quality-score checking, trimming, splitting, and simulation.
 
