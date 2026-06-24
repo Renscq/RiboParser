@@ -35,7 +35,7 @@ def ribo_parser():
 
 
 def main():
-    now_time()
+
     args = ribo_parser()
 
     if args.version:
@@ -55,7 +55,6 @@ def main():
         RiboParser.RiboParserInfo.check_package_modules()
 
     print('')
-    now_time()
 
 
 if __name__ == "__main__":
