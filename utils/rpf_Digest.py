@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 #
 # Author: Rensc
-# Date: 2026-06-24
-# Version: 0.2.7.2
+# Date: 2026-07-08
+# Version: 0.2.7.3
 # Function: This script is used to detect the digestion sites.
 # Input: Command-line arguments and input files specified by the user.
 # Output: Digestion-site tables, figures, and sequence-logo files.
@@ -90,6 +90,18 @@ def _build_parser() -> argparse.ArgumentParser:
         default=100,
         help="the maximum reads length to keep (default: %(default)s nt).",
     )
+    parser.add_argument(
+        "-p",
+        "--thread",
+        dest="thread",
+        required=False,
+        type=int,
+        default=1,
+        help=(
+            "the number of worker processes for indexed BAM input "
+            "(default: %(default)s)."
+        ),
+    )
 
     return parser
 
@@ -103,6 +115,9 @@ def _validate_args(args: Namespace) -> None:
 
     if args.max < args.min:
         raise ValueError("--max/-M must be greater than or equal to --min/-m.")
+
+    if args.thread <= 0:
+        raise ValueError("--thread/-p must be greater than 0.")
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> Namespace:

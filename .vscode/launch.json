@@ -303,19 +303,22 @@
             "name": "Python: rpf_Check.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceRoot}/utils/rpf_Check.py",
+            "module": "utils.rpf_Check",
             "args": [
                 "-t",
-                "/mnt/t64/rensc/1404/ribo-2024-02-13/ribo/ribo-mt/v2/NC12.mito.norm.txt",
+                "/data1/shuchao/database/sce/norm/sce.norm.txt",
+                // "/mnt/t64/rensc/1404/ribo-2024-02-13/ribo/ribo-mt/v2/NC12.mito.norm.txt",
                 // "/mnt/t64/database/ncr/ensb/norm/NC12.norm.txt",
                 "-b",
-                "/mnt/t64/rensc/1404/ribo-2024-02-13/ribo/ribo/step01-qc/R_WT_3.bam",
+                "/data1/shuchao/project/sce/star/ribo/testAligned.toTranscriptome.out.bam",
+                // "/mnt/t64/rensc/1404/ribo-2024-02-13/ribo/ribo/step01-qc/R_WT_3.bam",
                 // "/mnt/t64/rensc/1404/ribo-2024-02-13/ribo/star/RIBO_WT_3Aligned.toTranscriptome.out.bam",
                 "--thread",
                 "12",
                 "-s",
                 "-o",
-                "/mnt/t64/rensc/1404/ribo-2024-02-13/ribo/ribo/test/ncr-wt1"
+                "/data1/shuchao/project/sce/riboparser/ribo/01.qc/test"
+                // "/mnt/t64/rensc/1404/ribo-2024-02-13/ribo/ribo/test/ncr-wt1"
             ],
             "console": "integratedTerminal",
             "justMyCode": true
