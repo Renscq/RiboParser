@@ -54,6 +54,7 @@ rpf_Cumulative_CoV = utils.rpf_Cumulative_CoV:main
 rpf_Density = utils.rpf_Density:main
 rpf_Digest = utils.rpf_Digest:main
 rpf_Geneplot = utils.rpf_Geneplot:main
+rpf_Json2txt = utils.rpf_Json2txt:main
 rpf_Merge = utils.rpf_Merge:main
 rpf_Meta_Codon = utils.rpf_Meta_Codon:main
 rpf_Metaplot = utils.rpf_Metaplot:main
