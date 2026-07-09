@@ -77,6 +77,7 @@ utils/rpf_Cumulative_CoV.py
 utils/rpf_Density.py
 utils/rpf_Digest.py
 utils/rpf_Geneplot.py
+utils/rpf_Json2txt.py
 utils/rpf_Merge.py
 utils/rpf_Meta_Codon.py
 utils/rpf_Metaplot.py
