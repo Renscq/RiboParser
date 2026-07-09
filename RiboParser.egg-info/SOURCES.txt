@@ -116,6 +116,7 @@ utils/ribo/Digestion.py
 utils/ribo/EndSite.py
 utils/ribo/Ensembl_Ref.py
 utils/ribo/GenePred.py
+utils/ribo/Merge.py
 utils/ribo/MetaCodon.py
 utils/ribo/Metaplot.py
 utils/ribo/Occupancy.py

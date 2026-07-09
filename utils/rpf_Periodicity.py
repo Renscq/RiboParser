@@ -3,9 +3,9 @@
 
 # Author: Rensc
 # Date: 2026-07-09
-# Version: 0.2.7.5
-# Function: This script is used to draw the periodicity plot.
-# Input: RPF density file in JSONL or TXT format.
+# Version: 0.2.7.7
+# Function: Draw 3-nt periodicity plots from RPF density files.
+# Input: RPF density file in JSONL or TXT format and optional transcript filter.
 # Output: Periodicity summary table and periodicity figures.
 
 """Command-line entry point for 3-nt periodicity analysis."""
@@ -20,33 +20,33 @@ from utils.ribo import Periodicity
 from utils.ribo.ArgsParser import args_print, file_check, now_time
 
 
-def periodicity_args_parser(argv: Sequence[str] | None = None) -> Namespace:
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description="This script is used to draw the periodicity plot.")
+def _build_parser() -> argparse.ArgumentParser:
+    """Build the command-line argument parser."""
+    parser = argparse.ArgumentParser(description="Draw 3-nt periodicity plots from RPF density files.")
 
-    input_group = parser.add_argument_group("Required arguments")
-    input_group.add_argument(
+    required_group = parser.add_argument_group("Required arguments")
+    required_group.add_argument(
         "-r",
         dest="rpf",
         required=True,
         type=str,
-        help="the name of input RPF density file in JSONL or TXT format.",
+        help="Input RPF density file in JSONL or TXT format.",
     )
-    input_group.add_argument(
+    required_group.add_argument(
         "-o",
         dest="output",
         required=True,
         type=str,
-        help="the prefix of output file.",
+        help="Output prefix.",
     )
 
-    input_group.add_argument(
+    parser.add_argument(
         "-t",
         dest="transcript",
         required=False,
         type=str,
         default=None,
-        help="the name of input transcript filter file in TXT format.",
+        help="Optional transcript filter table in TXT format.",
     )
     parser.add_argument(
         "-m",
@@ -54,7 +54,7 @@ def periodicity_args_parser(argv: Sequence[str] | None = None) -> Namespace:
         required=False,
         type=int,
         default=50,
-        help="retain transcript with more than minimum RPFs. (default: %(default)s).",
+        help="Retain transcripts with more than this minimum RPF count. Default: %(default)s.",
     )
     parser.add_argument(
         "--tis",
@@ -62,7 +62,7 @@ def periodicity_args_parser(argv: Sequence[str] | None = None) -> Namespace:
         required=False,
         type=int,
         default=0,
-        help="the number of codons after TIS will be discarded. (default: %(default)s AA).",
+        help="Number of codons after TIS to discard. Default: %(default)s AA.",
     )
     parser.add_argument(
         "--tts",
@@ -70,39 +70,60 @@ def periodicity_args_parser(argv: Sequence[str] | None = None) -> Namespace:
         required=False,
         type=int,
         default=0,
-        help="the number of codons before TTS will be discarded. (default: %(default)s AA).",
+        help="Number of codons before TTS to discard. Default: %(default)s AA.",
     )
 
-    args = parser.parse_args(argv)
+    return parser
+
+
+def _validate_args(args: Namespace) -> None:
+    """Validate command-line arguments."""
     file_check(args.rpf)
     if args.transcript:
         file_check(args.transcript)
-    args_print(args)
 
+
+def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
+    """Parse, validate, and print command-line arguments."""
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    _validate_args(args)
+    args_print(args)
     return args
 
 
-def main(argv: Sequence[str] | None = None) -> None:
-    """Run the 3-nt periodicity analysis workflow."""
-    now_time()
-    print("\nDraw the periodicity plot.", flush=True)
-    print("\nStep1: Checking the input Arguments.", flush=True)
-    args = periodicity_args_parser(argv)
+def _print_step(step: int, message: str) -> None:
+    """Print a standardized pipeline step message."""
+    print(f"\nStep{step}: {message}", flush=True)
 
-    print("\nStep2: Import the RPFs file.", flush=True)
+
+def _run_periodicity_pipeline(args: Namespace) -> None:
+    """Run the 3-nt periodicity analysis workflow."""
     rpfs = Periodicity.Periodicity(args)
+
+    _print_step(2, "Import the RPFs file.")
     rpfs.import_rpf()
 
-    print("\nStep3: Calculate the 3nt periodicity.", flush=True)
+    _print_step(3, "Calculate the 3-nt periodicity.")
     rpfs.calc_3nt_period()
 
-    print("\nStep4: Output the 3nt periodicity.", flush=True)
+    _print_step(4, "Output the 3-nt periodicity.")
     rpfs.output_meta()
 
-    print("\nStep5: Draw the 3nt periodicity plot.", flush=True)
+    _print_step(5, "Draw the 3-nt periodicity plots.")
     rpfs.draw_3nt_period_count()
     rpfs.draw_3nt_period_ratio()
     rpfs.draw_3nt_period_stacked()
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    """Command-line entry point for rpf_Periodicity."""
+    now_time()
+    print("\nDraw the periodicity plot.", flush=True)
+    _print_step(1, "Checking the input arguments.")
+
+    args = _parse_args(argv)
+    _run_periodicity_pipeline(args)
 
     print("\nAll done.", flush=True)
     now_time()
