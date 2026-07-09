@@ -2,20 +2,26 @@
 # -*- coding: utf-8 -*-
 
 # Author: Rensc
-# Date: 2026-07-08
-# Version: 0.2.8-dev.012
+# Date: 2026-07-09
+# Version: 0.2.8-dev.013
 # Function: Summarize RPF BAM/SAM mapping quality and output filtered BAM.
 # Input: RiboParser transcript annotation and BAM/SAM alignment file.
 # Output: Filtered sorted BAM, BAM index, length distribution, summary JSON, and optional saturation plots.
 
+"""Command-line entry point for rpf_Check."""
+
+from __future__ import annotations
+
 import argparse
+from argparse import Namespace
+from collections.abc import Sequence
 
 from utils.ribo.ArgsParser import args_print, file_check, now_time
 from utils.ribo.Quality import Quality
 
 
-def rpf_bam_check_parser():
-    """Parse command-line arguments for rpf_Check."""
+def _build_parser() -> argparse.ArgumentParser:
+    """Build the command-line argument parser."""
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="Summarize RPF BAM/SAM mapping quality and output filtered BAM.",
@@ -51,9 +57,14 @@ def rpf_bam_check_parser():
         required=False,
         type=int,
         default=4,
-        help="""Number of parallel worker processes and BAM I/O threads (default: %(default)s).
-When this value is greater than 1, rpf_Check automatically prepares an indexed BAM and uses multi-process transcript-reference fetching.""",
+        help=(
+            "Number of parallel worker processes and BAM I/O threads "
+            "(default: %(default)s). When this value is greater than 1, "
+            "rpf_Check automatically prepares an indexed BAM and uses "
+            "multi-process transcript-reference fetching."
+        ),
     )
+
     filter_group = parser.add_argument_group("Read filtering options")
     filter_group.add_argument(
         "-g",
@@ -62,9 +73,10 @@ When this value is greater than 1, rpf_Check automatically prepares an indexed B
         type=int,
         required=False,
         default=0,
-        help="""Filter reads by mapping uniqueness (default: %(default)s).
-[0]: all mapped reads are used;
-[1]: unique mapped reads are used.""",
+        help=(
+            "Filter reads by mapping uniqueness (default: %(default)s). "
+            "[0]: all mapped reads are used; [1]: unique mapped reads are used."
+        ),
     )
     filter_group.add_argument(
         "-a",
@@ -73,8 +85,10 @@ When this value is greater than 1, rpf_Check automatically prepares an indexed B
         type=str,
         required=False,
         default="star",
-        help="""Aligner used to generate the BAM/SAM file.
-This option controls unique-read tag interpretation. (default: %(default)s).""",
+        help=(
+            "Aligner used to generate the BAM/SAM file. This option controls "
+            "unique-read tag interpretation. (default: %(default)s)."
+        ),
     )
     filter_group.add_argument(
         "-r",
@@ -82,8 +96,10 @@ This option controls unique-read tag interpretation. (default: %(default)s).""",
         action="store_true",
         required=False,
         default=False,
-        help="""Backward-compatible option retained for old commands.
-The optimized rpf_Check workflow always retains and reports plus/minus strands separately.""",
+        help=(
+            "Backward-compatible option retained for old commands. The optimized "
+            "rpf_Check workflow always retains and reports plus/minus strands separately."
+        ),
     )
     filter_group.add_argument(
         "-l",
@@ -99,8 +115,10 @@ The optimized rpf_Check workflow always retains and reports plus/minus strands s
         action="store_true",
         required=False,
         default=False,
-        help="""Calculate RPF saturation. (default: %(default)s).
-This step takes extra memory, especially when multi-mapping reads are retained.""",
+        help=(
+            "Calculate RPF saturation. (default: %(default)s). This step takes "
+            "extra memory, especially when multi-mapping reads are retained."
+        ),
     )
     filter_group.add_argument(
         "--secondary",
@@ -127,30 +145,39 @@ This step takes extra memory, especially when multi-mapping reads are retained."
         help="Keep duplicate alignments. (default: %(default)s).",
     )
 
-    args = parser.parse_args()
-    file_check(args.transcript, args.bam)
-    args_print(args)
+    return parser
 
+
+def _validate_args(args: Namespace) -> None:
+    """Validate command-line arguments."""
+    file_check(args.transcript, args.bam)
+
+
+def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
+    """Parse, validate, and print command-line arguments."""
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    _validate_args(args)
+    args_print(args)
     return args
 
 
-def main():
+def _print_step(step: int, message: str) -> None:
+    """Print a standardized pipeline step message."""
+    print(f"\nStep{step}: {message}", flush=True)
+
+
+def _run_check_pipeline(args: Namespace) -> None:
     """Run the optimized rpf_Check workflow."""
-    now_time()
-    print("\nCheck the RPFs mapping condition.", flush=True)
-
-    print("\nStep1: Checking the input arguments.", flush=True)
-    args = rpf_bam_check_parser()
-
     rpf_quality = Quality(args)
 
-    print("\nStep2: Import the transcripts annotation.", flush=True)
+    _print_step(2, "Import the transcripts annotation.")
     rpf_quality.read_transcript()
 
-    print("\nStep3: Scan mRNA-aligned reads and output filtered BAM.", flush=True)
+    _print_step(3, "Scan mRNA-aligned reads and output filtered BAM.")
     rpf_quality.scan_mrna_reads()
 
-    print("\nStep4: Detect the type of sequence profile.", flush=True)
+    _print_step(4, "Detect the type of sequence profile.")
     if not rpf_quality.profile:
         rpf_quality.detect_seq_type()
     else:
@@ -162,18 +189,29 @@ def main():
             flush=True,
         )
 
-    print("\nStep5: Summarize the length distribution of reads aligned to mRNA.", flush=True)
+    _print_step(5, "Summarize the length distribution of reads aligned to mRNA.")
     rpf_quality.write_length_distr()
     rpf_quality.write_summary()
 
     if args.saturation:
-        print("\nStep6: Check the RPFs saturation.", flush=True)
+        _print_step(6, "Check the RPFs saturation.")
         rpf_quality.rpf_saturation()
         rpf_quality.draw_gene_saturation()
         rpf_quality.draw_rpf_saturation()
         rpf_quality.write_summary()
     else:
-        print("\nStep6: Do not check the RPFs saturation.", flush=True)
+        _print_step(6, "Do not check the RPFs saturation.")
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    """Command-line entry point for rpf_Check."""
+    now_time()
+    print("\nCheck the RPFs mapping condition.", flush=True)
+
+    _print_step(1, "Checking the input arguments.")
+    args = _parse_args(argv)
+
+    _run_check_pipeline(args)
 
     print("\nAll done.", flush=True)
     now_time()
