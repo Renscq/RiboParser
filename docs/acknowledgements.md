@@ -21,7 +21,6 @@ RiboParser depends on and interoperates with widely used open-source tools, incl
 - Polars
 - Biopython
 - SciPy
-- scikit-learn
 - statsmodels
 - pysam
 - joblib

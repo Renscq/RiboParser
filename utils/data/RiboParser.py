@@ -26,9 +26,9 @@ class RiboParserInfo:
         doi:10.1016/j.jgg.2025.04.010.
         '''
     )
-    required_packages = ["pandas", "polars", "numpy", "matplotlib-venn", "seqlogo", 
+    required_packages = ["pandas", "polars", "numpy", "matplotlib-venn", 
                          "matplotlib", "seaborn", "biopython", 
-                         "scipy", "scikit-learn", "statsmodels", 
+                         "scipy", "statsmodels", 
                          "pysam", "joblib"]
 
     @classmethod

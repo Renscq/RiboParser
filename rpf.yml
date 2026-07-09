@@ -74,7 +74,6 @@ dependencies:
     - requests-toolbelt==1.0.0
     - rfc3986==2.0.0
     - rich==15.0.0
-    - scikit-learn==1.8.0
     - scipy==1.17.1
     - seaborn==0.13.2
     - seqlogo==5.29.11
