@@ -109,6 +109,7 @@ utils/ribo/CDT.py
 utils/ribo/CST.py
 utils/ribo/Codon.py
 utils/ribo/Coefficient_of_Variation.py
+utils/ribo/Corr.py
 utils/ribo/Coverage.py
 utils/ribo/Cumulative_CoV.py
 utils/ribo/Density.py
