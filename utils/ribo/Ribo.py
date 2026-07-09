@@ -3,8 +3,8 @@
 
 # Author: Rensc
 # Date: 2026-07-09
-# Version: 0.2.8-dev.007
-# Function: Provide compact JSON-based RPF density generation and conversion utilities.
+# Version: 0.2.8-dev.008
+# Function: Provide multi-sample-compatible JSON-based RPF density generation and conversion utilities.
 # Input: RiboParser norm TXT or genePred annotation, transcript FASTA, BAM/SAM alignment, and P-site offset table.
 # Output: Gzip-compressed compact RPF density JSONL, summary JSON, and optional legacy codon-level TXT table.
 
@@ -12,7 +12,7 @@
 
 This module converts transcriptome-aligned Ribo-seq BAM/SAM records into
 P-site density. The default output is a compact JSONL file with one transcript
-record per line. A compatibility converter is provided to expand the JSONL file
+record per line. Each record stores one or more samples under the ``samples`` field. A compatibility converter is provided to expand the JSONL file
 back into the legacy codon-level TXT table when downstream modules still require
 that format.
 
@@ -1147,7 +1147,15 @@ class Ribo(object):
         )
 
     def _record_from_isoform(self, name: str, isoform: Mrna) -> OrderedDict:
-        """Build one compact JSON-serializable transcript density record."""
+        """Build one compact JSON-serializable transcript density record.
+
+        Notes
+        -----
+        The JSON schema is multi-sample compatible by design. A single-sample
+        ``rpf_Density`` output stores its density under ``samples[sample_name]``.
+        ``rpf_Merge`` can then merge multiple JSONL files by adding more sample
+        entries without duplicating annotation, sequence, or genome mapping data.
+        """
         trim_info = self._trim_info_from_isoform(isoform)
         shift5 = trim_info["shift5_nt"]
         shift3 = trim_info["shift3_nt"]
@@ -1156,16 +1164,21 @@ class Ribo(object):
         trim_rpf = self._trim_array(isoform.rpf, shift5, shift3)
         density = self._density_from_trimmed_rpf(trim_rpf)
 
+        sample_record = OrderedDict(
+            [
+                ("profile", str(self.profile)),
+                ("density", density),
+            ]
+        )
+
         return OrderedDict(
             [
                 ("record_type", "transcript"),
-                ("sample", self.sample_name),
                 ("transcript_id", str(isoform.transcript_id)),
                 ("gene_id", str(isoform.gene_id)),
                 ("name", str(name)),
                 ("chromosome", str(isoform.chromosome)),
                 ("strand", str(isoform.strand)),
-                ("profile", str(self.profile)),
                 ("length_nt", int(isoform.length)),
                 ("utr5_nt", int(isoform.utr5_length)),
                 ("cds_nt", int(isoform.cds_length)),
@@ -1174,7 +1187,7 @@ class Ribo(object):
                 ("genome_mapping", isoform.genome_mapping),
                 ("trim", trim_info),
                 ("sequence", trim_seq),
-                ("density", density),
+                ("samples", OrderedDict([(self.sample_name, sample_record)])),
             ]
         )
 
@@ -1204,33 +1217,65 @@ class Ribo(object):
 
     @staticmethod
     def _legacy_header(sample_name: str) -> List[str]:
-        """Return legacy codon-level TXT header."""
-        return [
-            "name",
-            "now_nt",
-            "from_tis",
-            "from_tts",
-            "region",
-            "codon",
-            sample_name + "_f0",
-            sample_name + "_f1",
-            sample_name + "_f2",
-        ]
+        """Return legacy codon-level TXT header for one sample."""
+        return Ribo._legacy_header_from_samples([sample_name])
 
     @staticmethod
-    def _density_to_dense_frames(record: Dict) -> Tuple[List[int], List[int], List[int]]:
+    def _legacy_header_from_samples(sample_names: List[str]) -> List[str]:
+        """Return legacy codon-level TXT header for one or more samples."""
+        header = ["name", "now_nt", "from_tis", "from_tts", "region", "codon"]
+        for sample_name in sample_names:
+            header.extend([sample_name + "_f0", sample_name + "_f1", sample_name + "_f2"])
+        return header
+
+    @staticmethod
+    def _sample_names_from_record(record: Dict) -> List[str]:
+        """Return sample names stored in a compact density record."""
+        samples = record.get("samples")
+        if isinstance(samples, dict) and samples:
+            return [str(sample) for sample in samples.keys()]
+        return [str(record.get("sample", "sample"))]
+
+    @staticmethod
+    def _density_for_sample(record: Dict, sample_name: Optional[str] = None) -> Dict:
+        """Return the density object for one sample from new or legacy JSON records."""
+        samples = record.get("samples")
+        if isinstance(samples, dict) and samples:
+            if sample_name is None:
+                sample_name = next(iter(samples.keys()))
+            sample_entry = samples.get(sample_name)
+            if sample_entry is None:
+                return {}
+            if isinstance(sample_entry, dict) and "density" in sample_entry:
+                return sample_entry.get("density") or {}
+            # Defensive fallback for records that store sample -> density directly.
+            if isinstance(sample_entry, dict):
+                return sample_entry
+            return {}
+
+        # Backward compatibility for rpf_Density.001-.007 JSON records.
+        return record.get("density") or {}
+
+    @staticmethod
+    def _density_to_dense_frames(record: Dict, sample_name: Optional[str] = None) -> Tuple[List[int], List[int], List[int]]:
         """Return dense frame arrays from sparse or dense density encoding."""
         trim = record["trim"]
         codon_count = int(trim["codon_count"])
-        density = record["density"]
+        density = Ribo._density_for_sample(record, sample_name=sample_name)
         encoding = density.get("encoding", SPARSE_ENCODING)
 
         if encoding == DENSE_ENCODING:
-            return (
-                [int(x) for x in density.get("f0", [])],
-                [int(x) for x in density.get("f1", [])],
-                [int(x) for x in density.get("f2", [])],
-            )
+            f0 = [int(x) for x in density.get("f0", [])]
+            f1 = [int(x) for x in density.get("f1", [])]
+            f2 = [int(x) for x in density.get("f2", [])]
+            # Fill missing trailing positions defensively.
+            if len(f0) < codon_count:
+                f0.extend([0] * (codon_count - len(f0)))
+            if len(f1) < codon_count:
+                f1.extend([0] * (codon_count - len(f1)))
+            if len(f2) < codon_count:
+                f2.extend([0] * (codon_count - len(f2)))
+            return f0[:codon_count], f1[:codon_count], f2[:codon_count]
 
         f0 = [0] * codon_count
         f1 = [0] * codon_count
@@ -1248,11 +1293,18 @@ class Ribo(object):
         return f0, f1, f2
 
     @staticmethod
-    def _legacy_rows_from_record(record: Dict, nonzero_only: bool = False) -> Iterator[List]:
+    def _legacy_rows_from_record(
+        record: Dict,
+        sample_names: Optional[List[str]] = None,
+        nonzero_only: bool = False,
+    ) -> Iterator[List]:
         """Yield legacy codon-level TXT rows from one compact JSON record."""
         trim = record["trim"]
         sequence = record.get("sequence", "")
         name = record.get("name", record.get("transcript_id", "NA"))
+
+        if sample_names is None:
+            sample_names = Ribo._sample_names_from_record(record)
 
         codon_count = int(trim["codon_count"])
         start_nt0 = int(trim["start_nt0"])
@@ -1262,14 +1314,19 @@ class Ribo(object):
         utr3_nt = int(trim["utr3_nt"])
 
         from_tts_start = (utr3_nt - trim_length_nt) // 3 + 1
-        f0, f1, f2 = Ribo._density_to_dense_frames(record)
+        frame_arrays = [Ribo._density_to_dense_frames(record, sample_name=sample_name) for sample_name in sample_names]
 
         for codon_index in range(codon_count):
-            value0 = int(f0[codon_index])
-            value1 = int(f1[codon_index])
-            value2 = int(f2[codon_index])
+            sample_values = []
+            total_value = 0
+            for f0, f1, f2 in frame_arrays:
+                value0 = int(f0[codon_index])
+                value1 = int(f1[codon_index])
+                value2 = int(f2[codon_index])
+                sample_values.extend([value0, value1, value2])
+                total_value += value0 + value1 + value2
 
-            if nonzero_only and value0 == 0 and value1 == 0 and value2 == 0:
+            if nonzero_only and total_value == 0:
                 continue
 
             if codon_index < utr5_codons:
@@ -1285,18 +1342,19 @@ class Ribo(object):
             from_tis = codon_index - utr5_codons
             from_tts = from_tts_start + codon_index
 
-            yield [name, now_nt, from_tis, from_tts, region, codon, value0, value1, value2]
+            yield [name, now_nt, from_tis, from_tts, region, codon] + sample_values
 
     def write_density_txt(self, out_txt: Optional[str] = None) -> str:
         """Write complete legacy TXT directly from in-memory density records."""
         if out_txt is None:
             out_txt = self.output + "_rpf.txt"
 
+        sample_names = [self.sample_name]
         with open(out_txt, "w", encoding="utf-8", newline="") as out:
             writer = csv.writer(out, delimiter="\t", lineterminator="\n")
-            writer.writerow(self._legacy_header(self.sample_name))
+            writer.writerow(self._legacy_header_from_samples(sample_names))
             for record in self.iter_density_records():
-                writer.writerows(self._legacy_rows_from_record(record, nonzero_only=False))
+                writer.writerows(self._legacy_rows_from_record(record, sample_names=sample_names, nonzero_only=False))
 
         self.txt_path = out_txt
         print("Legacy RPF density TXT written: {path}".format(path=out_txt), flush=True)
@@ -1312,7 +1370,8 @@ class Ribo(object):
         Parameters
         ----------
         json_file : str
-            Input ``*_rpf.jsonl`` or ``*_rpf.jsonl.gz`` file.
+            Input ``*_rpf.jsonl`` or ``*_rpf.jsonl.gz`` file. Both single-sample
+            and merged multi-sample JSONL files are supported.
         output_txt : str
             Output legacy TXT file.
         Returns
@@ -1324,6 +1383,7 @@ class Ribo(object):
         with in_handle as inp, open(output_txt, "w", encoding="utf-8", newline="") as out:
             writer = csv.writer(out, delimiter="\t", lineterminator="\n")
             header_written = False
+            sample_names = None
             record_count = 0
             row_count = 0
 
@@ -1335,18 +1395,18 @@ class Ribo(object):
                 if record.get("record_type") != "transcript":
                     continue
 
-                current_sample = record.get("sample", "sample")
-                if not header_written:
-                    writer.writerow(Ribo._legacy_header(current_sample))
+                if sample_names is None:
+                    sample_names = Ribo._sample_names_from_record(record)
+                    writer.writerow(Ribo._legacy_header_from_samples(sample_names))
                     header_written = True
 
-                for row in Ribo._legacy_rows_from_record(record, nonzero_only=False):
+                for row in Ribo._legacy_rows_from_record(record, sample_names=sample_names, nonzero_only=False):
                     writer.writerow(row)
                     row_count += 1
                 record_count += 1
 
             if not header_written:
-                writer.writerow(Ribo._legacy_header("sample"))
+                writer.writerow(Ribo._legacy_header_from_samples(["sample"]))
 
         print(
             "JSONL to TXT conversion done: {records} records, {rows} rows.".format(

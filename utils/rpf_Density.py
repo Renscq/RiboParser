@@ -3,9 +3,9 @@
 
 # Author: Rensc
 # Date: 2026-07-09
-# Version: 0.2.8-dev.003
-# Function: Convert Ribo-seq BAM/SAM alignments to compact P-site density JSONL.
-# Input: Transcript annotation, transcript FASTA, BAM/SAM alignment, and P-site offset table.
+# Version: 0.2.8-dev.008
+# Function: Convert Ribo-seq BAM/SAM alignments to multi-sample-compatible self-contained P-site density JSONL.
+# Input: RiboParser norm TXT or genePred annotation, transcript FASTA, BAM/SAM alignment, and P-site offset table.
 # Output: Gzip-compressed compact RPF density JSONL, summary JSON, and optional legacy TXT table.
 
 """Command-line entry point for compact RPF density generation."""
@@ -20,7 +20,7 @@ from utils.ribo.ArgsParser import args_print, file_check, now_time
 
 def ribo_args_parser():
     parser = argparse.ArgumentParser(
-        description="Convert Ribo-seq BAM/SAM alignments to compact P-site density JSONL."
+        description="Convert Ribo-seq BAM/SAM alignments to multi-sample-compatible self-contained P-site density JSONL."
     )
 
     input_group = parser.add_argument_group("Required arguments")
@@ -29,7 +29,7 @@ def ribo_args_parser():
         dest="transcript",
         required=True,
         type=str,
-        help="Input transcript annotation file in TXT format.",
+        help="Input transcript annotation file in RiboParser norm TXT or genePred format.",
     )
     input_group.add_argument(
         "-s",
@@ -57,7 +57,7 @@ def ribo_args_parser():
         dest="output",
         required=True,
         type=str,
-        help="Output prefix. Default JSON output is prefix + '_rpf.jsonl.gz'.",
+        help="Output prefix. Default JSON output is prefix + '_rpf.jsonl.gz'. The JSON uses a samples field to support downstream multi-sample merging.",
     )
 
     parser.add_argument(
@@ -122,7 +122,7 @@ def ribo_args_parser():
         type=int,
         required=False,
         default=1,
-        help="Reserved thread count for future indexed-BAM scan mode. Current compact output is streamed. Default: %(default)s.",
+        help="Number of workers for indexed BAM parallel scanning. If BAM is not indexed, stream mode is used. Default: %(default)s.",
     )
 
     output_group = parser.add_argument_group("Output arguments")
@@ -150,7 +150,7 @@ def ribo_args_parser():
 
 def main():
     now_time()
-    print("\nConvert reads to compact RPF density.", flush=True)
+    print("\nConvert reads to multi-sample-compatible compact RPF density.", flush=True)
     print("\nStep1: Checking the input arguments.", flush=True)
     args = ribo_args_parser()
 
