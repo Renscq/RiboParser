@@ -2,11 +2,13 @@
 # -*- coding: utf-8 -*-
 
 # Author: Rensc
-# Date: 2026-07-09
-# Version: 0.2.7.3
+# Date: 2026-07-21
+# Version: 0.2.8.18
 # Function: Build normalized RiboParser reference files with enhanced transcript annotation.
 # Input: Genome FASTA and GTF/GFF annotation files.
-# Output: Normalized genePred, GTF, enhanced norm TXT, mRNA FASTA, and CDS FASTA files.
+# Output: Normalized genePred, GTF, norm TXT, mRNA FASTA, and CDS FASTA files.
+
+"""Command-line entry point for building RiboParser reference files."""
 
 from __future__ import annotations
 
@@ -46,40 +48,39 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Output prefix for normalized reference files.",
     )
 
-    parser.add_argument(
+    annotation_group = parser.add_argument_group("Annotation arguments")
+    annotation_group.add_argument(
         "-u",
         dest="utr",
-        required=False,
-        type=int,
         default=0,
-        help="Add pseudo UTR to leaderless transcripts (default: %(default)s nt).",
+        type=int,
+        help="Pseudo-UTR length added to leaderless transcripts (default: %(default)s nt).",
     )
-    parser.add_argument(
+    annotation_group.add_argument(
         "-c",
         dest="coding",
-        required=False,
         action="store_true",
         default=False,
         help="Only retain protein-coding transcripts (default: %(default)s).",
     )
-    parser.add_argument(
+    annotation_group.add_argument(
         "-l",
         dest="longest",
-        required=False,
         action="store_true",
         default=False,
         help=(
-            "Only retain the representative transcript with the longest CDS per gene; "
-            "recommended for subsequent analysis (default: %(default)s)."
+            "Only retain the transcript with the longest CDS per gene "
+            "(default: %(default)s)."
         ),
     )
-    parser.add_argument(
+
+    output_group = parser.add_argument_group("Output arguments")
+    output_group.add_argument(
         "-w",
         dest="whole",
-        required=False,
         action="store_true",
         default=False,
-        help="Output the whole intermediate annotation table (default: %(default)s).",
+        help="Output the complete intermediate annotation table (default: %(default)s).",
     )
 
     return parser
@@ -88,10 +89,12 @@ def _build_parser() -> argparse.ArgumentParser:
 def _validate_args(args: Namespace) -> None:
     """Validate command-line arguments."""
     file_check(args.genome, args.gtf)
+    if args.utr < 0:
+        raise ValueError("-u must be >= 0.")
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
-    """Parse and validate command-line arguments."""
+    """Parse, validate, and print command-line arguments."""
     parser = _build_parser()
     args = parser.parse_args(argv)
     _validate_args(args)
@@ -105,36 +108,36 @@ def _print_step(step: int, message: str) -> None:
 
 
 def _run_reference_pipeline(args: Namespace) -> None:
-    """Run the RiboParser reference-building pipeline."""
+    """Run the RiboParser reference-building workflow."""
     from utils.ribo.GenePred import GenePred
 
-    ribo_ref = GenePred(args)
+    reference = GenePred(args)
 
-    _print_step(2, "Import genome sequence.")
-    ribo_ref.read_genome()
+    _print_step(2, "Import the genome sequence.")
+    reference.read_genome()
 
-    _print_step(3, "Format GTF/GFF annotation.")
-    ribo_ref.gtf2gp()
-    ribo_ref.read_genepred()
-    ribo_ref.get_rep_transcript()
-    ribo_ref.add_utr()
+    _print_step(3, "Format the GTF/GFF transcript annotation.")
+    reference.gtf2gp()
+    reference.read_genepred()
+    reference.get_rep_transcript()
+    reference.add_utr()
 
-    _print_step(4, "Output normalized annotation with exon blocks.")
-    ribo_ref.write_txt()
-    ribo_ref.gp2gtf()
+    _print_step(4, "Output normalized transcript annotation.")
+    reference.write_txt()
+    reference.gp2gtf()
 
     _print_step(5, "Retrieve mRNA and CDS sequences.")
-    ribo_ref.get_seq()
-    ribo_ref.write_seq()
+    reference.get_seq()
+    reference.write_seq()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Reference."""
-    args = _parse_args(argv)
-
     now_time()
-    print("\nMake the reference for RiboParser.", flush=True)
+    print("\nBuild the reference files for RiboParser.", flush=True)
+    _print_step(1, "Checking the input arguments.")
 
+    args = _parse_args(argv)
     _run_reference_pipeline(args)
 
     print("\nAll done.", flush=True)

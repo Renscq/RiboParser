@@ -114,8 +114,6 @@ utils/ribo/Coverage.py
 utils/ribo/Cumulative_CoV.py
 utils/ribo/Density.py
 utils/ribo/Digestion.py
-utils/ribo/EndSite.py
-utils/ribo/Ensembl_Ref.py
 utils/ribo/GenePred.py
 utils/ribo/Geneplot.py
 utils/ribo/Merge.py
