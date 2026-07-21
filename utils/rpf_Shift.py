@@ -3,7 +3,7 @@
 
 # Author: Rensc
 # Date: 2026-07-13
-# Version: 0.2.8-dev.005
+# Version: 0.2.8-dev.006
 # Function: Detect transcript-level ribosomal frameshift candidates.
 # Input: RPF density file in JSONL or TXT format and optional transcript filter.
 # Output: Frame-transition statistics, candidate tables, summaries, and figures.

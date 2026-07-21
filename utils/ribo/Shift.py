@@ -3,7 +3,7 @@
 
 # Author: Rensc
 # Date: 2026-07-13
-# Version: 0.2.8-dev.005
+# Version: 0.2.8-dev.006
 # Function: Detect transcript-level ribosomal frameshift candidates from RPF density data.
 # Input: RPF density file in JSONL or TXT format and an optional transcript filter.
 # Output: Frame periodicity, change-point statistics, candidate tables, summaries, and figures.
@@ -47,7 +47,6 @@ import pandas as pd
 BASE_COLUMNS = ["name", "now_nt", "from_tis", "from_tts", "region", "codon"]
 FRAME_NAMES = ["frame0", "frame1", "frame2"]
 PROGRESS_EVERY = 500
-SHIFT_VERSION = "0.2.8-dev.005"
 
 FRAME_COLORS = {
     0: "#56B4E9",
@@ -206,7 +205,6 @@ class Shift(object):
         self.transcript_ends = ends.astype(np.int64, copy=False)
         self.meta_table = self.raw_rpf.loc[:, BASE_COLUMNS]
 
-        print(f"Shift module version: {SHIFT_VERSION}.", flush=True)
         print(
             "Imported frame-resolved RPF density: samples={samples}, format={fmt}, "
             "CDS rows={rows:,}.".format(
@@ -641,7 +639,7 @@ class Shift(object):
 
         summary_json = self.output + "_frame_shift.summary.json"
         payload = {
-            "version": "0.2.8-dev.005",
+            "version": "0.2.8-dev.006",
             "input": os.path.abspath(self.rpf),
             "input_format": self.file_format,
             "samples": self.sample_name,
@@ -974,8 +972,6 @@ class Shift(object):
                 ax.axvline(shift_x, linestyle="--", linewidth=1.0, color="#555555")
                 ax.set_xlim(1, len(table))
 
-            fig.text(0.99, 0.01, f"Shift {SHIFT_VERSION}", ha="right", va="bottom",
-                     fontsize=6, color="#777777")
             fig.subplots_adjust(top=0.90, bottom=0.13, left=0.10, right=0.98, hspace=0.22)
 
             stem = (

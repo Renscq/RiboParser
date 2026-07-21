@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 # Author: Rensc
-# Date: 2026-07-09
-# Version: 0.2.8-dev.002
+# Date: 2026-07-13
+# Version: 0.2.8-dev.011
 # Function: Provide RiboParser core functions for RPF density data import and analysis.
 # Input: RiboParser compact JSONL density files or legacy codon-level TXT density files.
 # Output: Polars/Pandas RPF density objects and summary tables for downstream modules.
@@ -22,14 +22,17 @@ updated ``rpf_Density`` and ``rpf_Merge`` workflows.
 from __future__ import annotations
 
 import gzip
+import io
 import json
 import os
+import itertools
 import re
 import sys
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import polars as pl
 
@@ -39,6 +42,14 @@ FRAME_SUFFIXES = ("_f0", "_f1", "_f2")
 SPARSE_ENCODING = "sparse_codon_frame"
 DENSE_ENCODING = "dense_codon_frame"
 PROGRESS_EVERY = 1000
+JSON_CHUNK_RECORDS = 512
+JSON_BUFFER_SIZE = 8 * 1024 * 1024
+RPF_READER_VERSION = "0.2.8-dev.011"
+
+
+def _json_loads(line: bytes | str) -> dict[str, Any]:
+    """Decode one JSON line with the Python standard-library parser."""
+    return json.loads(line)
 
 
 # -----------------------------------------------------------------------------
@@ -51,6 +62,16 @@ def _open_text(path: str, mode: str = "rt"):
     if path.endswith(".gz"):
         return gzip.open(path, mode, encoding="utf-8", newline="")
     return open(path, mode, encoding="utf-8", newline="")
+
+
+def _open_binary(path: str):
+    """Open plain or gzip-compressed input with a large buffered reader."""
+    raw = open(path, "rb", buffering=0)
+    if path.endswith(".gz"):
+        stream = gzip.GzipFile(fileobj=raw, mode="rb")
+    else:
+        stream = raw
+    return io.BufferedReader(stream, buffer_size=JSON_BUFFER_SIZE)
 
 
 def _to_int(value: Any, default: int = 0) -> int:
@@ -165,13 +186,13 @@ def _row_pass_filter(
 
 def iter_json_records(json_file: str) -> Iterator[dict[str, Any]]:
     """Yield current RPF density transcript records from JSONL."""
-    with _open_text(json_file, "rt") as handle:
+    with _open_binary(json_file) as handle:
         for line_number, line in enumerate(handle, start=1):
             line = line.strip()
             if not line:
                 continue
 
-            record = json.loads(line)
+            record = _json_loads(line)
             if record.get("record_type") != "transcript":
                 continue
 
@@ -205,57 +226,127 @@ def _density_for_sample(record: dict[str, Any], sample_name: str) -> dict[str, A
     return density
 
 
-def density_to_frame_arrays(
+def density_to_frame_matrix(
     record: dict[str, Any],
     sample_name: str,
     codon_count: int | None = None,
-) -> tuple[list[int], list[int], list[int]]:
-    """Convert sparse or dense JSON density to three dense frame arrays."""
+) -> np.ndarray:
+    """Convert sparse or dense JSON density to a dense ``codon x frame`` matrix."""
     if codon_count is None:
         codon_count = _to_int(record.get("trim", {}).get("codon_count"), 0)
+    codon_count = max(0, int(codon_count))
+    matrix = np.zeros((codon_count, 3), dtype=np.int64)
+    if codon_count == 0:
+        return matrix
 
     density = _density_for_sample(record, sample_name)
     encoding = str(density.get("encoding", SPARSE_ENCODING))
 
     if encoding in {DENSE_ENCODING, "dense"}:
-        f0 = [_to_int(x) for x in density.get("f0", density.get("frame0", []))]
-        f1 = [_to_int(x) for x in density.get("f1", density.get("frame1", []))]
-        f2 = [_to_int(x) for x in density.get("f2", density.get("frame2", []))]
-
-        if len(f0) < codon_count:
-            f0.extend([0] * (codon_count - len(f0)))
-        if len(f1) < codon_count:
-            f1.extend([0] * (codon_count - len(f1)))
-        if len(f2) < codon_count:
-            f2.extend([0] * (codon_count - len(f2)))
-
-        return f0[:codon_count], f1[:codon_count], f2[:codon_count]
+        for frame, keys in enumerate((("f0", "frame0"), ("f1", "frame1"), ("f2", "frame2"))):
+            values = density.get(keys[0], density.get(keys[1], []))
+            if not values:
+                continue
+            array = np.asarray(values, dtype=np.int64).reshape(-1)
+            length = min(codon_count, array.size)
+            matrix[:length, frame] = array[:length]
+        return matrix
 
     if encoding not in {SPARSE_ENCODING, "sparse"}:
         raise ValueError(
-            "Unsupported density encoding '{encoding}' in transcript '{transcript}' sample '{sample}'.".format(
+            "Unsupported density encoding '{encoding}' in transcript '{transcript}' "
+            "sample '{sample}'.".format(
                 encoding=encoding,
                 transcript=record.get("transcript_id", "NA"),
                 sample=sample_name,
             )
         )
 
-    f0 = [0] * codon_count
-    f1 = [0] * codon_count
-    f2 = [0] * codon_count
-    frames = (f0, f1, f2)
+    codon_index = np.asarray(density.get("codon_index", []), dtype=np.int64)
+    frame = np.asarray(density.get("frame", []), dtype=np.int64)
+    count = np.asarray(density.get("count", []), dtype=np.int64)
+    length = min(codon_index.size, frame.size, count.size)
+    if length == 0:
+        return matrix
+    codon_index = codon_index[:length]
+    frame = frame[:length]
+    count = count[:length]
+    valid = (codon_index >= 0) & (codon_index < codon_count) & (frame >= 0) & (frame < 3)
+    if valid.any():
+        np.add.at(matrix, (codon_index[valid], frame[valid]), count[valid])
+    return matrix
 
-    for codon_index, frame, count in zip(
-        density.get("codon_index", []),
-        density.get("frame", []),
-        density.get("count", []),
-    ):
-        codon_index = _to_int(codon_index, -1)
-        frame = _to_int(frame, -1)
-        if 0 <= codon_index < codon_count and frame in (0, 1, 2):
-            frames[frame][codon_index] += _to_int(count)
 
-    return f0, f1, f2
+def _density_to_selected_matrix(
+    record: dict[str, Any],
+    sample_name: str,
+    codon_count: int,
+    selected: np.ndarray,
+    selected_lookup: np.ndarray,
+) -> np.ndarray:
+    """Decode only retained codons into a compact ``selected x 3`` matrix."""
+    result = np.zeros((selected.size, 3), dtype=np.int64)
+    if selected.size == 0:
+        return result
+
+    density = _density_for_sample(record, sample_name)
+    encoding = str(density.get("encoding", SPARSE_ENCODING))
+    if encoding in {DENSE_ENCODING, "dense"}:
+        for frame_id, keys in enumerate((("f0", "frame0"), ("f1", "frame1"), ("f2", "frame2"))):
+            values = density.get(keys[0], density.get(keys[1], []))
+            if not values:
+                continue
+            array = np.asarray(values, dtype=np.int64).reshape(-1)
+            valid_selected = selected[selected < array.size]
+            if valid_selected.size:
+                output_index = selected_lookup[valid_selected]
+                result[output_index, frame_id] = array[valid_selected]
+        return result
+
+    if encoding not in {SPARSE_ENCODING, "sparse"}:
+        raise ValueError(
+            "Unsupported density encoding '{encoding}' in transcript '{transcript}' "
+            "sample '{sample}'.".format(
+                encoding=encoding,
+                transcript=record.get("transcript_id", "NA"),
+                sample=sample_name,
+            )
+        )
+
+    codon_index = np.asarray(density.get("codon_index", []), dtype=np.int64)
+    frame = np.asarray(density.get("frame", []), dtype=np.int64)
+    count = np.asarray(density.get("count", []), dtype=np.int64)
+    length = min(codon_index.size, frame.size, count.size)
+    if length == 0:
+        return result
+    codon_index = codon_index[:length]
+    frame = frame[:length]
+    count = count[:length]
+    valid = (codon_index >= 0) & (codon_index < codon_count) & (frame >= 0) & (frame < 3)
+    if not valid.any():
+        return result
+    codon_index = codon_index[valid]
+    frame = frame[valid]
+    count = count[valid]
+    output_index = selected_lookup[codon_index]
+    retained = output_index >= 0
+    if retained.any():
+        np.add.at(result, (output_index[retained], frame[retained]), count[retained])
+    return result
+
+
+def density_to_frame_arrays(
+    record: dict[str, Any],
+    sample_name: str,
+    codon_count: int | None = None,
+) -> tuple[list[int], list[int], list[int]]:
+    """Convert JSON density to three frame arrays; retained for compatibility."""
+    matrix = density_to_frame_matrix(record, sample_name, codon_count)
+    return (
+        matrix[:, 0].tolist(),
+        matrix[:, 1].tolist(),
+        matrix[:, 2].tolist(),
+    )
 
 
 def _region_from_codon_index(codon_index: int, utr5_codons: int, cds_codons: int) -> str:
@@ -267,24 +358,14 @@ def _region_from_codon_index(codon_index: int, utr5_codons: int, cds_codons: int
     return "3utr"
 
 
-def _init_column_store(sample_names: Sequence[str]) -> dict[str, list[Any]]:
-    """Initialize a column-oriented codon-level table store."""
-    store: dict[str, list[Any]] = {column: [] for column in BASE_COLUMNS}
-    for sample in sample_names:
-        for column in _frame_columns(str(sample)):
-            store[column] = []
-    return store
 
-
-def _append_record_to_store(
-    store: dict[str, list[Any]],
+def _prepare_record_metadata(
     record: dict[str, Any],
-    sample_names: Sequence[str],
     gene_filter: set[str] | None = None,
     tis: int | None = None,
     tts: int | None = None,
-) -> int:
-    """Append one JSON transcript record to a column-oriented table store."""
+) -> dict[str, Any] | None:
+    """Prepare retained transcript coordinates once for batch construction."""
     trim = record.get("trim")
     if not isinstance(trim, dict):
         raise ValueError(
@@ -294,9 +375,12 @@ def _append_record_to_store(
         )
 
     name = str(record.get("name") or record.get("transcript_id") or "NA")
+    if gene_filter is not None and name not in gene_filter:
+        return None
+
     codon_count = _to_int(trim.get("codon_count"), 0)
     if codon_count <= 0:
-        return 0
+        return None
 
     start_nt0 = _to_int(trim.get("start_nt0"), 0)
     trim_length_nt = _to_int(trim.get("trim_length_nt"), codon_count * 3)
@@ -305,43 +389,179 @@ def _append_record_to_store(
     utr3_nt = _to_int(trim.get("utr3_nt"), 0)
     from_tts_start = (utr3_nt - trim_length_nt) // 3 + 1
 
-    sequence = str(record.get("sequence", "")).upper()
-    frame_arrays = [density_to_frame_arrays(record, str(sample), codon_count) for sample in sample_names]
+    codon_index = np.arange(codon_count, dtype=np.int32)
+    from_tis = codon_index - np.int32(utr5_codons)
+    from_tts = np.int32(from_tts_start) + codon_index
+    keep = np.ones(codon_count, dtype=bool)
+    if tis is not None:
+        keep &= from_tis >= int(tis)
+    if tts is not None:
+        keep &= from_tts <= -int(tts)
 
-    appended_rows = 0
+    sequence = str(record.get("sequence", "")).upper().encode("ascii", errors="replace")
+    target_length = codon_count * 3
+    if len(sequence) < target_length:
+        sequence = sequence + b" " * (target_length - len(sequence))
+    else:
+        sequence = sequence[:target_length]
+    codon_bytes = np.frombuffer(sequence, dtype=np.uint8, count=codon_count * 3).reshape(codon_count, 3)
+    keep &= ~(codon_bytes == ord("N")).any(axis=1)
+    codons = np.frombuffer(sequence, dtype="S3", count=codon_count)
 
-    for codon_index in range(codon_count):
-        codon_start = codon_index * 3
-        codon = sequence[codon_start : codon_start + 3].upper()
-        from_tis = codon_index - utr5_codons
-        from_tts = from_tts_start + codon_index
+    selected = np.flatnonzero(keep).astype(np.int32, copy=False)
+    if selected.size == 0:
+        return None
 
-        if not _row_pass_filter(
-            name=name,
-            codon=codon,
-            from_tis=from_tis,
-            from_tts=from_tts,
-            gene_filter=gene_filter,
-            tis=tis,
-            tts=tts,
-        ):
+    selected_lookup = np.full(codon_count, -1, dtype=np.int32)
+    selected_lookup[selected] = np.arange(selected.size, dtype=np.int32)
+
+    selected_region = np.full(selected.size, "3utr", dtype="U4")
+    selected_region[selected < utr5_codons] = "5utr"
+    selected_region[
+        (selected >= utr5_codons) & (selected < utr5_codons + cds_codons)
+    ] = "cds"
+
+    return {
+        "record": record,
+        "name": name,
+        "codon_count": codon_count,
+        "selected": selected,
+        "selected_lookup": selected_lookup,
+        "now_nt": (start_nt0 + 1 + selected.astype(np.int64) * 3).astype(np.int64),
+        "from_tis": from_tis[selected].astype(np.int32, copy=False),
+        "from_tts": from_tts[selected].astype(np.int32, copy=False),
+        "region": selected_region,
+        "codon": codons[selected].astype("U3"),
+    }
+
+
+def _fill_selected_density(
+    target: np.ndarray,
+    record: dict[str, Any],
+    sample_name: str,
+    codon_count: int,
+    selected: np.ndarray,
+    selected_lookup: np.ndarray,
+) -> None:
+    """Decode one sample directly into a preallocated ``rows x 3`` target."""
+    density = _density_for_sample(record, sample_name)
+    encoding = str(density.get("encoding", SPARSE_ENCODING))
+
+    if encoding in {DENSE_ENCODING, "dense"}:
+        for frame_id, keys in enumerate((("f0", "frame0"), ("f1", "frame1"), ("f2", "frame2"))):
+            values = density.get(keys[0], density.get(keys[1], []))
+            if not values:
+                continue
+            array = np.asarray(values, dtype=np.int64).reshape(-1)
+            valid = selected < array.size
+            if valid.any():
+                target[valid, frame_id] = array[selected[valid]]
+        return
+
+    if encoding not in {SPARSE_ENCODING, "sparse"}:
+        raise ValueError(
+            "Unsupported density encoding '{encoding}' in transcript '{transcript}' "
+            "sample '{sample}'.".format(
+                encoding=encoding,
+                transcript=record.get("transcript_id", "NA"),
+                sample=sample_name,
+            )
+        )
+
+    codon_index = np.asarray(density.get("codon_index", []), dtype=np.int64)
+    frame = np.asarray(density.get("frame", []), dtype=np.int64)
+    count = np.asarray(density.get("count", []), dtype=np.int64)
+    length = min(codon_index.size, frame.size, count.size)
+    if length == 0:
+        return
+    codon_index = codon_index[:length]
+    frame = frame[:length]
+    count = count[:length]
+    valid = (
+        (codon_index >= 0)
+        & (codon_index < codon_count)
+        & (frame >= 0)
+        & (frame < 3)
+    )
+    if not valid.any():
+        return
+    codon_index = codon_index[valid]
+    frame = frame[valid]
+    count = count[valid]
+    output_index = selected_lookup[codon_index]
+    retained = output_index >= 0
+    if retained.any():
+        np.add.at(target, (output_index[retained], frame[retained]), count[retained])
+
+
+def _records_to_frame(
+    records: Sequence[dict[str, Any]],
+    sample_names: Sequence[str],
+    gene_filter: set[str] | None = None,
+    tis: int | None = None,
+    tts: int | None = None,
+) -> tuple[pl.DataFrame | None, int]:
+    """Build one Polars chunk using one batch-level preallocation."""
+    prepared: list[dict[str, Any]] = []
+    total_rows = 0
+    max_name_length = 1
+    for record in records:
+        metadata = _prepare_record_metadata(record, gene_filter, tis, tts)
+        if metadata is None:
             continue
+        prepared.append(metadata)
+        rows = int(metadata["selected"].size)
+        total_rows += rows
+        max_name_length = max(max_name_length, len(metadata["name"]))
 
-        store["name"].append(name)
-        store["now_nt"].append(start_nt0 + 1 + codon_index * 3)
-        store["from_tis"].append(from_tis)
-        store["from_tts"].append(from_tts)
-        store["region"].append(_region_from_codon_index(codon_index, utr5_codons, cds_codons))
-        store["codon"].append(codon)
+    if total_rows == 0:
+        return None, 0
 
-        for sample_name, (f0, f1, f2) in zip(sample_names, frame_arrays):
-            store[f"{sample_name}_f0"].append(int(f0[codon_index]))
-            store[f"{sample_name}_f1"].append(int(f1[codon_index]))
-            store[f"{sample_name}_f2"].append(int(f2[codon_index]))
+    names = np.empty(total_rows, dtype=f"U{max_name_length}")
+    now_nt = np.empty(total_rows, dtype=np.int64)
+    from_tis = np.empty(total_rows, dtype=np.int32)
+    from_tts = np.empty(total_rows, dtype=np.int32)
+    region = np.empty(total_rows, dtype="U4")
+    codon = np.empty(total_rows, dtype="U3")
+    density = np.zeros((total_rows, len(sample_names) * 3), dtype=np.int64)
 
-        appended_rows += 1
+    offset = 0
+    for metadata in prepared:
+        rows = int(metadata["selected"].size)
+        stop = offset + rows
+        sl = slice(offset, stop)
+        names[sl] = metadata["name"]
+        now_nt[sl] = metadata["now_nt"]
+        from_tis[sl] = metadata["from_tis"]
+        from_tts[sl] = metadata["from_tts"]
+        region[sl] = metadata["region"]
+        codon[sl] = metadata["codon"]
 
-    return appended_rows
+        for sample_index, sample in enumerate(sample_names):
+            _fill_selected_density(
+                target=density[sl, sample_index * 3:(sample_index + 1) * 3],
+                record=metadata["record"],
+                sample_name=str(sample),
+                codon_count=int(metadata["codon_count"]),
+                selected=metadata["selected"],
+                selected_lookup=metadata["selected_lookup"],
+            )
+        offset = stop
+
+    columns: dict[str, np.ndarray] = {
+        "name": names,
+        "now_nt": now_nt,
+        "from_tis": from_tis,
+        "from_tts": from_tts,
+        "region": region,
+        "codon": codon,
+    }
+    for sample_index, sample in enumerate(sample_names):
+        columns[f"{sample}_f0"] = density[:, sample_index * 3]
+        columns[f"{sample}_f1"] = density[:, sample_index * 3 + 1]
+        columns[f"{sample}_f2"] = density[:, sample_index * 3 + 2]
+    return pl.DataFrame(columns), total_rows
+
 
 
 def read_json_rpf_file(
@@ -350,9 +570,24 @@ def read_json_rpf_file(
     tis: int | None = None,
     tts: int | None = None,
     sample_name: str | Sequence[str] | None = None,
+    thread: int | None = None,
 ) -> pl.DataFrame:
-    """Read current compact JSONL RPF density as a codon-level Polars table."""
-    all_sample_names = get_json_sample_names(rpf_file)
+    """Read compact JSONL using native sequential batch conversion.
+
+    The ``thread`` argument is retained for backward compatibility but is not
+    used. Benchmarks showed that thread-pool conversion was slower because gzip
+    decompression and JSON parsing remain sequential, while concurrent NumPy and
+    Polars construction adds scheduling and memory-bandwidth overhead.
+    """
+    records = iter_json_records(rpf_file)
+    try:
+        first_record = next(records)
+    except StopIteration as exc:
+        raise ValueError(
+            f"No transcript records were found in JSON density file: {rpf_file}"
+        ) from exc
+
+    all_sample_names = [str(sample) for sample in first_record["samples"].keys()]
     requested_samples = _normalize_sample_name(sample_name)
     if requested_samples is None:
         selected_samples = all_sample_names
@@ -367,11 +602,35 @@ def read_json_rpf_file(
         selected_samples = requested_samples
 
     gene_filter = _read_gene_filter(gene)
-    store = _init_column_store(selected_samples)
+    chunks: list[pl.DataFrame] = []
+    batch: list[dict[str, Any]] = []
     record_count = 0
     row_count = 0
+    next_progress = PROGRESS_EVERY
 
-    for record in iter_json_records(rpf_file):
+    def flush_batch(records_batch: list[dict[str, Any]]) -> None:
+        nonlocal row_count, next_progress
+        if not records_batch:
+            return
+        frame, rows = _records_to_frame(
+            records_batch,
+            selected_samples,
+            gene_filter,
+            tis,
+            tts,
+        )
+        if frame is not None:
+            chunks.append(frame)
+        row_count += rows
+        if record_count >= next_progress:
+            print(
+                f"processed records={record_count:,}, retained rows={row_count:,}",
+                flush=True,
+            )
+            while next_progress <= record_count:
+                next_progress += PROGRESS_EVERY
+
+    for record in itertools.chain((first_record,), records):
         current_samples = [str(sample) for sample in record["samples"].keys()]
         if current_samples != all_sample_names:
             raise ValueError(
@@ -380,28 +639,33 @@ def read_json_rpf_file(
                 )
             )
 
-        row_count += _append_record_to_store(
-            store=store,
-            record=record,
-            sample_names=selected_samples,
-            gene_filter=gene_filter,
-            tis=tis,
-            tts=tts,
-        )
+        batch.append(record)
         record_count += 1
+        if len(batch) >= JSON_CHUNK_RECORDS:
+            flush_batch(batch)
+            batch = []
 
-        if record_count % PROGRESS_EVERY == 0:
-            print(f"records={record_count:,}, rows={row_count:,}", flush=True)
+    if batch:
+        flush_batch(batch)
 
     print(
-        "Imported JSON RPF density: records={records:,}, rows={rows:,}.".format(
+        "Imported JSON RPF density: records={records:,}, rows={rows:,}, "
+        "reader=native-json, builder=preallocated.".format(
             records=record_count,
             rows=row_count,
         ),
         flush=True,
     )
 
-    return pl.DataFrame(store)
+    if not chunks:
+        columns = {column: [] for column in BASE_COLUMNS}
+        for sample in selected_samples:
+            for column in _frame_columns(str(sample)):
+                columns[column] = []
+        return pl.DataFrame(columns)
+    if len(chunks) == 1:
+        return chunks[0]
+    return pl.concat(chunks, how="vertical", rechunk=False)
 
 
 # -----------------------------------------------------------------------------
@@ -688,6 +952,7 @@ class RPFData:
         gene: str | None = None,
         tis: int | None = None,
         tts: int | None = None,
+        json_thread: int | None = None,
     ) -> "RPFData":
         """Create an ``RPFData`` object from JSONL or TXT density input."""
         file_format = _detect_rpf_format(rpf_file)
@@ -699,6 +964,7 @@ class RPFData:
                 tis=tis,
                 tts=tts,
                 sample_name=sample_name,
+                thread=json_thread,
             )
         else:
             raw_rpf = read_txt_rpf_file(
