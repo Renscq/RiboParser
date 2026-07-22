@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 
 # Author: Rensc
-# Date: 2026-07-21
+# Date: 2026-07-22
 # Version: 0.2.8.18
-# Function: Scan transcript-centric small open reading frames.
+# Function: Scan transcript-centric complete and partial smORFs.
 # Input: Genome FASTA and genePred transcript annotation.
-# Output: Candidate smORF annotation, sequence, and summary files.
+# Output: smORF genePred, metadata, nucleotide FASTA, and peptide FASTA files.
 
 """Command-line entry point for transcript-centric smORF scanning."""
 
@@ -16,12 +16,23 @@ import argparse
 from argparse import Namespace
 from collections.abc import Sequence
 
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+from utils.ribo.ArgsParser import (
+    args_print,
+    file_check,
+    now_time,
+    result_print,
+    step_print,
+    title_print,
+)
 from utils.smorf import SmORFPipeline
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    """Build the command-line argument parser."""
+    """Build the command-line argument parser.
+
+    Returns:
+        Configured argument parser.
+    """
     parser = argparse.ArgumentParser(
         description="Scan transcript-centric small open reading frames."
     )
@@ -33,7 +44,7 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="genome",
         required=True,
         type=str,
-        help="Input genome sequence file in FASTA format.",
+        help="Input genome sequence file in FASTA or FASTA.GZ format.",
     )
     required_group.add_argument(
         "-a",
@@ -75,7 +86,7 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="min_aa",
         default=8,
         type=int,
-        help="Minimum ORF length (default: %(default)s aa).",
+        help="Minimum peptide length (default: %(default)s aa).",
     )
     scanning_group.add_argument(
         "-M",
@@ -83,7 +94,7 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="max_aa",
         default=10000,
         type=int,
-        help="Maximum ORF length (default: %(default)s aa).",
+        help="Maximum peptide length (default: %(default)s aa).",
     )
     scanning_group.add_argument(
         "-x",
@@ -92,7 +103,7 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=["sense", "antisense", "both"],
         default="sense",
         type=str,
-        help="Transcript strand scanned for ORFs (default: %(default)s).",
+        help="Transcript orientation scanned for ORFs (default: %(default)s).",
     )
     scanning_group.add_argument(
         "-u",
@@ -108,23 +119,30 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="kozak_down",
         default=6,
         type=int,
-        help="Downstream Kozak-context length (default: %(default)s nt).",
+        help=(
+            "Downstream Kozak-context length after the start codon "
+            "(default: %(default)s nt)."
+        ),
     )
     scanning_group.add_argument(
-        "-O",
-        "--mark-overlap",
-        dest="mark_overlap",
-        action="store_true",
-        default=False,
-        help="Annotate nested and overlapping ORFs (default: %(default)s).",
+        "--no-partial",
+        dest="keep_partial",
+        action="store_false",
+        default=True,
+        help=(
+            "Discard 3-prime partial ORFs without an in-frame stop codon "
+            "(default: retain partial ORFs)."
+        ),
     )
     scanning_group.add_argument(
-        "-R",
-        "--remove-discarded",
-        dest="remove_discarded",
+        "--allow-ambiguous",
+        dest="allow_ambiguous",
         action="store_true",
         default=False,
-        help="Remove discarded same-frame internal ORFs (default: %(default)s).",
+        help=(
+            "Retain ORFs containing ambiguous codons and translate them as X "
+            "(default: %(default)s)."
+        ),
     )
     scanning_group.add_argument(
         "-I",
@@ -132,7 +150,31 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="include_stop",
         action="store_true",
         default=False,
-        help="Retain the stop-codon symbol in peptide sequences (default: %(default)s).",
+        help=(
+            "Retain the terminal stop symbol in peptide sequences "
+            "(default: %(default)s)."
+        ),
+    )
+
+    overlap_group = parser.add_argument_group("Overlap arguments")
+    overlap_group.add_argument(
+        "-O",
+        "--mark-overlap",
+        dest="mark_overlap",
+        action="store_true",
+        default=False,
+        help="Annotate nested and overlapping ORFs (default: %(default)s).",
+    )
+    overlap_group.add_argument(
+        "-R",
+        "--remove-discarded",
+        dest="remove_discarded",
+        action="store_true",
+        default=False,
+        help=(
+            "Remove discarded same-frame internal ORFs "
+            "(default: %(default)s)."
+        ),
     )
 
     runtime_group = parser.add_argument_group("Runtime arguments")
@@ -149,8 +191,16 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _validate_args(args: Namespace) -> None:
-    """Validate command-line arguments."""
+    """Validate command-line arguments.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Raises:
+        ValueError: If a parameter value is invalid.
+    """
     file_check(args.genome, args.annotation)
+
     if args.min_aa < 1:
         raise ValueError("--min-aa must be >= 1.")
     if args.max_aa < args.min_aa:
@@ -159,14 +209,19 @@ def _validate_args(args: Namespace) -> None:
         raise ValueError("Kozak-context lengths must be >= 0.")
     if args.threads < 1:
         raise ValueError("--threads must be >= 1.")
+    if not args.out_prefix:
+        raise ValueError("--out-prefix must not be empty.")
+    if not args.orf_prefix:
+        raise ValueError("--orf-prefix must not be empty.")
 
     start_codons = [
-        codon.strip().upper()
+        codon.strip().upper().replace("U", "T")
         for codon in args.start_codons.split(",")
         if codon.strip()
     ]
     if not start_codons:
         raise ValueError("--start-codons must contain at least one codon.")
+
     invalid_codons = [
         codon
         for codon in start_codons
@@ -176,24 +231,47 @@ def _validate_args(args: Namespace) -> None:
         raise ValueError(
             "Invalid start codon(s): " + ", ".join(invalid_codons)
         )
+    stop_as_start = sorted(
+        set(start_codons).intersection({"TAA", "TAG", "TGA"})
+    )
+    if stop_as_start:
+        raise ValueError(
+            "Stop codons cannot be used as start codons: "
+            + ", ".join(stop_as_start)
+        )
 
 
-def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
-    """Parse, validate, and print command-line arguments."""
+def _parse_args(
+    argv: Sequence[str] | None = None,
+) -> Namespace:
+    """Parse, validate, and print command-line arguments.
+
+    Args:
+        argv: Optional argument sequence used by tests or embedded callers.
+
+    Returns:
+        Validated command-line arguments.
+    """
     parser = _build_parser()
     args = parser.parse_args(argv)
-    _validate_args(args)
+
+    try:
+        _validate_args(args)
+    except ValueError as error:
+        parser.error(str(error))
+
     args_print(args)
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
 
 
 def _run_scanner_pipeline(args: Namespace) -> None:
-    """Run transcript-centric smORF scanning."""
+    """Run the complete smORF scanning workflow.
+
+    Args:
+        args: Validated command-line arguments.
+    """
     pipeline = SmORFPipeline(
         genome=args.genome,
         annotation=args.annotation,
@@ -208,23 +286,30 @@ def _run_scanner_pipeline(args: Namespace) -> None:
         mark_overlap=args.mark_overlap,
         remove_discarded=args.remove_discarded,
         include_stop=args.include_stop,
+        keep_partial=args.keep_partial,
+        allow_ambiguous=args.allow_ambiguous,
         threads=args.threads,
+        retain_records=False,
     )
-
-    _print_step(2, "Scan ORFs from transcript sequences.")
     pipeline.run()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    """Command-line entry point for smorf_scanner."""
+    """Run the smorf_scanner command.
+
+    Args:
+        argv: Optional argument sequence used by tests or embedded callers.
+    """
     now_time()
-    print("\nScan transcript-centric small open reading frames.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print("Scan transcript-centric small open reading frames.")
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
+
+    step_print(2, "Scan ORFs from transcript sequences.")
     _run_scanner_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    title_print("All done.")
     now_time()
 
 
