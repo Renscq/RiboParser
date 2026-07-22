@@ -48,91 +48,119 @@ def _build_parser() -> argparse.ArgumentParser:
 
     required = parser.add_argument_group("Required arguments")
     required.add_argument(
-        "-r", dest="rpf", required=True, type=str,
+        "-r", 
+        "--rpf",
+        dest="rpf", required=True, type=str,
         help="Input RPF density file in JSONL or TXT format.",
     )
     required.add_argument(
-        "-o", dest="output", required=True, type=str,
+        "-o", 
+        "--output",
+        dest="output", required=True, type=str,
         help="Output prefix.",
     )
 
-    input_group = parser.add_argument_group("Input filtering arguments")
+    input_group = parser.add_argument_group("Filtering arguments")
     input_group.add_argument(
-        "-g", "--group", dest="group", default=None, type=str,
+        "-g", 
+        "--group", 
+        dest="group", default=None, type=str,
         help="Optional sample-group table containing Name and Group columns.",
     )
     input_group.add_argument(
-        "-l", "--list", dest="list", default=None, type=str,
+        "-l", 
+        "--list", 
+        dest="list", default=None, type=str,
         help="Optional transcript filter table. The transcript_id column or first column is used.",
     )
     input_group.add_argument(
-        "-s", "--site", dest="site", choices=["E", "P", "A"], default="P",
+        "-s", 
+        "--site", 
+        dest="site", choices=["E", "P", "A"], default="P",
         help="Ribosomal site used for positional density. Default: %(default)s.",
     )
     input_group.add_argument(
-        "-f", "--frame", dest="frame", choices=["0", "1", "2", "all"], default="all",
+        "-f", 
+        "--frame", 
+        dest="frame", choices=["0", "1", "2", "all"], default="all",
         help="Reading frame used for CoV calculation. Default: %(default)s.",
     )
     input_group.add_argument(
-        "-m", "--min", dest="min", type=int, default=5,
+        "-m", 
+        "--min", 
+        dest="min", type=int, default=5,
         help="Minimum sample-specific CDS RPF count required for a transcript. Default: %(default)s.",
     )
     input_group.add_argument(
-        "--tis", dest="tis", type=int, default=15,
+        "--tis", 
+        dest="tis", type=int, default=15,
         help="Discard this many codons after the start codon. Default: %(default)s.",
     )
     input_group.add_argument(
-        "--tts", dest="tts", type=int, default=5,
+        "--tts", 
+        dest="tts", type=int, default=5,
         help="Discard this many codons before the stop codon. Default: %(default)s.",
     )
 
     calculation = parser.add_argument_group("CoV calculation arguments")
     calculation.add_argument(
-        "-n", "--normal", dest="normal", action="store_true", default=False,
+        "-n", 
+        "--normal", 
+        dest="normal", action="store_true", default=False,
         help="Convert each sample to RPM before reporting sums and means. CoV itself is scale invariant. Default: %(default)s.",
     )
     calculation.add_argument(
-        "--ddof", dest="ddof", type=int, choices=[0, 1], default=1,
+        "--ddof", 
+        dest="ddof", type=int, choices=[0, 1], default=1,
         help="Delta degrees of freedom used for positional SD. Use 1 for sample SD and 0 for population SD. Default: %(default)s.",
     )
     calculation.add_argument(
-        "--min-codons", dest="min_codons", type=int, default=10,
+        "--min-codons", 
+        dest="min_codons", type=int, default=10,
         help="Minimum number of non-outlier CDS codon positions required for CoV. Default: %(default)s.",
     )
     calculation.add_argument(
-        "--thread", dest="thread", type=int, default=1,
+        "--thread", 
+        dest="thread", type=int, default=1,
         help="Number of sample-level worker threads. Default: %(default)s.",
     )
 
     outlier = parser.add_argument_group("Outlier arguments")
     outlier.add_argument(
-        "--remove-outlier", dest="remove_outlier", action="store_true", default=False,
+        "--remove-outlier", 
+        dest="remove_outlier", action="store_true", default=False,
         help="Remove isolated extreme RPF pileups before CoV calculation. Default: %(default)s.",
     )
     outlier.add_argument(
-        "--outlier-iqr", dest="outlier_iqr", type=float, default=8.0,
+        "--outlier-iqr", 
+        dest="outlier_iqr", type=float, default=8.0,
         help="Robust log1p cutoff multiplier for candidate pileups. Default: %(default)s.",
     )
     outlier.add_argument(
-        "--outlier-window", dest="outlier_window", type=int, default=5,
+        "--outlier-window", 
+        dest="outlier_window", type=int, default=5,
         help="Neighboring codons on each side used for local background. Default: %(default)s.",
     )
     outlier.add_argument(
-        "--outlier-local-fold", dest="outlier_local_fold", type=float, default=10.0,
+        "--outlier-local-fold", 
+        dest="outlier_local_fold", type=float, default=10.0,
         help="Minimum fold over local background required for removal. Default: %(default)s.",
     )
 
     plot_group = parser.add_argument_group("Curve fitting and plotting arguments")
     plot_group.add_argument(
-        "--fit-model", dest="fit_model", choices=["nb"], default="nb",
+        "--fit-model", 
+        dest="fit_model", choices=["nb"], default="nb",
         help="Mean-CoV model. 'nb' fits CV = sqrt(alpha + beta / mean). Default: %(default)s.",
     )
     plot_group.add_argument(
-        "--fit-quantile", dest="fit_quantile", type=float, default=0.01,
+        "--fit-quantile", 
+        dest="fit_quantile", type=float, default=0.01,
         help="Symmetric tail fraction excluded before fitting; 0 disables trimming. Default: %(default)s.",
     )
     plot_group.add_argument(
-        "--plot-transform", dest="plot_transform", choices=["log2"], default="log2",
+        "--plot-transform", 
+        dest="plot_transform", choices=["log2"], default="log2",
         help="Axis transformation for the mean-CoV scatter. Default: %(default)s.",
     )
 

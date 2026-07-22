@@ -38,6 +38,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-r",
+        "--rpf",
         dest="rpf",
         required=True,
         type=str,
@@ -45,6 +46,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
@@ -54,6 +56,7 @@ def _build_parser() -> argparse.ArgumentParser:
     input_group = parser.add_argument_group("Input and density arguments")
     input_group.add_argument(
         "-t",
+        "--transcript",
         dest="transcript",
         required=False,
         default=None,
@@ -96,14 +99,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     filter_group.add_argument(
         "-m",
-        "--min-gene-count",
+        "--min",
         dest="min_gene_count",
         default=0.0,
         type=float,
         help="Retain genes with total raw RPF count >= this value. Default: %(default)s.",
     )
 
-    plot_group = parser.add_argument_group("Plot arguments")
+    plot_group = parser.add_argument_group("Plotting arguments")
     plot_group.add_argument(
         "--cmap",
         dest="cmap",

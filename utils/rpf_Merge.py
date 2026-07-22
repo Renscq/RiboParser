@@ -37,6 +37,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-l",
+        "--list",
         dest="list",
         required=True,
         type=str,
@@ -44,34 +45,41 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
         help="Output prefix.",
     )
 
-    parser.add_argument(
+    file_group = parser.add_argument_group("File arguments")
+    file_group.add_argument(
+        "-if",
         "--input-format",
         dest="input_format",
         choices=["auto", "json", "txt"],
         default="auto",
         help="Input density format. Default: %(default)s.",
     )
-    parser.add_argument(
+    file_group.add_argument(
+        "-of",
         "--output-format",
         dest="output_format",
         choices=["auto", "json", "txt", "both"],
         default="auto",
         help="Output density format. Default: JSON input -> json; TXT input -> txt.",
     )
-    parser.add_argument(
+    file_group.add_argument(
+        "-c",
         "--density-encoding",
         dest="density_encoding",
         choices=["sparse", "dense"],
         default="sparse",
         help="Density encoding used when converting TXT input to JSON. Default: %(default)s.",
     )
-    parser.add_argument(
+
+    runtime_group = parser.add_argument_group("Runtime arguments")
+    runtime_group.add_argument(
         "--thread",
         dest="thread",
         type=int,

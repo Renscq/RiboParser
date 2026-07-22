@@ -37,6 +37,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-r",
+        "--rpf",
         dest="rpf",
         required=True,
         type=str,
@@ -44,6 +45,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
@@ -51,6 +53,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-c",
+        "--control",
         dest="control",
         required=True,
         type=str,
@@ -58,6 +61,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-t",
+        "--treat",
         dest="treat",
         required=True,
         type=str,
@@ -67,6 +71,7 @@ def _build_parser() -> argparse.ArgumentParser:
     filtering_group = parser.add_argument_group("Input filtering arguments")
     filtering_group.add_argument(
         "-l",
+        "--list",
         dest="list",
         default=None,
         type=str,
@@ -74,6 +79,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     filtering_group.add_argument(
         "-s",
+        "--site",
         dest="site",
         choices=["E", "P", "A"],
         default="P",
@@ -82,6 +88,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     filtering_group.add_argument(
         "-f",
+        "--frame",
         dest="frame",
         choices=["0", "1", "2", "all"],
         default="all",
@@ -90,6 +97,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     filtering_group.add_argument(
         "-m",
+        "--min",
         dest="min",
         default=50,
         type=int,
@@ -127,6 +135,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     calculation_group.add_argument(
         "-n",
+        "--normal",
         dest="normal",
         action="store_true",
         default=False,
@@ -134,6 +143,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     calculation_group.add_argument(
         "-z",
+        "--zero",
         dest="zero",
         action="store_true",
         default=False,
@@ -149,6 +159,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     calculation_group.add_argument(
         "-v",
+        "--value",
         dest="value",
         default=0.05,
         type=float,

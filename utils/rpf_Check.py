@@ -39,6 +39,7 @@ def _build_parser() -> argparse.ArgumentParser:
     input_group = parser.add_argument_group("Required arguments")
     input_group.add_argument(
         "-t",
+        "--transcript",
         dest="transcript",
         required=True,
         type=str,
@@ -46,6 +47,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     input_group.add_argument(
         "-b",
+        "--bam",
         dest="bam",
         required=True,
         type=str,
@@ -53,6 +55,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     input_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
@@ -76,19 +79,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
     filter_group = parser.add_argument_group("Read filtering options")
     filter_group.add_argument(
-        "-g",
-        dest="tag",
-        choices=[0, 1],
-        type=int,
-        required=False,
-        default=0,
-        help=(
-            "Filter reads by mapping uniqueness (default: %(default)s). "
-            "[0]: all mapped reads are used; [1]: unique mapped reads are used."
-        ),
-    )
-    filter_group.add_argument(
         "-a",
+        "--aligner",
         dest="align",
         choices=["star", "hisat2", "bowtie2"],
         type=str,
@@ -100,7 +92,21 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     filter_group.add_argument(
+        "-g",
+        "--tag",
+        dest="tag",
+        choices=[0, 1],
+        type=int,
+        required=False,
+        default=0,
+        help=(
+            "Filter reads by mapping uniqueness (default: %(default)s). "
+            "[0]: all mapped reads are used; [1]: unique mapped reads are used."
+        ),
+    )
+    filter_group.add_argument(
         "-r",
+        "--reverse",
         dest="reverse",
         action="store_true",
         required=False,
@@ -108,25 +114,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Backward-compatible option retained for old commands. The optimized "
             "rpf_Check workflow always retains and reports plus/minus strands separately."
-        ),
-    )
-    filter_group.add_argument(
-        "-l",
-        dest="longest",
-        action="store_true",
-        required=False,
-        default=False,
-        help="Only keep the representative/longest transcript per gene. (default: %(default)s).",
-    )
-    filter_group.add_argument(
-        "-s",
-        dest="saturation",
-        action="store_true",
-        required=False,
-        default=False,
-        help=(
-            "Calculate RPF saturation. (default: %(default)s). This step takes "
-            "extra memory, especially when multi-mapping reads are retained."
         ),
     )
     filter_group.add_argument(
@@ -152,6 +139,27 @@ def _build_parser() -> argparse.ArgumentParser:
         required=False,
         default=False,
         help="Keep duplicate alignments. (default: %(default)s).",
+    )
+    filter_group.add_argument(
+        "-l",
+        "--longest",
+        dest="longest",
+        action="store_true",
+        required=False,
+        default=False,
+        help="Only keep the representative/longest transcript per gene. (default: %(default)s).",
+    )
+    filter_group.add_argument(
+        "-s",
+        "--saturation",
+        dest="saturation",
+        action="store_true",
+        required=False,
+        default=False,
+        help=(
+            "Calculate RPF saturation. (default: %(default)s). This step takes "
+            "extra memory, especially when multi-mapping reads are retained."
+        ),
     )
 
     return parser

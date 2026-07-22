@@ -29,6 +29,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-t",
+        "--transcript",
         dest="transcript",
         required=True,
         type=str,
@@ -36,6 +37,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-s",
+        "--sequence",
         dest="sequence",
         required=True,
         type=str,
@@ -43,6 +45,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-b",
+        "--bam",
         dest="bam",
         required=True,
         type=str,
@@ -50,6 +53,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-p",
+        "--psite",
         dest="psite",
         required=True,
         type=str,
@@ -57,6 +61,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
@@ -66,6 +71,7 @@ def _build_parser() -> argparse.ArgumentParser:
     filtering_group = parser.add_argument_group("Read filtering arguments")
     filtering_group.add_argument(
         "-l",
+        "--longest",
         dest="longest",
         action="store_true",
         default=False,
@@ -73,6 +79,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     filtering_group.add_argument(
         "-m",
+        "--min",
         dest="min",
         default=25,
         type=int,
@@ -80,6 +87,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     filtering_group.add_argument(
         "-M",
+        "--max",
         dest="max",
         default=150,
         type=int,
@@ -87,6 +95,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     filtering_group.add_argument(
         "-r",
+        "--rolling",
         dest="rolling",
         action="store_true",
         default=False,

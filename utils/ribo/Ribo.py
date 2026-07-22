@@ -133,7 +133,6 @@ class Ribo(object):
 
         self.psite = args.psite
         self.periodicity = args.periodicity
-        self.min_confidence = args.min_confidence
         self.drop_warning = args.drop_warning
         self.min_length = args.min
         self.max_length = args.max
@@ -650,9 +649,6 @@ class Ribo(object):
         print("The import offset table: ", flush=True)
         print(raw_offset, flush=True)
 
-        if "confidence" in offset.columns:
-            offset["confidence"] = pd.to_numeric(offset["confidence"], errors="coerce").fillna(0)
-            offset = offset[offset["confidence"] >= self.min_confidence]
         if self.drop_warning and "warning" in offset.columns:
             offset["warning"] = offset["warning"].fillna("PASS").astype(str)
             offset = offset[offset["warning"].isin(["PASS", "", "nan"])]
@@ -1433,7 +1429,6 @@ class Ribo(object):
                 ("min_length", int(self.min_length)),
                 ("max_length", int(self.max_length)),
                 ("periodicity", float(self.periodicity)),
-                ("min_confidence", float(self.min_confidence)),
                 ("drop_warning", bool(self.drop_warning)),
                 ("longest", bool(self.longest)),
                 ("thread", int(self.thread)),
@@ -1495,7 +1490,6 @@ class Ribo(object):
         fake_args.bam = "NA.bam"
         fake_args.psite = "NA"
         fake_args.periodicity = 0
-        fake_args.min_confidence = 0
         fake_args.drop_warning = False
         fake_args.min = 0
         fake_args.max = 999

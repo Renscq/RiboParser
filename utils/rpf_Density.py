@@ -40,6 +40,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-t",
+        "--transcript",
         dest="transcript",
         required=True,
         type=str,
@@ -47,6 +48,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-s",
+        "--sequence",
         dest="sequence",
         required=True,
         type=str,
@@ -54,6 +56,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-b",
+        "--bam",
         dest="bam",
         required=True,
         type=str,
@@ -61,6 +64,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-p",
+        "--psite",
         dest="psite",
         required=True,
         type=str,
@@ -68,6 +72,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
@@ -77,8 +82,10 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
-    parser.add_argument(
+    filtering_group = parser.add_argument_group("Filtering arguments")
+    filtering_group.add_argument(
         "-l",
+        "--longest",
         dest="longest",
         action="store_true",
         required=False,
@@ -88,23 +95,25 @@ def _build_parser() -> argparse.ArgumentParser:
             "Recommended: True. Default: %(default)s."
         ),
     )
-    parser.add_argument(
+    filtering_group.add_argument(
         "-m",
+        "--min",
         dest="min",
         required=False,
         type=int,
         default=27,
         help="Minimum read length to keep. Default: %(default)s nt.",
     )
-    parser.add_argument(
+    filtering_group.add_argument(
         "-M",
+        "--max",
         dest="max",
         required=False,
         type=int,
         default=33,
         help="Maximum read length to keep. Default: %(default)s nt.",
     )
-    parser.add_argument(
+    filtering_group.add_argument(
         "--period",
         dest="periodicity",
         required=False,
@@ -112,18 +121,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=40,
         help="Minimum 3-nt periodicity to keep. Default: %(default)s.",
     )
-    parser.add_argument(
-        "--min-confidence",
-        dest="min_confidence",
-        required=False,
-        type=float,
-        default=50.0,
-        help=(
-            "Minimum offset confidence to keep when the offset file contains "
-            "a confidence column. Default: %(default)s."
-        ),
-    )
-    parser.add_argument(
+    filtering_group.add_argument(
         "--drop-warning",
         dest="drop_warning",
         required=False,
@@ -134,7 +132,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "file contains a warning column. Default: %(default)s."
         ),
     )
-    parser.add_argument(
+    filtering_group.add_argument(
         "--silence",
         dest="silence",
         required=False,
@@ -142,20 +140,9 @@ def _build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Discard warning information. Default: %(default)s.",
     )
-    parser.add_argument(
-        "--thread",
-        dest="thread",
-        type=int,
-        required=False,
-        default=1,
-        help=(
-            "Number of workers for indexed BAM parallel scanning. If BAM is not "
-            "indexed, stream mode is used. Default: %(default)s."
-        ),
-    )
 
-    output_group = parser.add_argument_group("Output arguments")
-    output_group.add_argument(
+    file_group = parser.add_argument_group("File arguments")
+    file_group.add_argument(
         "--output-format",
         dest="output_format",
         choices=["json", "txt", "both"],
@@ -165,12 +152,25 @@ def _build_parser() -> argparse.ArgumentParser:
             "'txt' writes legacy TXT; 'both' writes both. Default: %(default)s."
         ),
     )
-    output_group.add_argument(
+    file_group.add_argument(
         "--density-encoding",
         dest="density_encoding",
         choices=["sparse", "dense"],
         default="sparse",
         help="Density encoding in JSONL. Sparse encoding is recommended. Default: %(default)s.",
+    )
+
+    runtime_group = parser.add_argument_group("Runtime arguments")
+    runtime_group.add_argument(
+        "--thread",
+        dest="thread",
+        type=int,
+        required=False,
+        default=1,
+        help=(
+            "Number of workers for indexed BAM parallel scanning. If BAM is not "
+            "indexed, stream mode is used. Default: %(default)s."
+        ),
     )
 
     return parser

@@ -31,6 +31,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
@@ -40,6 +41,7 @@ def _build_parser() -> argparse.ArgumentParser:
     offset_group = parser.add_argument_group("Offset arguments")
     offset_group.add_argument(
         "-m",
+        "--min",
         dest="min",
         default=25,
         type=int,
@@ -47,6 +49,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     offset_group.add_argument(
         "-M",
+        "--max",
         dest="max",
         default=151,
         type=int,
@@ -54,6 +57,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     offset_group.add_argument(
         "-e",
+        "--exp_offset",
         dest="exp_offset",
         default=12,
         type=int,

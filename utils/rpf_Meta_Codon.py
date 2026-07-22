@@ -38,6 +38,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-r",
+        "--rpf",
         dest="rpf",
         required=True,
         type=str,
@@ -45,6 +46,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
@@ -54,6 +56,7 @@ def _build_parser() -> argparse.ArgumentParser:
     filtering_group = parser.add_argument_group("Input filtering arguments")
     filtering_group.add_argument(
         "-l",
+        "--list",
         dest="list",
         default=None,
         type=str,
@@ -61,6 +64,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     filtering_group.add_argument(
         "-c",
+        "--codon",
         dest="codon",
         default=None,
         type=str,
@@ -68,6 +72,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     filtering_group.add_argument(
         "-f",
+        "--frame",
         dest="frame",
         choices=["0", "1", "2", "all"],
         default="all",
@@ -76,6 +81,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     filtering_group.add_argument(
         "-a",
+        "--around",
         dest="around",
         default=20,
         type=int,
@@ -83,6 +89,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     filtering_group.add_argument(
         "-m",
+        "--min",
         dest="min",
         default=50,
         type=int,
@@ -104,49 +111,53 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     filtering_group.add_argument(
         "-u",
+        "--unique",
         dest="unique",
         action="store_true",
         default=False,
         help="Only retain uniquely occurring target codons (default: %(default)s).",
     )
 
-    calculation_group = parser.add_argument_group("Calculation arguments")
-    calculation_group.add_argument(
+    plotting_group = parser.add_argument_group("Plotting arguments")
+    plotting_group.add_argument(
         "-n",
+        "--normal",
         dest="normal",
         action="store_true",
         default=False,
         help="Normalize RPF counts to RPM (default: %(default)s).",
     )
-    calculation_group.add_argument(
+    plotting_group.add_argument(
         "-s",
+        "--scale",
         dest="scale",
         action="store_true",
         default=False,
         help="Scale meta-codon density profiles (default: %(default)s).",
     )
-    calculation_group.add_argument(
+    plotting_group.add_argument(
         "--smooth",
         dest="smooth",
         default=None,
         type=str,
         help="Optional smoothing method.",
     )
-    calculation_group.add_argument(
-        "--thread",
-        dest="thread",
-        default=1,
-        type=int,
-        help="Number of worker processes (default: %(default)s).",
-    )
 
-    output_group = parser.add_argument_group("Output arguments")
-    output_group.add_argument(
+    plotting_group.add_argument(
         "--fig",
         dest="fig",
         action="store_true",
         default=False,
         help="Draw meta-codon figures (default: %(default)s).",
+    )
+
+    runtime_group = parser.add_argument_group("Runtime arguments")
+    runtime_group.add_argument(
+        "--thread",
+        dest="thread",
+        default=1,
+        type=int,
+        help="Number of worker processes (default: %(default)s).",
     )
 
     return parser

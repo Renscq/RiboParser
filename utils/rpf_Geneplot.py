@@ -33,13 +33,13 @@ from utils.ribo.ArgsParser import (
 def _build_parser() -> argparse.ArgumentParser:
     """Build the command-line argument parser."""
     parser = argparse.ArgumentParser(
-        description="Draw IGV-like gene-level RPF/RNA density profiles from JSONL or TXT density files.",
-        add_help=False,
+        description="Draw IGV-like gene-level RPF/RNA density profiles from JSONL or TXT density files."
     )
 
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-r",
+        "--rpf",
         dest="rpf",
         required=True,
         type=str,
@@ -67,6 +67,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
@@ -134,6 +135,7 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     coordinate_group.add_argument(
+        "-f",
         "--frame",
         dest="frame",
         choices=["all", "0", "1", "2"],
@@ -349,14 +351,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Legend font size. Default: --font-size - 1.",
     )
 
-    help_group = parser.add_argument_group("Help")
-    help_group.add_argument(
-        "-h",
-        "--help",
-        action="help",
-        default=argparse.SUPPRESS,
-        help="Show this help message and exit.",
-    )
+    # help_group = parser.add_argument_group("Help")
+    # help_group.add_argument(
+    #     "-h",
+    #     "--help",
+    #     action="help",
+    #     default=argparse.SUPPRESS,
+    #     help="Show this help message and exit.",
+    # )
 
     return parser
 

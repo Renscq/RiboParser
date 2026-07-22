@@ -38,6 +38,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-r",
+        "--rpf",
         dest="rpf",
         required=True,
         type=str,
@@ -45,6 +46,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=False,
         default=None,
@@ -52,9 +54,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Output file prefix. Default: determined from the input filename.",
     )
 
-    filtering_group = parser.add_argument_group("Input filtering arguments")
+    filtering_group = parser.add_argument_group("Filtering arguments")
     filtering_group.add_argument(
         "-l",
+        "--list",
         dest="list",
         default=None,
         type=str,
@@ -62,6 +65,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     filtering_group.add_argument(
         "-m",
+        "--min",
         dest="min",
         default=0,
         type=int,
@@ -71,6 +75,7 @@ def _build_parser() -> argparse.ArgumentParser:
     calculation_group = parser.add_argument_group("Calculation arguments")
     calculation_group.add_argument(
         "-n",
+        "--normal",
         dest="normal",
         action="store_true",
         default=False,
@@ -78,6 +83,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     calculation_group.add_argument(
         "-f",
+        "--format",
         dest="format",
         action="store_true",
         default=False,
@@ -87,6 +93,7 @@ def _build_parser() -> argparse.ArgumentParser:
     output_group = parser.add_argument_group("Output arguments")
     output_group.add_argument(
         "-s",
+        "--split",
         dest="split",
         action="store_true",
         default=False,

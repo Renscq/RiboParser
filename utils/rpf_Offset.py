@@ -35,6 +35,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-t",
+        "--transcript",
         dest="transcript",
         required=True,
         type=str,
@@ -42,6 +43,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-b",
+        "--bam",
         dest="bam",
         required=True,
         type=str,
@@ -49,6 +51,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
@@ -58,6 +61,7 @@ def _build_parser() -> argparse.ArgumentParser:
     offset_group = parser.add_argument_group("Offset detection arguments")
     offset_group.add_argument(
         "-a",
+        "--aligner",
         dest="align",
         choices=["both", "tis", "tts"],
         default="both",
@@ -66,6 +70,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     offset_group.add_argument(
         "-l",
+        "--longest",
         dest="longest",
         action="store_true",
         default=False,
@@ -73,6 +78,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     offset_group.add_argument(
         "-m",
+        "--min",
         dest="min",
         default=27,
         type=int,
@@ -80,6 +86,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     offset_group.add_argument(
         "-M",
+        "--max",
         dest="max",
         default=33,
         type=int,
@@ -87,6 +94,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     offset_group.add_argument(
         "-p",
+        "--exp_peak",
         dest="exp_peak",
         default=30,
         type=int,
@@ -94,6 +102,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     offset_group.add_argument(
         "-s",
+        "--shift",
         dest="shift",
         default=2,
         type=int,
@@ -110,6 +119,7 @@ def _build_parser() -> argparse.ArgumentParser:
     output_group = parser.add_argument_group("Output arguments")
     output_group.add_argument(
         "-d",
+        "--detail",
         dest="detail",
         action="store_true",
         default=False,

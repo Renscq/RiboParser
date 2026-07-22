@@ -39,32 +39,42 @@ def _build_parser() -> argparse.ArgumentParser:
 
     required = parser.add_argument_group("Required arguments")
     required.add_argument(
-        "--rpf", required=True, type=str,
+        "--rpf", 
+        dest="rpf",
+        required=True, type=str,
         help="Input RPF density file in JSONL or TXT format.",
     )
     required.add_argument(
-        "--rna", required=True, type=str,
+        "--rna", 
+        dest="rna",
+        required=True, type=str,
         help="Input RNA density file in JSONL or TXT format.",
     )
     required.add_argument(
-        "-o", dest="output", required=True, type=str,
+        "-o", 
+        "--output",
+        dest="output", required=True, type=str,
         help="Output prefix.",
     )
 
-    filtering = parser.add_argument_group("Input filtering arguments")
+    filtering = parser.add_argument_group("Filtering arguments")
     filtering.add_argument(
-        "-l", "--list", dest="list", default=None, type=str,
+        "-l", 
+        "--list", 
+        dest="list", default=None, type=str,
         help=(
             "Optional transcript filter table. The transcript_id column is used "
             "when available; otherwise the first column is used."
         ),
     )
     filtering.add_argument(
-        "-m", dest="min", default=30, type=int,
+        "--min",
+        dest="min", default=30, type=int,
         help="Minimum sample-specific CDS RPF count per transcript. Default: %(default)s.",
     )
     filtering.add_argument(
-        "--min-rna", dest="min_rna", default=1, type=int,
+        "--min-rna", 
+        dest="min_rna", default=1, type=int,
         help="Minimum sample-specific CDS RNA count per transcript. Default: %(default)s.",
     )
     filtering.add_argument(
@@ -78,11 +88,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
     calculation = parser.add_argument_group("CST calculation arguments")
     calculation.add_argument(
-        "-s", dest="site", choices=["E", "P", "A"], default="P",
+        "-s", "--site", dest="site", choices=["E", "P", "A"], default="P",
         help="Ribosomal site used for RPF CST calculation. Default: %(default)s.",
     )
     calculation.add_argument(
-        "-f", dest="frame", choices=["0", "1", "2", "all"], default="all",
+        "-f", "--frame", dest="frame", choices=["0", "1", "2", "all"], default="all",
         help="Reading frame used for RPF and RNA density import. Default: %(default)s.",
     )
     calculation.add_argument(
@@ -116,7 +126,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Minimum fold over local background for outlier removal. Default: %(default)s.",
     )
 
-    output = parser.add_argument_group("Output and plotting arguments")
+    output = parser.add_argument_group("Plotting arguments")
     output.add_argument(
         "--scale", choices=["none", "minmax", "zscore"], default="minmax",
         help="Sample-wise scaling for relative CST values. Default: %(default)s.",

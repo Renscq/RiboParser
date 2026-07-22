@@ -53,7 +53,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Output file prefix.",
     )
 
-    filtering_group = parser.add_argument_group("Input filtering arguments")
+    filtering_group = parser.add_argument_group("Filtering arguments")
     filtering_group.add_argument(
         "-l",
         "--list",
@@ -178,7 +178,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Minimum fold above local background required for removal.",
     )
 
-    plotting_group = parser.add_argument_group("Output and plotting arguments")
+    plotting_group = parser.add_argument_group("Plotting arguments")
     plotting_group.add_argument(
         "--plot-stat",
         dest="plot_stat",

@@ -37,6 +37,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-b",
+        "--bam",
         dest="bam",
         required=True,
         type=str,
@@ -44,6 +45,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-p",
+        "--psite",
         dest="psite",
         required=True,
         type=str,
@@ -53,6 +55,7 @@ def _build_parser() -> argparse.ArgumentParser:
     alignment_group = parser.add_argument_group("Alignment arguments")
     alignment_group.add_argument(
         "-t",
+        "--times",
         dest="times",
         default=3,
         type=int,
@@ -76,6 +79,7 @@ def _build_parser() -> argparse.ArgumentParser:
     output_group = parser.add_argument_group("Output arguments")
     output_group.add_argument(
         "-f",
+        "--format",
         dest="format",
         choices=["bedgraph", "wig"],
         default="bedgraph",
@@ -84,6 +88,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     output_group.add_argument(
         "-n",
+        "--norm",
         dest="norm",
         action="store_true",
         default=False,
@@ -91,6 +96,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     output_group.add_argument(
         "-m",
+        "--merge",
         dest="merge",
         action="store_true",
         default=False,
@@ -98,6 +104,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     output_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         default=None,
         type=str,

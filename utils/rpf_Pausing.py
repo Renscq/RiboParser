@@ -40,6 +40,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-r",
+        "--rpf",
         dest="rpf",
         required=True,
         type=str,
@@ -47,13 +48,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
         help="Output prefix.",
     )
 
-    input_group = parser.add_argument_group("Input filtering arguments")
+    input_group = parser.add_argument_group("Filtering arguments")
     input_group.add_argument(
         "-l",
         "--list",
@@ -68,6 +70,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     input_group.add_argument(
         "-m",
+        "--min",
         dest="min",
         required=False,
         type=int,
@@ -93,9 +96,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default=5,
         help="Discard this number of CDS codons before the TTS. Default: %(default)s AA.",
     )
+
     calculation_group = parser.add_argument_group("Pausing calculation arguments")
     calculation_group.add_argument(
         "-s",
+        "--site",
         dest="site",
         choices=["E", "P", "A"],
         required=False,
@@ -105,6 +110,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     calculation_group.add_argument(
         "-f",
+        "--frame",
         dest="frame",
         choices=["0", "1", "2", "all"],
         required=False,
@@ -114,6 +120,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     calculation_group.add_argument(
         "-b",
+        "--background",
         dest="background",
         required=False,
         type=int,
@@ -200,7 +207,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Minimum fold over local background for outlier removal. Default: %(default)s.",
     )
 
-    output_group = parser.add_argument_group("Output and plotting arguments")
+    output_group = parser.add_argument_group("Plotting arguments")
     output_group.add_argument(
         "--scale",
         dest="scale",

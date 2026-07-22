@@ -106,7 +106,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     annotation_group = parser.add_argument_group("Annotation arguments")
     annotation_group.add_argument(
-        "-a",
+        "-g",
         "--genepred",
         dest="genepred",
         default=None,
@@ -200,7 +200,7 @@ def _build_parser() -> argparse.ArgumentParser:
     runtime_group = parser.add_argument_group("Runtime arguments")
     runtime_group.add_argument(
         "-t",
-        "--threads",
+        "--thread",
         dest="threads",
         default=1,
         type=int,

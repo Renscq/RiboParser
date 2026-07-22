@@ -47,6 +47,14 @@ def _build_parser() -> argparse.ArgumentParser:
         type=str,
         help="Input RPF density file in JSONL, JSONL.GZ, TXT, or TSV format.",
     )
+    required_group.add_argument(
+        "-o",
+        "--output",
+        dest="output",
+        default=None,
+        type=str,
+        help="Output prefix. Default: input RPF filename without density suffix.",
+    )
 
     input_group = parser.add_argument_group("Input filtering arguments")
     input_group.add_argument(
@@ -132,15 +140,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Base figure font size (default: %(default)s).",
     )
 
-    output_group = parser.add_argument_group("Output arguments")
-    output_group.add_argument(
-        "-o",
-        "--output",
-        dest="output",
-        default=None,
-        type=str,
-        help="Output prefix. Default: input RPF filename without density suffix.",
-    )
 
     return parser
 

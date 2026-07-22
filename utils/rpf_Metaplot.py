@@ -37,6 +37,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-r",
+        "--rpf",
         dest="rpf",
         required=True,
         type=str,
@@ -44,29 +45,33 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
         help="Output prefix.",
     )
 
-    parser.add_argument(
+    filtering_group = parser.add_argument_group("Filtering arguments")
+    filtering_group.add_argument(
         "-t",
+        "--transcript",
         dest="transcript",
         required=False,
         type=str,
         default=None,
         help="Optional transcript filter table in TXT format. If provided, transcript_id is used when available.",
     )
-    parser.add_argument(
+    filtering_group.add_argument(
         "-m",
+        "--min",
         dest="min",
         required=False,
         type=int,
         default=50,
         help="Retain transcripts with at least this sample-specific CDS RPF count. Default: %(default)s.",
     )
-    parser.add_argument(
+    filtering_group.add_argument(
         "--utr5",
         dest="utr5",
         type=int,
@@ -74,7 +79,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=20,
         help="Number of codons upstream of the start codon. Default: %(default)s AA.",
     )
-    parser.add_argument(
+    filtering_group.add_argument(
         "--cds",
         dest="cds",
         type=int,
@@ -82,7 +87,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=50,
         help="Number of CDS codons used around start and stop codons. Default: %(default)s AA.",
     )
-    parser.add_argument(
+    filtering_group.add_argument(
         "--utr3",
         dest="utr3",
         type=int,
@@ -90,7 +95,9 @@ def _build_parser() -> argparse.ArgumentParser:
         default=20,
         help="Number of codons downstream of the stop codon. Default: %(default)s AA.",
     )
-    parser.add_argument(
+
+    plotting_group = parser.add_argument_group("Plotting arguments")
+    plotting_group.add_argument(
         "-n",
         "--normal",
         dest="normal",
@@ -99,7 +106,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Normalize RPF counts to RPM before metaplot aggregation. Default: %(default)s.",
     )
-    parser.add_argument(
+    plotting_group.add_argument(
         "--mode",
         dest="mode",
         required=False,
@@ -108,7 +115,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default="bar",
         help="Metaplot style for per-sample figures. Default: %(default)s.",
     )
-    parser.add_argument(
+    plotting_group.add_argument(
         "--plot-transform",
         dest="plot_transform",
         required=False,
@@ -120,7 +127,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "'log' is an alias of log1p. Default: %(default)s."
         ),
     )
-    parser.add_argument(
+    plotting_group.add_argument(
         "--scale",
         dest="scale",
         required=False,

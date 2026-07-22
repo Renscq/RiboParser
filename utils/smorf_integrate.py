@@ -162,7 +162,7 @@ def _build_parser() -> argparse.ArgumentParser:
     runtime_group = parser.add_argument_group("Runtime arguments")
     runtime_group.add_argument(
         "-t",
-        "--threads",
+        "--thread",
         dest="threads",
         default=4,
         type=int,

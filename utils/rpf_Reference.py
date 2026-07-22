@@ -35,6 +35,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-g",
+        "--genome",
         dest="genome",
         required=True,
         type=str,
@@ -42,6 +43,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-t",
+        "--gtf",
         dest="gtf",
         required=True,
         type=str,
@@ -49,6 +51,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
@@ -58,6 +61,7 @@ def _build_parser() -> argparse.ArgumentParser:
     annotation_group = parser.add_argument_group("Annotation arguments")
     annotation_group.add_argument(
         "-u",
+        "--utr",
         dest="utr",
         default=0,
         type=int,
@@ -65,6 +69,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     annotation_group.add_argument(
         "-c",
+        "--coding",
         dest="coding",
         action="store_true",
         default=False,
@@ -72,6 +77,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     annotation_group.add_argument(
         "-l",
+        "--longest",
         dest="longest",
         action="store_true",
         default=False,
@@ -84,6 +90,7 @@ def _build_parser() -> argparse.ArgumentParser:
     output_group = parser.add_argument_group("Output arguments")
     output_group.add_argument(
         "-w",
+        "--whole",
         dest="whole",
         action="store_true",
         default=False,

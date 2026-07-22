@@ -38,6 +38,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-r",
+        "--rpf",
         dest="rpf",
         required=True,
         type=str,
@@ -45,23 +46,26 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
         help="Output prefix.",
     )
 
-    input_group = parser.add_argument_group("Input and density arguments")
-    input_group.add_argument(
+    filtering_group = parser.add_argument_group("Filtering arguments")
+    filtering_group.add_argument(
         "-t",
+        "--transcript",
         dest="transcript",
         required=False,
         default=None,
         type=str,
         help="Optional transcript filter table. If provided, transcript_id is used when available.",
     )
-    input_group.add_argument(
+    filtering_group.add_argument(
         "-f",
+        "--frame",
         dest="frame",
         choices=["0", "1", "2", "all"],
         required=False,
@@ -69,7 +73,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default="all",
         help="Reading frame used for quantification. Default: %(default)s.",
     )
-    input_group.add_argument(
+    filtering_group.add_argument(
         "--region",
         dest="region",
         choices=Quant.REGION_CHOICES,
@@ -79,8 +83,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Transcript region to quantify. Use 'all' to quantify 5'UTR, CDS, and 3'UTR. Default: %(default)s.",
     )
 
-    trim_group = parser.add_argument_group("CDS trimming arguments")
-    trim_group.add_argument(
+    filtering_group.add_argument(
         "--tis",
         dest="tis",
         required=False,
@@ -88,7 +91,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=0,
         help="Number of codons after TIS to discard for CDS quantification. Default: %(default)s.",
     )
-    trim_group.add_argument(
+    filtering_group.add_argument(
         "--tts",
         dest="tts",
         required=False,
@@ -97,8 +100,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Number of codons before TTS to discard for CDS quantification. Default: %(default)s.",
     )
 
-    filter_group = parser.add_argument_group("Filtering arguments")
-    filter_group.add_argument(
+    filtering_group.add_argument(
         "--remove-outlier",
         "--outlier",
         dest="remove_outlier",

@@ -40,6 +40,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-r",
+        "--rpf",
         dest="rpf",
         required=True,
         type=str,
@@ -47,13 +48,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
         help="Output prefix. Shuffled files use prefix + '_shuffle'.",
     )
 
-    filter_group = parser.add_argument_group("Input filtering arguments")
+    filter_group = parser.add_argument_group("Filtering arguments")
     filter_group.add_argument(
         "-l",
         "--list",

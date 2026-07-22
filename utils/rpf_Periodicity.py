@@ -35,6 +35,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-r",
+        "--rpf",
         dest="rpf",
         required=True,
         type=str,
@@ -42,29 +43,33 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
         help="Output prefix.",
     )
 
-    parser.add_argument(
+    filtering_group = parser.add_argument_group("Filtering arguments")
+    filtering_group.add_argument(
         "-t",
+        "--transcript",
         dest="transcript",
         required=False,
         type=str,
         default=None,
         help="Optional transcript filter table in TXT format.",
     )
-    parser.add_argument(
+    filtering_group.add_argument(
         "-m",
+        "--min",
         dest="min",
         required=False,
         type=int,
         default=50,
         help="Retain transcripts with more than this minimum RPF count. Default: %(default)s.",
     )
-    parser.add_argument(
+    filtering_group.add_argument(
         "--tis",
         dest="tis",
         required=False,
@@ -72,7 +77,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=0,
         help="Number of codons after TIS to discard. Default: %(default)s AA.",
     )
-    parser.add_argument(
+    filtering_group.add_argument(
         "--tts",
         dest="tts",
         required=False,

@@ -37,6 +37,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-r",
+        "--rpf",
         dest="rpf",
         required=True,
         type=str,
@@ -44,22 +45,26 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
         help="Output prefix.",
     )
 
-    parser.add_argument(
+    filtering_group = parser.add_argument_group("Filtering arguments")
+    filtering_group.add_argument(
         "-t",
+        "--transcript",
         dest="transcript",
         required=False,
         type=str,
         default=None,
         help="Optional transcript filter table in TXT format. If provided, transcript_id is used when available.",
     )
-    parser.add_argument(
+    filtering_group.add_argument(
         "-f",
+        "--frame",
         dest="frame",
         choices=["0", "1", "2", "all"],
         required=False,
@@ -67,7 +72,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default="all",
         help="Reading frame used for coverage calculation. Default: %(default)s.",
     )
-    parser.add_argument(
+    filtering_group.add_argument(
         "--site",
         dest="site",
         choices=["E", "P", "A", "all"],
@@ -76,33 +81,16 @@ def _build_parser() -> argparse.ArgumentParser:
         default="P",
         help="Ribosomal site used for codon-level density shifting. Default: %(default)s.",
     )
-    parser.add_argument(
+    filtering_group.add_argument(
         "-m",
+        "--min",
         dest="min",
         required=False,
         type=int,
         default=50,
         help="Retain transcripts with at least this sample-specific CDS RPF count. Default: %(default)s.",
     )
-    parser.add_argument(
-        "-b",
-        "--bin",
-        dest="bin",
-        required=False,
-        type=str,
-        default="30,100,30",
-        help="Normalize 5'UTR, CDS, and 3'UTR to these bin numbers. Default: %(default)s.",
-    )
-    parser.add_argument(
-        "-n",
-        "--normal",
-        dest="normal",
-        action="store_true",
-        required=False,
-        default=False,
-        help="Normalize RPF counts to RPM before coverage aggregation. Default: %(default)s.",
-    )
-    parser.add_argument(
+    filtering_group.add_argument(
         "--set",
         dest="set",
         choices=["intersect", "union"],
@@ -114,7 +102,56 @@ def _build_parser() -> argparse.ArgumentParser:
             "'intersect' keeps only transcripts with all requested regions. Default: %(default)s."
         ),
     )
-    parser.add_argument(
+    filtering_group.add_argument(
+        "--thread",
+        dest="thread",
+        type=int,
+        required=False,
+        default=1,
+        help="Reserved for compatibility. Current coverage aggregation is vectorized. Default: %(default)s.",
+    )
+
+    plotting_group = parser.add_argument_group("Plotting arguments")
+    plotting_group.add_argument(
+        "--bar",
+        dest="barplot",
+        action="store_true",
+        required=False,
+        default=False,
+        help="Draw covered-transcript percentage barplots. Default: %(default)s.",
+    )
+    plotting_group.add_argument(
+        "--gene-heatmap",
+        "--heat",
+        dest="gene_heatmap",
+        action="store_true",
+        required=False,
+        default=False,
+        help=(
+            "Deprecated compatibility option. Transcript-by-position heatmaps are no longer drawn. "
+            "The combined sample heatmap is controlled by --mode heatmap/both/all."
+        ),
+    )
+
+    plotting_group.add_argument(
+        "-b",
+        "--bin",
+        dest="bin",
+        required=False,
+        type=str,
+        default="30,100,30",
+        help="Normalize 5'UTR, CDS, and 3'UTR to these bin numbers. Default: %(default)s.",
+    )
+    plotting_group.add_argument(
+        "-n",
+        "--normal",
+        dest="normal",
+        action="store_true",
+        required=False,
+        default=False,
+        help="Normalize RPF counts to RPM before coverage aggregation. Default: %(default)s.",
+    )
+    plotting_group.add_argument(
         "--mode",
         dest="mode",
         required=False,
@@ -123,7 +160,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default="both",
         help="Coverage plot type. 'both' draws line plots and the combined sample heatmap. Default: %(default)s.",
     )
-    parser.add_argument(
+    plotting_group.add_argument(
         "--plot-transform",
         dest="plot_transform",
         required=False,
@@ -135,7 +172,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "'log' is an alias of log1p. Default: %(default)s."
         ),
     )
-    parser.add_argument(
+    plotting_group.add_argument(
         "--scale",
         dest="scale",
         required=False,
@@ -145,36 +182,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Heatmap scaling method. 'row' applies row-wise min-max scaling "
             "to emphasize each sample profile shape. Default: %(default)s."
-        ),
-    )
-    parser.add_argument(
-        "--thread",
-        dest="thread",
-        type=int,
-        required=False,
-        default=1,
-        help="Reserved for compatibility. Current coverage aggregation is vectorized. Default: %(default)s.",
-    )
-
-    output_group = parser.add_argument_group("Optional plot outputs")
-    output_group.add_argument(
-        "--bar",
-        dest="barplot",
-        action="store_true",
-        required=False,
-        default=False,
-        help="Draw covered-transcript percentage barplots. Default: %(default)s.",
-    )
-    output_group.add_argument(
-        "--gene-heatmap",
-        "--heat",
-        dest="gene_heatmap",
-        action="store_true",
-        required=False,
-        default=False,
-        help=(
-            "Deprecated compatibility option. Transcript-by-position heatmaps are no longer drawn. "
-            "The combined sample heatmap is controlled by --mode heatmap/both/all."
         ),
     )
 

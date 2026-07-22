@@ -35,6 +35,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-t",
+        "--transcript",
         dest="transcript",
         required=True,
         type=str,
@@ -42,6 +43,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-s",
+        "--sequence",
         dest="sequence",
         required=True,
         type=str,
@@ -49,22 +51,26 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-b",
+        "--bam",
         dest="bam",
         required=True,
         type=str,
         help="Input BAM alignment file.",
     )
+
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
         help="Output file prefix.",
     )
 
-    filtering_group = parser.add_argument_group("Read filtering arguments")
+    filtering_group = parser.add_argument_group("Filtering arguments")
     filtering_group.add_argument(
         "-l",
+        "--longest",
         dest="longest",
         action="store_true",
         default=False,
@@ -72,6 +78,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     filtering_group.add_argument(
         "-m",
+        "--min",
         dest="min",
         default=20,
         type=int,
@@ -79,6 +86,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     filtering_group.add_argument(
         "-M",
+        "--max",
         dest="max",
         default=100,
         type=int,
@@ -96,7 +104,6 @@ def _build_parser() -> argparse.ArgumentParser:
 
     runtime_group = parser.add_argument_group("Runtime arguments")
     runtime_group.add_argument(
-        "-p",
         "--thread",
         dest="thread",
         default=1,

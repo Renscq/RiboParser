@@ -40,6 +40,7 @@ def _build_parser() -> argparse.ArgumentParser:
     required_group = parser.add_argument_group("Required arguments")
     required_group.add_argument(
         "-r",
+        "--rpf",
         dest="rpf",
         required=True,
         type=str,
@@ -47,16 +48,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     required_group.add_argument(
         "-o",
+        "--output",
         dest="output",
         required=True,
         type=str,
         help="Output prefix.",
     )
 
-    input_group = parser.add_argument_group("Input filtering arguments")
+    input_group = parser.add_argument_group("Filtering arguments")
     input_group.add_argument(
         "-t",
-        "-l",
         "--transcript",
         dest="transcript",
         default=None,
@@ -65,6 +66,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     input_group.add_argument(
         "-m",
+        "--min",
         dest="min",
         default=50,
         type=int,
@@ -88,6 +90,7 @@ def _build_parser() -> argparse.ArgumentParser:
     scan_group = parser.add_argument_group("Frameshift scan arguments")
     scan_group.add_argument(
         "-s",
+        "--site",
         dest="site",
         choices=["E", "P", "A"],
         default="P",
@@ -181,7 +184,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Minimum fold over local background for outlier removal.",
     )
 
-    plotting_group = parser.add_argument_group("Output and plotting arguments")
+    plotting_group = parser.add_argument_group("Plotting arguments")
     plotting_group.add_argument(
         "--smooth-window",
         dest="smooth_window",
