@@ -17,7 +17,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import Coverage
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -264,25 +272,20 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_coverage_pipeline(args: Namespace) -> None:
     """Run the metagene coverage workflow."""
     coverage = Coverage.Coverage(args)
 
-    _print_step(2, "Import the RPFs file.")
+    step_print(2, "Import the RPFs file.")
     coverage.import_rpf()
 
-    _print_step(3, "Calculate metagene coverage profiles.")
+    step_print(3, "Calculate metagene coverage profiles.")
     coverage.calc_coverage()
 
-    _print_step(4, "Output coverage tables.")
+    step_print(4, "Output coverage tables.")
     coverage.output_coverage()
 
-    _print_step(5, "Draw coverage figures.")
+    step_print(5, "Draw coverage figures.")
     if args.mode in {"line", "both", "all"}:
         coverage.draw_meta_gene_line()
         coverage.draw_combined_line()
@@ -291,20 +294,20 @@ def _run_coverage_pipeline(args: Namespace) -> None:
     if args.barplot or args.mode == "all":
         coverage.draw_meta_gene_bar()
 
-    _print_step(6, "Write coverage summary.")
+    step_print(6, "Write coverage summary.")
     coverage.write_summary()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Coverage."""
     now_time()
-    print("\nDraw the metagene coverage.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Draw the metagene coverage.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_coverage_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

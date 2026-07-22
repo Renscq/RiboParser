@@ -16,7 +16,14 @@ import argparse
 from argparse import Namespace
 from collections.abc import Sequence
 
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -102,31 +109,26 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_reference_pipeline(args: Namespace) -> None:
     """Run the RiboParser reference-building workflow."""
     from utils.ribo.GenePred import GenePred
 
     reference = GenePred(args)
 
-    _print_step(2, "Import the genome sequence.")
+    step_print(2, "Import the genome sequence.")
     reference.read_genome()
 
-    _print_step(3, "Format the GTF/GFF transcript annotation.")
+    step_print(3, "Format the GTF/GFF transcript annotation.")
     reference.gtf2gp()
     reference.read_genepred()
     reference.get_rep_transcript()
     reference.add_utr()
 
-    _print_step(4, "Output normalized transcript annotation.")
+    step_print(4, "Output normalized transcript annotation.")
     reference.write_txt()
     reference.gp2gtf()
 
-    _print_step(5, "Retrieve mRNA and CDS sequences.")
+    step_print(5, "Retrieve mRNA and CDS sequences.")
     reference.get_seq()
     reference.write_seq()
 
@@ -134,13 +136,13 @@ def _run_reference_pipeline(args: Namespace) -> None:
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Reference."""
     now_time()
-    print("\nBuild the reference files for RiboParser.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Build the reference files for RiboParser.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_reference_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

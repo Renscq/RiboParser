@@ -16,7 +16,14 @@ import argparse
 from argparse import Namespace
 from collections.abc import Sequence
 
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -135,45 +142,40 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_offset_pipeline(args: Namespace) -> None:
     """Run direct RSBM offset detection."""
     from utils.ribo.Offset_RSBM import Offset
 
     offset = Offset(args)
 
-    _print_step(2, "Import transcript annotation.")
+    step_print(2, "Import transcript annotation.")
     offset.read_transcript()
 
-    _print_step(3, "Import BAM/SAM alignments.")
+    step_print(3, "Import BAM/SAM alignments.")
     offset.get_mrna_reads()
 
-    _print_step(4, "Detect RSBM offsets.")
+    step_print(4, "Detect RSBM offsets.")
     offset.get_frame_offset()
     offset.format_frame_offset()
     offset.adjust_frame_offset()
 
-    _print_step(5, "Output the RSBM offset table.")
+    step_print(5, "Output the RSBM offset table.")
     offset.write_frame_offset()
 
-    _print_step(6, "Draw the RSBM offset heatmap.")
+    step_print(6, "Draw the RSBM offset heatmap.")
     offset.draw_frame_heatmap()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Offset_RSBM."""
     now_time()
-    print("\nDetect P-site offsets using RSBM.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Detect P-site offsets using RSBM.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_offset_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

@@ -17,7 +17,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import Quant
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -124,42 +132,37 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_quant_pipeline(args: Namespace) -> None:
     """Run the RPF quantification workflow."""
     quant = Quant.Quant(args)
 
-    _print_step(2, "Import the RPF density file.")
+    step_print(2, "Import the RPF density file.")
     quant.import_rpf()
 
-    _print_step(3, "Quantify RPF abundance.")
+    step_print(3, "Quantify RPF abundance.")
     quant.quantify_regions()
     quant.output_total_rpf()
 
-    _print_step(4, "Draw quantification QC plots.")
+    step_print(4, "Draw quantification QC plots.")
     quant.draw_rpf_barplot()
     quant.draw_rpf_cdfplot()
     quant.draw_rpf_pcaplot()
     quant.draw_rpf_heatmap()
 
-    _print_step(5, "Write summary JSON.")
+    step_print(5, "Write summary JSON.")
     quant.write_summary()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Quant."""
     now_time()
-    print("\nQuantify RPF abundance at gene level.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Quantify RPF abundance at gene level.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_quant_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

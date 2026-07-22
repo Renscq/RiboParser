@@ -17,7 +17,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import CDT
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -142,41 +150,36 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_pipeline(args: Namespace) -> None:
     """Run the codon decoding time workflow."""
     cdt = CDT.CodonDecodingTime(args)
 
-    _print_step(2, "Import paired RPF and RNA density files.")
+    step_print(2, "Import paired RPF and RNA density files.")
     cdt.import_density()
 
-    _print_step(3, "Calculate sample-specific codon decoding time.")
+    step_print(3, "Calculate sample-specific codon decoding time.")
     cdt.calculate_cdt()
 
-    _print_step(4, "Output codon decoding time tables.")
+    step_print(4, "Output codon decoding time tables.")
     cdt.output_tables()
 
-    _print_step(5, "Draw codon decoding time figures.")
+    step_print(5, "Draw codon decoding time figures.")
     cdt.draw_cdt_corr()
     cdt.draw_cdt_heat()
     cdt.draw_cdt_rank()
 
-    _print_step(6, "Write codon decoding time summary.")
+    step_print(6, "Write codon decoding time summary.")
     cdt.write_summary()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_CDT."""
     now_time()
-    print("\nCalculate codon decoding time.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Calculate codon decoding time.')
+    step_print(1, "Checking the input arguments.")
     args = _parse_args(argv)
     _run_pipeline(args)
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

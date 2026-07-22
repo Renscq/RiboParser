@@ -18,7 +18,15 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from utils.ribo import Percentage
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -189,40 +197,35 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_percentage_pipeline(args: Namespace) -> None:
     """Run the transcript-level CDS RPF coverage workflow."""
     percentage = Percentage.Percentage(args)
 
-    _print_step(2, "Import the RPF density file.")
+    step_print(2, "Import the RPF density file.")
     percentage.read_rpf()
     percentage.import_gene()
 
-    _print_step(3, "Calculate transcript-level CDS coverage.")
+    step_print(3, "Calculate transcript-level CDS coverage.")
     percentage.calc_density_percent()
 
-    _print_step(4, "Draw RPF coverage and abundance figures.")
+    step_print(4, "Draw RPF coverage and abundance figures.")
     percentage.draw_rpf_histogram()
     percentage.draw_rpf_boxplot()
 
-    _print_step(5, "Output RPF coverage tables.")
+    step_print(5, "Output RPF coverage tables.")
     percentage.output_density_percent()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Percent."""
     now_time()
-    print("\nCalculate transcript-level CDS RPF coverage.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Calculate transcript-level CDS RPF coverage.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_percentage_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

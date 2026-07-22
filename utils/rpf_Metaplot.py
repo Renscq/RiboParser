@@ -17,7 +17,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import Metaplot
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -196,45 +204,40 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_metaplot_pipeline(args: Namespace) -> None:
     """Run the metaplot analysis workflow."""
     metaplot = Metaplot.Metaplot(args)
 
-    _print_step(2, "Import the RPFs file.")
+    step_print(2, "Import the RPFs file.")
     metaplot.import_rpf()
 
-    _print_step(3, "Calculate metaplot profiles.")
+    step_print(3, "Calculate metaplot profiles.")
     metaplot.calc_metaplot()
 
-    _print_step(4, "Output metaplot tables.")
+    step_print(4, "Output metaplot tables.")
     metaplot.output_meta()
 
-    _print_step(5, "Draw metaplot figures.")
+    step_print(5, "Draw metaplot figures.")
     if args.mode in {"bar", "both"}:
         metaplot.draw_metaplot("bar")
     if args.mode in {"line", "both"}:
         metaplot.draw_metaplot("line")
     metaplot.draw_heatmap()
 
-    _print_step(6, "Write metaplot summary.")
+    step_print(6, "Write metaplot summary.")
     metaplot.write_summary()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Metaplot."""
     now_time()
-    print("\nDraw the metaplot.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Draw the metaplot.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_metaplot_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

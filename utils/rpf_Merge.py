@@ -17,7 +17,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import Merge
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -92,11 +100,6 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_merge_pipeline(args: Namespace) -> None:
     """Run the RPF density merge pipeline."""
     merger = Merge.RPFMerge(args)
@@ -106,15 +109,15 @@ def _run_merge_pipeline(args: Namespace) -> None:
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Merge."""
     now_time()
-    print("\nMerge RPF density files from different samples.", flush=True)
+    title_print('Merge RPF density files from different samples.')
 
-    _print_step(1, "Checking the input arguments.")
+    step_print(1, "Checking the input arguments.")
     args = _parse_args(argv)
 
-    _print_step(2, "Merge density files.")
+    step_print(2, "Merge density files.")
     _run_merge_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

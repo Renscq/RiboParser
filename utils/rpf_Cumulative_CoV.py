@@ -17,7 +17,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import Cumulative_CoV
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -251,40 +259,35 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_cov_pipeline(args: Namespace) -> None:
     """Run cumulative CoV analysis."""
     analysis = Cumulative_CoV.CumulativeCoV(args)
 
-    _print_step(2, "Import the RPF density file.")
+    step_print(2, "Import the RPF density file.")
     analysis.import_rpf()
 
-    _print_step(3, "Calculate sample-specific cumulative CoV.")
+    step_print(3, "Calculate sample-specific cumulative CoV.")
     analysis.calculate_cumulative_cov()
 
-    _print_step(4, "Draw cumulative CoV figures.")
+    step_print(4, "Draw cumulative CoV figures.")
     analysis.draw_cumulative_cov()
     analysis.draw_transcript_count()
     analysis.draw_gene_cumulative_cov()
 
-    _print_step(5, "Output cumulative CoV results.")
+    step_print(5, "Output cumulative CoV results.")
     analysis.output_results()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Cumulative_CoV."""
     now_time()
-    print("\nCalculate cumulative coefficient of variation.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Calculate cumulative coefficient of variation.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_cov_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

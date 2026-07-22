@@ -18,7 +18,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import Coefficient_of_Variation
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -165,47 +173,42 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized workflow step."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_pipeline(args: Namespace) -> None:
     """Run the complete coefficient-of-variation workflow."""
     cov = Coefficient_of_Variation.CoV(args)
 
-    _print_step(2, "Import the RPF density file.")
+    step_print(2, "Import the RPF density file.")
     cov.import_rpf()
 
-    _print_step(3, "Calculate sample-specific transcript CoV.")
+    step_print(3, "Calculate sample-specific transcript CoV.")
     cov.calculate_cov()
 
-    _print_step(4, "Read sample groups and compare CoV distributions.")
+    step_print(4, "Read sample groups and compare CoV distributions.")
     cov.read_group()
     cov.compare_groups()
 
-    _print_step(5, "Fit the corrected mean-CoV relationship.")
+    step_print(5, "Fit the corrected mean-CoV relationship.")
     cov.fit_mean_cov()
 
-    _print_step(6, "Output CoV tables.")
+    step_print(6, "Output CoV tables.")
     cov.output_tables()
 
-    _print_step(7, "Draw CoV figures.")
+    step_print(7, "Draw CoV figures.")
     cov.draw_fit_plot()
     cov.draw_distribution_plot()
 
-    _print_step(8, "Write the analysis summary.")
+    step_print(8, "Write the analysis summary.")
     cov.write_summary()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_CoV."""
     now_time()
-    print("\nCalculate positional coefficient of variation in CDS regions.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Calculate positional coefficient of variation in CDS regions.')
+    step_print(1, "Checking the input arguments.")
     args = _parse_args(argv)
     _run_pipeline(args)
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

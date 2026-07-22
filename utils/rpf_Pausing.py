@@ -17,7 +17,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import Pausing
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -260,46 +268,41 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_pausing_pipeline(args: Namespace) -> None:
     """Run the codon pausing analysis workflow."""
     pausing = Pausing.Pausing(args)
 
-    _print_step(2, "Import the RPF density file.")
+    step_print(2, "Import the RPF density file.")
     pausing.import_rpf()
 
-    _print_step(3, "Calculate sample-specific pausing scores.")
+    step_print(3, "Calculate sample-specific pausing scores.")
     pausing.calculate_pausing()
 
-    _print_step(4, "Output pausing score tables.")
+    step_print(4, "Output pausing score tables.")
     pausing.output_cds_pausing()
     pausing.output_cds_codon_pausing()
     pausing.output_sum_codon_pausing()
     pausing.output_all_pausing()
 
-    _print_step(5, "Draw codon pausing figures.")
+    step_print(5, "Draw codon pausing figures.")
     pausing.draw_pausing_corr()
     pausing.draw_codon_pausing_heatmap()
     pausing.draw_codon_rank_plot()
 
-    _print_step(6, "Write pausing summary.")
+    step_print(6, "Write pausing summary.")
     pausing.write_summary()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Pausing."""
     now_time()
-    print("\nCalculate sample-specific codon pausing scores.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Calculate sample-specific codon pausing scores.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_pausing_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

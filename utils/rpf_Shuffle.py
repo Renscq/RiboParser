@@ -17,7 +17,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import Shuffle
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -137,35 +145,30 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_shuffle_pipeline(args: Namespace) -> None:
     """Run the RPF density shuffle workflow."""
     shuffler = Shuffle.Shuffle(args)
 
-    _print_step(2, "Inspect the RPF density file.")
+    step_print(2, "Inspect the RPF density file.")
     shuffler.import_rpf()
 
-    _print_step(3, "Shuffle transcript-level RPF density profiles.")
+    step_print(3, "Shuffle transcript-level RPF density profiles.")
     shuffler.shuffle_rpfs()
 
-    _print_step(4, "Write the shuffle summary.")
+    step_print(4, "Write the shuffle summary.")
     shuffler.output_rpfs()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Shuffle."""
     now_time()
-    print("\nShuffle RPF density profiles.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Shuffle RPF density profiles.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_shuffle_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

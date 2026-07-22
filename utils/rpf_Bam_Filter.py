@@ -10,7 +10,15 @@
 
 
 import argparse
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def bam_filter_args_parser():
@@ -42,17 +50,17 @@ def bam_filter_args_parser():
 
 def main():
     now_time()
-    print('\nFilter the specific length reads from bam file.', flush=True)
-    print('\nStep1: Checking the input Arguments.', flush=True)
+    title_print('Filter the specific length reads from bam file.')
+    step_print(1, 'Checking the input Arguments.')
     args = bam_filter_args_parser()
 
     from ribo import BamFilter
     bam_attr = BamFilter.BamFilter(args)
 
-    print('\nStep2: Filter the alignment bam file.', flush=True)
+    step_print(2, 'Filter the alignment bam file.')
     bam_attr.import_bam()
 
-    print('\nAll done.', flush=True)
+    complete_print()
     now_time()
 
 

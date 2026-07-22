@@ -17,7 +17,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import Ribo
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -182,39 +190,34 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_density_pipeline(args: Namespace) -> None:
     """Run the RPF density generation pipeline."""
     ribo_attr = Ribo.Ribo(args)
 
-    _print_step(2, "Import the P-site offset.")
+    step_print(2, "Import the P-site offset.")
     ribo_attr.read_offset()
 
-    _print_step(3, "Import the transcripts annotation.")
+    step_print(3, "Import the transcripts annotation.")
     ribo_attr.read_transcript()
     ribo_attr.check_transcript()
 
-    _print_step(4, "Import the BAM/SAM file and count P-site density.")
+    step_print(4, "Import the BAM/SAM file and count P-site density.")
     ribo_attr.read_bam()
 
-    _print_step(5, "Output the RPF density.")
+    step_print(5, "Output the RPF density.")
     ribo_attr.output_density()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Density."""
     now_time()
-    print("\nConvert reads to multi-sample-compatible compact RPF density.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Convert reads to multi-sample-compatible compact RPF density.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_density_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

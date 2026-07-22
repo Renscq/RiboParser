@@ -4,7 +4,7 @@
 # Author: Rensc
 # Date: 2026-07-22
 # Version: 0.2.8.18
-# Function: Provide standardized console-output and argument-validation helpers.
+# Function: Provide standardized console output for all RiboParser commands.
 # Input: argparse namespaces, workflow messages, result values, and file paths.
 # Output: Consistently formatted RiboParser console messages.
 
@@ -83,6 +83,11 @@ def progress_print(message: str) -> None:
         message: Progress text without a prefix.
     """
     print(f"Progress: {message}", flush=True)
+
+
+def complete_print() -> None:
+    """Print the standardized workflow completion message."""
+    print("\nAll done.", flush=True)
 
 
 def warning_print(message: str) -> None:

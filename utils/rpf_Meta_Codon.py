@@ -16,8 +16,17 @@ import argparse
 from argparse import Namespace
 from collections.abc import Sequence
 
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
 from utils.ribo.MetaCodon import MetaCodon
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -169,46 +178,41 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_meta_codon_pipeline(args: Namespace) -> None:
     """Run the meta-codon density workflow."""
     meta_codon = MetaCodon(args)
 
-    _print_step(2, "Import the codon list.")
+    step_print(2, "Import the codon list.")
     meta_codon.import_codon()
 
-    _print_step(3, "Import the RPF density file.")
+    step_print(3, "Import the RPF density file.")
     meta_codon.import_rpf()
 
-    _print_step(4, "Smooth the RPF density profiles.")
+    step_print(4, "Smooth the RPF density profiles.")
     meta_codon.smooth_rpf_density()
 
-    _print_step(5, "Retrieve meta-codon density profiles.")
+    step_print(5, "Retrieve meta-codon density profiles.")
     meta_codon.reterieve_codon_density()
 
-    _print_step(6, "Output meta-codon results.")
+    step_print(6, "Output meta-codon results.")
     meta_codon.output_meta_codon_density()
     meta_codon.output_meta_codon_seq()
 
     if args.fig:
-        _print_step(7, "Draw meta-codon figures.")
+        step_print(7, "Draw meta-codon figures.")
         meta_codon.draw_meta_codon()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Meta_Codon."""
     now_time()
-    print("\nCalculate meta-codon RPF density profiles.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Calculate meta-codon RPF density profiles.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_meta_codon_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

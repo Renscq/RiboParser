@@ -17,7 +17,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import Odd_Ratio
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -182,32 +190,27 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_odd_ratio_pipeline(args: Namespace) -> None:
     """Run the codon-level odds-ratio workflow."""
     odd_ratio = Odd_Ratio.OddRatio(args)
 
-    _print_step(2, "Import the RPF density file.")
+    step_print(2, "Import the RPF density file.")
     odd_ratio.read_rpf()
 
-    _print_step(3, "Build the codon contingency tables.")
+    step_print(3, "Build the codon contingency tables.")
     odd_ratio.make_two_dimensional_table()
 
-    _print_step(4, "Calculate codon odds ratios.")
+    step_print(4, "Calculate codon odds ratios.")
     odd_ratio.calc_odd_ratio()
 
-    _print_step(5, "Perform codon-level statistical tests.")
+    step_print(5, "Perform codon-level statistical tests.")
     odd_ratio.calc_chi2_test2()
 
-    _print_step(6, "Output codon odds-ratio results.")
+    step_print(6, "Output codon odds-ratio results.")
     odd_ratio.output_odd_ratio()
     odd_ratio.summarize_odd_ratio()
 
-    _print_step(7, "Draw codon odds-ratio figures.")
+    step_print(7, "Draw codon odds-ratio figures.")
     odd_ratio.draw_odd_ratio_line()
     odd_ratio.draw_odd_ratio_scatter()
 
@@ -215,13 +218,13 @@ def _run_odd_ratio_pipeline(args: Namespace) -> None:
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Odd_Ratio."""
     now_time()
-    print("\nCalculate codon-level RPF odds ratios.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Calculate codon-level RPF odds ratios.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_odd_ratio_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

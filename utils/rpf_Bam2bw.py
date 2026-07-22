@@ -17,7 +17,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import Bam2Wig
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -115,42 +123,37 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_bam_to_track_pipeline(args: Namespace) -> None:
     """Run the BAM-to-track conversion workflow."""
     converter = Bam2Wig.Bam2Wig(args)
 
-    _print_step(2, "Import the P-site offset table.")
+    step_print(2, "Import the P-site offset table.")
     converter.read_offset()
 
-    _print_step(3, "Configure alignment multiplicity tags.")
+    step_print(3, "Configure alignment multiplicity tags.")
     converter.set_tag_num()
 
-    _print_step(4, "Import BAM alignments.")
+    step_print(4, "Import BAM alignments.")
     converter.import_bam()
 
-    _print_step(5, "Convert alignments to density tables.")
+    step_print(5, "Convert alignments to density tables.")
     converter.convert_dict_to_dataframe()
     converter.norm_rpm()
 
-    _print_step(6, "Output strand-resolved density tracks.")
+    step_print(6, "Output strand-resolved density tracks.")
     converter.output_bed()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Bam2bw."""
     now_time()
-    print("\nConvert BAM alignments to density tracks.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Convert BAM alignments to density tracks.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_bam_to_track_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

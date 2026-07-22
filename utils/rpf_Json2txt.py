@@ -17,7 +17,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import Ribo
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -61,14 +69,9 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_conversion_pipeline(args: Namespace) -> None:
     """Convert the input JSONL density file to TXT format."""
-    _print_step(2, "Convert RPF density JSONL to TXT.")
+    step_print(2, "Convert RPF density JSONL to TXT.")
     Ribo.Ribo.json_to_txt(
         json_file=args.json_file,
         output_txt=args.output_txt,
@@ -78,13 +81,13 @@ def _run_conversion_pipeline(args: Namespace) -> None:
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Json2txt."""
     now_time()
-    print("\nConvert RPF density JSONL to TXT.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Convert RPF density JSONL to TXT.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_conversion_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

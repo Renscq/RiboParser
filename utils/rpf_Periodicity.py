@@ -17,7 +17,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import Periodicity
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -92,25 +100,20 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_periodicity_pipeline(args: Namespace) -> None:
     """Run the 3-nt periodicity analysis workflow."""
     rpfs = Periodicity.Periodicity(args)
 
-    _print_step(2, "Import the RPFs file.")
+    step_print(2, "Import the RPFs file.")
     rpfs.import_rpf()
 
-    _print_step(3, "Calculate the 3-nt periodicity.")
+    step_print(3, "Calculate the 3-nt periodicity.")
     rpfs.calc_3nt_period()
 
-    _print_step(4, "Output the 3-nt periodicity.")
+    step_print(4, "Output the 3-nt periodicity.")
     rpfs.output_meta()
 
-    _print_step(5, "Draw the 3-nt periodicity plots.")
+    step_print(5, "Draw the 3-nt periodicity plots.")
     rpfs.draw_3nt_period_count()
     rpfs.draw_3nt_period_ratio()
     rpfs.draw_3nt_period_stacked()
@@ -119,13 +122,13 @@ def _run_periodicity_pipeline(args: Namespace) -> None:
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Periodicity."""
     now_time()
-    print("\nDraw the periodicity plot.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Draw the periodicity plot.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_periodicity_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

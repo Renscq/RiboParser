@@ -19,7 +19,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import Geneplot
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -409,11 +417,6 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _safe_name(name: str) -> str:
     """Return a filesystem-safe target identifier."""
     return re.sub(r"[^0-9A-Za-z._-]+", "_", str(name)).strip("_") or "target"
@@ -490,7 +493,7 @@ def _run_geneplot_pipeline(args: Namespace) -> None:
     """Run the gene-level plotting workflow."""
     if args.target_list:
         targets = _read_target_list(args.target_list)
-        _print_step(2, "Batch geneplot for {count:,} target(s).".format(count=len(targets)))
+        step_print(2, "Batch geneplot for {count:,} target(s).".format(count=len(targets)))
         for index, target in enumerate(targets, start=1):
             print("\nTarget {index}/{total}: {target}".format(index=index, total=len(targets), target=target), flush=True)
             now_args = copy.copy(args)
@@ -499,20 +502,20 @@ def _run_geneplot_pipeline(args: Namespace) -> None:
             _run_target(now_args)
         return
 
-    _print_step(2, "Import target density profile and draw requested coordinate plot(s).")
+    step_print(2, "Import target density profile and draw requested coordinate plot(s).")
     _run_target(args)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Geneplot."""
     now_time()
-    print("\nDraw gene-level RPF/RNA density plot.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Draw gene-level RPF/RNA density plot.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_geneplot_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

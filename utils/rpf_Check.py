@@ -16,8 +16,17 @@ import argparse
 from argparse import Namespace
 from collections.abc import Sequence
 
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
 from utils.ribo.Quality import Quality
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -162,22 +171,17 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_check_pipeline(args: Namespace) -> None:
     """Run the optimized rpf_Check workflow."""
     rpf_quality = Quality(args)
 
-    _print_step(2, "Import the transcripts annotation.")
+    step_print(2, "Import the transcripts annotation.")
     rpf_quality.read_transcript()
 
-    _print_step(3, "Scan mRNA-aligned reads and output filtered BAM.")
+    step_print(3, "Scan mRNA-aligned reads and output filtered BAM.")
     rpf_quality.scan_mrna_reads()
 
-    _print_step(4, "Detect the type of sequence profile.")
+    step_print(4, "Detect the type of sequence profile.")
     if not rpf_quality.profile:
         rpf_quality.detect_seq_type()
     else:
@@ -189,31 +193,31 @@ def _run_check_pipeline(args: Namespace) -> None:
             flush=True,
         )
 
-    _print_step(5, "Summarize the length distribution of reads aligned to mRNA.")
+    step_print(5, "Summarize the length distribution of reads aligned to mRNA.")
     rpf_quality.write_length_distr()
     rpf_quality.write_summary()
 
     if args.saturation:
-        _print_step(6, "Check the RPFs saturation.")
+        step_print(6, "Check the RPFs saturation.")
         rpf_quality.rpf_saturation()
         rpf_quality.draw_gene_saturation()
         rpf_quality.draw_rpf_saturation()
         rpf_quality.write_summary()
     else:
-        _print_step(6, "Do not check the RPFs saturation.")
+        step_print(6, "Do not check the RPFs saturation.")
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Check."""
     now_time()
-    print("\nCheck the RPFs mapping condition.", flush=True)
+    title_print('Check the RPFs mapping condition.')
 
-    _print_step(1, "Checking the input arguments.")
+    step_print(1, "Checking the input arguments.")
     args = _parse_args(argv)
 
     _run_check_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

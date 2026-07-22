@@ -17,7 +17,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import Occupancy
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -222,41 +230,36 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_occupancy_pipeline(args: Namespace) -> None:
     """Run the codon occupancy workflow."""
     occupancy = Occupancy.Occupancy(args)
 
-    _print_step(2, "Import the RPF density file.")
+    step_print(2, "Import the RPF density file.")
     occupancy.import_rpf()
 
-    _print_step(3, "Calculate sample-specific codon occupancy.")
+    step_print(3, "Calculate sample-specific codon occupancy.")
     occupancy.calculate_occupancy()
 
-    _print_step(4, "Output codon occupancy tables.")
+    step_print(4, "Output codon occupancy tables.")
     occupancy.output_tables()
 
-    _print_step(5, "Draw codon occupancy figures.")
+    step_print(5, "Draw codon occupancy figures.")
     occupancy.draw_occupancy_corr()
     occupancy.draw_occupancy_heatmap()
     occupancy.draw_occupancy_rankplot()
 
-    _print_step(6, "Write occupancy summary.")
+    step_print(6, "Write occupancy summary.")
     occupancy.write_summary()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Occupancy."""
     now_time()
-    print("\nCalculate codon occupancy.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Calculate codon occupancy.')
+    step_print(1, "Checking the input arguments.")
     args = _parse_args(argv)
     _run_occupancy_pipeline(args)
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

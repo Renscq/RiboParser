@@ -16,7 +16,14 @@ import argparse
 from argparse import Namespace
 from collections.abc import Sequence
 
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -120,46 +127,41 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_digest_pipeline(args: Namespace) -> None:
     """Run digestion-site detection."""
     from utils.ribo.Digestion import Ribo
 
     digestion = Ribo(args)
 
-    _print_step(2, "Import transcript annotation.")
+    step_print(2, "Import transcript annotation.")
     digestion.read_transcript()
 
-    _print_step(3, "Detect RPF digestion sites.")
+    step_print(3, "Detect RPF digestion sites.")
     digestion.get_digest_sites()
 
-    _print_step(4, "Output digestion-site tables.")
+    step_print(4, "Output digestion-site tables.")
     digestion.output_digest_sites()
 
-    _print_step(5, "Draw digestion-site heatmaps.")
+    step_print(5, "Draw digestion-site heatmaps.")
     digestion.digestion_plot()
 
-    _print_step(6, "Output digestion-site motif counts.")
+    step_print(6, "Output digestion-site motif counts.")
     digestion.output_counts()
 
-    _print_step(7, "Draw digestion-site sequence logos.")
+    step_print(7, "Draw digestion-site sequence logos.")
     digestion.seq_logo_plot2()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Digest."""
     now_time()
-    print("\nDetect RPF digestion-site nucleotide preferences.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Detect RPF digestion-site nucleotide preferences.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_digest_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 

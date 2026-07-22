@@ -18,6 +18,15 @@ import argparse
 import pandas as pd
 import pysam
 
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
+
 
 class Mrna(object):
 
@@ -196,20 +205,19 @@ def rpf_end_args_parser():
 
 def main():
 
-    sys.stdout.writelines('\nDetect the p-site offset.\n')
-    sys.stdout.writelines('Step1: Checking the input Arguments.\n')
+    title_print('Detect the p-site offset.')
+    step_print(1, 'Checking the input Arguments.')
     args = rpf_end_args_parser()
     ribo_attr = Ribo(args)
 
-    sys.stdout.writelines('\nStep2: Import the transcripts annotation.\n')
+    step_print(2, 'Import the transcripts annotation.')
     ribo_attr.read_transcript()
 
-    sys.stdout.writelines('\nStep3: Import the bam file.\n')
+    step_print(3, 'Import the bam file.')
     ribo_attr.rpf_end_sum()
 
-    sys.stdout.writelines('\nAll done.\n')
+    complete_print()
 
 
 if __name__ == '__main__':
     main()
-

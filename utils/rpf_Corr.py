@@ -17,7 +17,15 @@ from argparse import Namespace
 from collections.abc import Sequence
 
 from utils.ribo import Corr
-from utils.ribo.ArgsParser import args_print, file_check, now_time
+
+from utils.ribo.ArgsParser import (
+    args_print,
+    complete_print,
+    file_check,
+    now_time,
+    step_print,
+    title_print,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -140,47 +148,42 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
-def _print_step(step: int, message: str) -> None:
-    """Print a standardized pipeline step message."""
-    print(f"\nStep{step}: {message}", flush=True)
-
-
 def _run_corr_pipeline(args: Namespace) -> None:
     """Run the RPF correlation workflow."""
     corr = Corr.RPFCorrelation(args)
 
-    _print_step(2, "Import the RPF density file.")
+    step_print(2, "Import the RPF density file.")
     corr.import_rpf()
 
-    _print_step(3, "Build frame-specific density matrices.")
+    step_print(3, "Build frame-specific density matrices.")
     corr.build_frame_tables()
 
-    _print_step(4, "Calculate sample correlations.")
+    step_print(4, "Calculate sample correlations.")
     corr.calculate_correlations()
 
-    _print_step(5, "Output correlation tables.")
+    step_print(5, "Output correlation tables.")
     corr.output_tables()
 
-    _print_step(6, "Draw correlation heatmaps.")
+    step_print(6, "Draw correlation heatmaps.")
     if corr.gene_corr:
         corr.draw_corr_plot("gene", corr.gene_corr)
     if corr.rpf_corr:
         corr.draw_corr_plot("rpf", corr.rpf_corr)
 
-    _print_step(7, "Write summary JSON.")
+    step_print(7, "Write summary JSON.")
     corr.write_summary()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Command-line entry point for rpf_Corr."""
     now_time()
-    print("\nDraw the correlation of samples.", flush=True)
-    _print_step(1, "Checking the input arguments.")
+    title_print('Draw the correlation of samples.')
+    step_print(1, "Checking the input arguments.")
 
     args = _parse_args(argv)
     _run_corr_pipeline(args)
 
-    print("\nAll done.", flush=True)
+    complete_print()
     now_time()
 
 
