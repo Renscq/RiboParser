@@ -2,23 +2,18 @@
 # -*- coding: utf-8 -*-
 
 # Author: Rensc
-# Date: 2026-07-22
-# Version: 0.2.8.18
-# Function: Write smORF annotation, metadata, nucleotide, and peptide outputs.
+# Date: 2026-07-24
+# Version: 0.2.8.24-dev.002
+# Function: Write smORF outputs with batched buffered I/O.
 # Input: Predicted ORFRecord objects.
-# Output: genePredExt-like, tabular, nucleotide FASTA, and peptide FASTA files.
+# Output: genePredExt-like, metadata, nucleotide FASTA, and peptide FASTA files.
 
-"""Output writers for transcript-centric smORF scanning.
-
-``ORFOutputWriter`` supports streaming output and writes to temporary files.
-Files are atomically moved to their final paths only after the complete scan
-finishes successfully. This prevents partially written final outputs when a
-worker fails and avoids retaining millions of ORF objects in memory.
-"""
+"""Output writers for transcript-centric smORF scanning."""
 
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
 from types import TracebackType
 from typing import TextIO
 
@@ -30,14 +25,7 @@ class GenePredWriter:
 
     @staticmethod
     def exon_frames(record: ORFRecord) -> list[int]:
-        """Calculate genePredExt exon-frame values.
-
-        Args:
-            record: ORF record containing genomic blocks.
-
-        Returns:
-            Exon frame values in ascending genomic block order.
-        """
+        """Calculate genePredExt exon-frame values."""
         blocks = list(zip(record.exon_starts, record.exon_ends))
         if record.strand == "+":
             coding_order = sorted(blocks, key=lambda block: block[0])
@@ -53,7 +41,6 @@ class GenePredWriter:
         for block in coding_order:
             frame_by_block[block] = coding_offset % 3
             coding_offset += block[1] - block[0]
-
         return [
             frame_by_block[block]
             for block in sorted(blocks, key=lambda block: block[0])
@@ -61,59 +48,45 @@ class GenePredWriter:
 
     @staticmethod
     def format_record(record: ORFRecord) -> str:
-        """Format one ORF as a genePredExt-like line.
-
-        Args:
-            record: ORF record.
-
-        Returns:
-            Tab-delimited output line without a trailing newline.
-        """
-        exon_count = len(record.exon_starts)
-        exon_starts = ",".join(
-            str(value) for value in record.exon_starts
-        ) + ","
-        exon_ends = ",".join(
-            str(value) for value in record.exon_ends
-        ) + ","
+        """Format one ORF as a genePredExt-like line."""
+        exon_starts = ",".join(map(str, record.exon_starts)) + ","
+        exon_ends = ",".join(map(str, record.exon_ends)) + ","
         exon_frames = ",".join(
-            str(value)
-            for value in GenePredWriter.exon_frames(record)
+            map(str, GenePredWriter.exon_frames(record))
         ) + ","
         completion = (
             "cmpl" if record.completeness == "complete" else "incmpl"
         )
-
-        fields = [
-            record.orf_id,
-            record.chrom,
-            record.strand,
-            str(record.genomic_start),
-            str(record.genomic_end),
-            str(record.genomic_start),
-            str(record.genomic_end),
-            str(exon_count),
-            exon_starts,
-            exon_ends,
-            "0",
-            record.gene_id,
-            completion,
-            completion,
-            exon_frames,
-        ]
-        return "\t".join(fields)
+        return "\t".join(
+            [
+                record.orf_id,
+                record.chrom,
+                record.strand,
+                str(record.genomic_start),
+                str(record.genomic_end),
+                str(record.genomic_start),
+                str(record.genomic_end),
+                str(len(record.exon_starts)),
+                exon_starts,
+                exon_ends,
+                "0",
+                record.gene_id,
+                completion,
+                completion,
+                exon_frames,
+            ]
+        )
 
     @staticmethod
     def write(path: str | Path, records: list[ORFRecord]) -> None:
-        """Write all ORFs to a genePredExt-like file.
-
-        Args:
-            path: Output path.
-            records: ORF records.
-        """
+        """Write all ORFs to a genePredExt-like file."""
         with Path(path).open("w", encoding="utf-8") as handle:
-            for record in records:
-                handle.write(GenePredWriter.format_record(record) + "\n")
+            handle.write(
+                "".join(
+                    GenePredWriter.format_record(record) + "\n"
+                    for record in records
+                )
+            )
 
 
 class MessageWriter:
@@ -149,55 +122,48 @@ class MessageWriter:
 
     @staticmethod
     def format_record(record: ORFRecord) -> str:
-        """Format one ORF metadata row.
-
-        Args:
-            record: ORF record.
-
-        Returns:
-            Tab-delimited output line without a trailing newline.
-        """
-        fields = [
-            record.orf_id,
-            record.gene_id,
-            record.transcript_id,
-            record.chrom,
-            record.strand,
-            record.source_strand,
-            record.category,
-            record.priority,
-            record.overlap_type,
-            str(record.frame),
-            str(record.tx_orf_start),
-            str(record.tx_orf_end),
-            str(record.genomic_start),
-            str(record.genomic_end),
-            record.start_codon,
-            record.stop_codon,
-            str(record.nt_length),
-            str(record.aa_length),
-            record.kozak_seq,
-            record.completeness,
-            str(len(record.exon_starts)),
-            ",".join(str(value) for value in record.exon_starts),
-            ",".join(str(value) for value in record.exon_ends),
-            str(record.kozak_start_index),
-            str(record.ambiguous_codon_count),
-        ]
-        return "\t".join(fields)
+        """Format one ORF metadata row."""
+        return "\t".join(
+            [
+                record.orf_id,
+                record.gene_id,
+                record.transcript_id,
+                record.chrom,
+                record.strand,
+                record.source_strand,
+                record.category,
+                record.priority,
+                record.overlap_type,
+                str(record.frame),
+                str(record.tx_orf_start),
+                str(record.tx_orf_end),
+                str(record.genomic_start),
+                str(record.genomic_end),
+                record.start_codon,
+                record.stop_codon,
+                str(record.nt_length),
+                str(record.aa_length),
+                record.kozak_seq,
+                record.completeness,
+                str(len(record.exon_starts)),
+                ",".join(map(str, record.exon_starts)),
+                ",".join(map(str, record.exon_ends)),
+                str(record.kozak_start_index),
+                str(record.ambiguous_codon_count),
+            ]
+        )
 
     @staticmethod
     def write(path: str | Path, records: list[ORFRecord]) -> None:
-        """Write all ORF metadata rows.
-
-        Args:
-            path: Output path.
-            records: ORF records.
-        """
+        """Write all ORF metadata rows."""
         with Path(path).open("w", encoding="utf-8") as handle:
             handle.write("\t".join(MessageWriter.HEADER) + "\n")
-            for record in records:
-                handle.write(MessageWriter.format_record(record) + "\n")
+            handle.write(
+                "".join(
+                    MessageWriter.format_record(record) + "\n"
+                    for record in records
+                )
+            )
 
 
 class FastaWriter:
@@ -205,18 +171,7 @@ class FastaWriter:
 
     @staticmethod
     def wrap(sequence: str, width: int = 60) -> str:
-        """Wrap a FASTA sequence.
-
-        Args:
-            sequence: Sequence to wrap.
-            width: Maximum line width.
-
-        Returns:
-            Wrapped sequence.
-
-        Raises:
-            ValueError: If ``width`` is not positive.
-        """
+        """Wrap a FASTA sequence."""
         if width < 1:
             raise ValueError("FASTA line width must be >= 1.")
         return "\n".join(
@@ -226,14 +181,7 @@ class FastaWriter:
 
     @staticmethod
     def format_nt(record: ORFRecord) -> str:
-        """Format one nucleotide FASTA record.
-
-        Args:
-            record: ORF record.
-
-        Returns:
-            Complete FASTA record ending with a newline.
-        """
+        """Format one nucleotide FASTA record."""
         header = (
             f">{record.orf_id} gene={record.gene_id} "
             f"transcript={record.transcript_id} type={record.category} "
@@ -243,14 +191,7 @@ class FastaWriter:
 
     @staticmethod
     def format_pep(record: ORFRecord) -> str:
-        """Format one peptide FASTA record.
-
-        Args:
-            record: ORF record.
-
-        Returns:
-            Complete FASTA record ending with a newline.
-        """
+        """Format one peptide FASTA record."""
         header = (
             f">{record.orf_id} gene={record.gene_id} "
             f"transcript={record.transcript_id} type={record.category} "
@@ -260,45 +201,32 @@ class FastaWriter:
 
     @staticmethod
     def write_nt(path: str | Path, records: list[ORFRecord]) -> None:
-        """Write nucleotide FASTA records.
-
-        Args:
-            path: Output path.
-            records: ORF records.
-        """
+        """Write nucleotide FASTA records."""
         with Path(path).open("w", encoding="utf-8") as handle:
-            for record in records:
-                handle.write(FastaWriter.format_nt(record))
+            handle.write(
+                "".join(FastaWriter.format_nt(record) for record in records)
+            )
 
     @staticmethod
     def write_pep(path: str | Path, records: list[ORFRecord]) -> None:
-        """Write peptide FASTA records.
-
-        Args:
-            path: Output path.
-            records: ORF records.
-        """
+        """Write peptide FASTA records."""
         with Path(path).open("w", encoding="utf-8") as handle:
-            for record in records:
-                handle.write(FastaWriter.format_pep(record))
+            handle.write(
+                "".join(FastaWriter.format_pep(record) for record in records)
+            )
 
 
 class ORFOutputWriter:
-    """Atomically stream all four smORF output formats.
+    """Atomically stream all four smORF output formats."""
 
-    Args:
-        output_prefix: Prefix shared by final output files.
-    """
-
-    def __init__(self, output_prefix: str | Path) -> None:
-        """Initialize final and temporary output paths.
-
-        Args:
-            output_prefix: Prefix shared by all output files.
-        """
+    def __init__(
+        self,
+        output_prefix: str | Path,
+        write_message_header: bool = True,
+    ) -> None:
+        """Initialize final and temporary output paths."""
         prefix = Path(output_prefix)
         prefix.parent.mkdir(parents=True, exist_ok=True)
-
         self.final_paths = {
             "genepred": Path(f"{prefix}.genePred"),
             "message": Path(f"{prefix}.message.txt"),
@@ -311,21 +239,19 @@ class ORFOutputWriter:
         }
         self.handles: dict[str, TextIO] = {}
         self.record_count = 0
+        self.write_message_header = bool(write_message_header)
 
     def __enter__(self) -> "ORFOutputWriter":
-        """Open temporary output files.
-
-        Returns:
-            The active output writer.
-        """
+        """Open temporary output files."""
         try:
             self.handles = {
-                name: path.open("w", encoding="utf-8")
+                name: path.open("w", encoding="utf-8", buffering=1024 * 1024)
                 for name, path in self.temporary_paths.items()
             }
-            self.handles["message"].write(
-                "\t".join(MessageWriter.HEADER) + "\n"
-            )
+            if self.write_message_header:
+                self.handles["message"].write(
+                    "\t".join(MessageWriter.HEADER) + "\n"
+                )
         except Exception:
             for handle in self.handles.values():
                 handle.close()
@@ -336,27 +262,97 @@ class ORFOutputWriter:
         return self
 
     def write_records(self, records: list[ORFRecord]) -> None:
-        """Append one transcript's ORF records.
-
-        Args:
-            records: ORF records with final stable identifiers.
-
-        Raises:
-            RuntimeError: If the writer is not active.
-        """
+        """Append one transcript's ORF records using four batched writes."""
         if not self.handles:
             raise RuntimeError("ORFOutputWriter is not active.")
+        if not records:
+            return
 
-        for record in records:
-            self.handles["genepred"].write(
+        self.handles["genepred"].write(
+            "".join(
                 GenePredWriter.format_record(record) + "\n"
+                for record in records
             )
-            self.handles["message"].write(
+        )
+        self.handles["message"].write(
+            "".join(
                 MessageWriter.format_record(record) + "\n"
+                for record in records
             )
-            self.handles["nt"].write(FastaWriter.format_nt(record))
-            self.handles["pep"].write(FastaWriter.format_pep(record))
-            self.record_count += 1
+        )
+        self.handles["nt"].write(
+            "".join(FastaWriter.format_nt(record) for record in records)
+        )
+        self.handles["pep"].write(
+            "".join(FastaWriter.format_pep(record) for record in records)
+        )
+        self.record_count += len(records)
+
+    @staticmethod
+    def merge_parts(
+        output_prefix: str | Path,
+        part_prefixes: list[str | Path],
+    ) -> None:
+        """Merge ordered worker shards into atomic final output files.
+
+        Parameters
+        ----------
+        output_prefix : str or pathlib.Path
+            Final output prefix.
+        part_prefixes : list of str or pathlib.Path
+            Worker shard prefixes in transcript input order.
+        """
+        prefix = Path(output_prefix)
+        prefix.parent.mkdir(parents=True, exist_ok=True)
+        suffixes = {
+            "genepred": ".genePred",
+            "message": ".message.txt",
+            "nt": ".nt.fa",
+            "pep": ".pep.fa",
+        }
+        final_paths = {
+            name: Path(f"{prefix}{suffix}")
+            for name, suffix in suffixes.items()
+        }
+        temporary_paths = {
+            name: path.with_name(path.name + ".tmp")
+            for name, path in final_paths.items()
+        }
+
+        handles: dict[str, object] = {}
+        try:
+            handles = {
+                name: path.open("wb", buffering=1024 * 1024)
+                for name, path in temporary_paths.items()
+            }
+            handles["message"].write(
+                ("\t".join(MessageWriter.HEADER) + "\n").encode("utf-8")
+            )
+
+            for part_prefix in part_prefixes:
+                part = Path(part_prefix)
+                for name, suffix in suffixes.items():
+                    part_path = Path(f"{part}{suffix}")
+                    with part_path.open("rb", buffering=1024 * 1024) as source:
+                        if name == "message":
+                            source.readline()
+                        shutil.copyfileobj(
+                            source,
+                            handles[name],
+                            length=16 * 1024 * 1024,
+                        )
+
+            for handle in handles.values():
+                handle.close()
+            handles.clear()
+            for name, temporary_path in temporary_paths.items():
+                temporary_path.replace(final_paths[name])
+        except Exception:
+            for handle in handles.values():
+                handle.close()
+            for temporary_path in temporary_paths.values():
+                temporary_path.unlink(missing_ok=True)
+            raise
 
     def __exit__(
         self,
@@ -364,16 +360,7 @@ class ORFOutputWriter:
         exception: BaseException | None,
         traceback: TracebackType | None,
     ) -> bool:
-        """Close files and commit or discard temporary outputs.
-
-        Args:
-            exception_type: Raised exception type, if any.
-            exception: Raised exception, if any.
-            traceback: Raised exception traceback, if any.
-
-        Returns:
-            ``False`` so exceptions propagate to the caller.
-        """
+        """Close files and commit or discard temporary outputs."""
         for handle in self.handles.values():
             handle.close()
         self.handles.clear()
@@ -384,5 +371,4 @@ class ORFOutputWriter:
         else:
             for temporary_path in self.temporary_paths.values():
                 temporary_path.unlink(missing_ok=True)
-
         return False

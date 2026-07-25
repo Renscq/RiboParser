@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 # Author: Rensc
-# Date: 2026-07-22
-# Version: 0.2.8.18
-# Function: Scan transcript-centric complete and partial smORFs.
+# Date: 2026-07-24
+# Version: 0.2.8.24-dev.001
+# Function: Scan complete transcript-centric smORFs and discard invalid candidates.
 # Input: Genome FASTA and genePred transcript annotation.
 # Output: smORF genePred, metadata, nucleotide FASTA, and peptide FASTA files.
 
@@ -20,7 +20,6 @@ from utils.ribo.ArgsParser import (
     args_print,
     file_check,
     now_time,
-    result_print,
     step_print,
     title_print,
 )
@@ -122,26 +121,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Downstream Kozak-context length after the start codon "
             "(default: %(default)s nt)."
-        ),
-    )
-    scanning_group.add_argument(
-        "--no-partial",
-        dest="keep_partial",
-        action="store_false",
-        default=True,
-        help=(
-            "Discard 3-prime partial ORFs without an in-frame stop codon "
-            "(default: retain partial ORFs)."
-        ),
-    )
-    scanning_group.add_argument(
-        "--allow-ambiguous",
-        dest="allow_ambiguous",
-        action="store_true",
-        default=False,
-        help=(
-            "Retain ORFs containing ambiguous codons and translate them as X "
-            "(default: %(default)s)."
         ),
     )
     scanning_group.add_argument(
@@ -286,8 +265,8 @@ def _run_scanner_pipeline(args: Namespace) -> None:
         mark_overlap=args.mark_overlap,
         remove_discarded=args.remove_discarded,
         include_stop=args.include_stop,
-        keep_partial=args.keep_partial,
-        allow_ambiguous=args.allow_ambiguous,
+        keep_partial=False,
+        allow_ambiguous=False,
         threads=args.threads,
         retain_records=False,
     )

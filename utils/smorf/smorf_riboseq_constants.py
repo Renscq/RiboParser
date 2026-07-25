@@ -147,22 +147,22 @@ class EvidenceThresholds:
                 min_rpf_sum=3.0,
                 min_covered_codon=2,
                 min_codon_coverage=0.10,
-                moderate_periodicity=0.50,
-                strong_periodicity=0.65,
+                moderate_periodicity=0.45,
+                strong_periodicity=0.60,
             ),
             "balanced": cls(
                 min_rpf_sum=5.0,
                 min_covered_codon=3,
                 min_codon_coverage=0.15,
-                moderate_periodicity=0.55,
-                strong_periodicity=0.70,
+                moderate_periodicity=0.50,
+                strong_periodicity=0.65,
             ),
             "strict": cls(
                 min_rpf_sum=10.0,
                 min_covered_codon=5,
                 min_codon_coverage=0.25,
-                moderate_periodicity=0.60,
-                strong_periodicity=0.75,
+                moderate_periodicity=0.55,
+                strong_periodicity=0.70,
             ),
         }
         key = str(mode).lower()
