@@ -26,7 +26,7 @@ from utils.ribo.ArgsParser import (
     title_print,
     warning_print,
 )
-from utils.smorf.smorf_cluster import SmORFCluster
+from utils.smorf.smorf_cluster_core import SmORFCluster
 from utils.smorf.smorf_filter import ORFTable
 from utils.smorf.smorf_kozak import BUILTIN_MODELS, KozakModel
 

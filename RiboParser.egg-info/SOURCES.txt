@@ -141,7 +141,7 @@ utils/serp/SeRP.py
 utils/serp/__init__.py
 utils/smorf/__init__.py
 utils/smorf/smorf_classifier.py
-utils/smorf/smorf_cluster.py
+utils/smorf/smorf_cluster_core.py
 utils/smorf/smorf_coordinate.py
 utils/smorf/smorf_fasta.py
 utils/smorf/smorf_filter.py
@@ -154,6 +154,7 @@ utils/smorf/smorf_riboseq_adaptive.py
 utils/smorf/smorf_riboseq_constants.py
 utils/smorf/smorf_riboseq_density.py
 utils/smorf/smorf_riboseq_density_cache.py
+utils/smorf/smorf_riboseq_family_engine.py
 utils/smorf/smorf_riboseq_family_io.py
 utils/smorf/smorf_riboseq_family_pipeline.py
 utils/smorf/smorf_riboseq_integrate.py

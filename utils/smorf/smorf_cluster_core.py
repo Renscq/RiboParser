@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 # Author: Rensc
-# Date: 2026-07-25
-# Version: 0.2.8.24-dev.005
-# Function: Cluster smORFs with indexed streaming and gene-safe parallel shards.
+# Date: 2026-07-31
+# Version: 0.2.8.24-dev.006
+# Function: Cluster smORFs and remove annotated-ORF same-frame redundancy.
 # Input: smorf_scanner message table and source genePred annotation.
 # Output: Primary families, compact member mappings, removed ORFs, and summary.
 
@@ -15,7 +15,7 @@ Workflow
 1. Parse genePred into compact transcript and gene-boundary indexes.
 2. Stream the scanner table with compiled integer column indexes.
 3. Apply structural filtering without constructing per-row dictionaries.
-4. Remove same-gene lncORFs that exactly reproduce an annotated mORF.
+4. Remove non-annotated ORFs overlapping any annotated ORF in-frame.
 5. Collapse exact genomic ORF duplicates across transcript isoforms.
 6. Build alternative-start families with a splice-suffix index instead of
    quadratic all-pairs comparisons.
@@ -50,6 +50,16 @@ from utils.ribo.ArgsParser import progress_print
 from .smorf_kozak import KozakModel
 
 STOP_CODONS: Final[frozenset[bytes]] = frozenset({b"TAA", b"TAG", b"TGA"})
+ANNOTATED_CATEGORIES: Final[frozenset[bytes]] = frozenset(
+    {b"annotated_ORF", b"annotated_mORF"}
+)
+ANNOTATION_BIN_SIZE: Final[int] = 32_768
+ANNOTATED_OVERLAP_COLUMNS: Final[tuple[bytes, ...]] = (
+    b"matched_annotated_orf_id",
+    b"annotated_overlap_relation",
+    b"annotated_overlap_nt",
+    b"annotated_overlap_codon",
+)
 CLUSTER_REQUIRED_COLUMNS: Final[tuple[bytes, ...]] = (
     b"orf_id",
     b"gene_id",
@@ -130,6 +140,40 @@ class TranscriptMeta:
     cds_blocks: tuple[tuple[int, int], ...]
 
 
+@dataclass(frozen=True, slots=True)
+class AnnotatedORF:
+    """Store one unique genePred-derived annotated coding structure."""
+
+    annotated_orf_id: bytes
+    transcript_id: bytes
+    gene_id: bytes
+    chrom: bytes
+    strand: bytes
+    blocks: tuple[tuple[int, int], ...]
+    nt_length: int
+    block_offsets: tuple[int, ...]
+
+    @property
+    def genomic_start(self) -> int:
+        """Return the leftmost coding coordinate."""
+        return self.blocks[0][0]
+
+    @property
+    def genomic_end(self) -> int:
+        """Return the rightmost coding coordinate."""
+        return self.blocks[-1][1]
+
+
+@dataclass(frozen=True, slots=True)
+class AnnotatedOverlap:
+    """Describe one phase-compatible candidate-to-annotation overlap."""
+
+    annotated_orf: AnnotatedORF
+    relation: bytes
+    overlap_nt: int
+    overlap_codon: int
+
+
 @dataclass(slots=True)
 class AnnotationIndex:
     """Index transcript metadata, gene lifetimes, and annotated mORFs."""
@@ -137,10 +181,8 @@ class AnnotationIndex:
     transcripts: dict[bytes, TranscriptMeta]
     gene_first_order: dict[bytes, int]
     gene_last_order: dict[bytes, int]
-    morf_keys_by_gene: dict[
-        bytes,
-        set[tuple[bytes, bytes, tuple[tuple[int, int], ...]]],
-    ]
+    annotated_orfs: tuple[AnnotatedORF, ...]
+    annotated_bins: dict[tuple[bytes, bytes, int], tuple[int, ...]]
     safe_cut_after: tuple[bool, ...]
     transcript_count: int
 
@@ -151,10 +193,6 @@ class AnnotationIndex:
         transcripts: dict[bytes, TranscriptMeta] = {}
         gene_first_order: dict[bytes, int] = {}
         gene_last_order: dict[bytes, int] = {}
-        morf_keys_by_gene: dict[
-            bytes,
-            set[tuple[bytes, bytes, tuple[tuple[int, int], ...]]],
-        ] = defaultdict(set)
         annotation_order = 0
 
         with annotation_path.open("rb", buffering=_BUFFER_BYTES) as handle:
@@ -242,10 +280,6 @@ class AnnotationIndex:
                             "Coding transcript has no CDS blocks: "
                             + transcript_id.decode("utf-8", errors="replace")
                         )
-                    morf_keys_by_gene[gene_id].add(
-                        (chrom, strand, cds_blocks)
-                    )
-
                 transcripts[transcript_id] = TranscriptMeta(
                     transcript_id=transcript_id,
                     gene_id=gene_id,
@@ -272,11 +306,63 @@ class AnnotationIndex:
             active += difference[order]
             safe_cut_after[order] = active == 0
 
+        annotated_orfs: list[AnnotatedORF] = []
+        seen_structures: set[
+            tuple[bytes, bytes, bytes, tuple[tuple[int, int], ...]]
+        ] = set()
+        for transcript_meta in transcripts.values():
+            if not transcript_meta.is_coding:
+                continue
+            structure_key = (
+                transcript_meta.gene_id,
+                transcript_meta.chrom,
+                transcript_meta.strand,
+                transcript_meta.cds_blocks,
+            )
+            if structure_key in seen_structures:
+                continue
+            seen_structures.add(structure_key)
+            cds_length = sum(
+                end - start for start, end in transcript_meta.cds_blocks
+            )
+            annotated_orfs.append(
+                AnnotatedORF(
+                    annotated_orf_id=(
+                        b"ANNOTATED_TRANSCRIPT:"
+                        + transcript_meta.transcript_id
+                    ),
+                    transcript_id=transcript_meta.transcript_id,
+                    gene_id=transcript_meta.gene_id,
+                    chrom=transcript_meta.chrom,
+                    strand=transcript_meta.strand,
+                    blocks=transcript_meta.cds_blocks,
+                    nt_length=cds_length,
+                    block_offsets=cls._block_offsets(
+                        transcript_meta.cds_blocks,
+                        transcript_meta.strand,
+                    ),
+                )
+            )
+
+        mutable_bins: dict[
+            tuple[bytes, bytes, int], list[int]
+        ] = defaultdict(list)
+        for annotated_index, annotated_orf in enumerate(annotated_orfs):
+            first_bin = annotated_orf.genomic_start // ANNOTATION_BIN_SIZE
+            last_bin = (annotated_orf.genomic_end - 1) // ANNOTATION_BIN_SIZE
+            for bin_number in range(first_bin, last_bin + 1):
+                mutable_bins[
+                    (annotated_orf.chrom, annotated_orf.strand, bin_number)
+                ].append(annotated_index)
+
         return cls(
             transcripts=transcripts,
             gene_first_order=gene_first_order,
             gene_last_order=gene_last_order,
-            morf_keys_by_gene=dict(morf_keys_by_gene),
+            annotated_orfs=tuple(annotated_orfs),
+            annotated_bins={
+                key: tuple(values) for key, values in mutable_bins.items()
+            },
             safe_cut_after=tuple(safe_cut_after),
             transcript_count=annotation_order,
         )
@@ -288,6 +374,63 @@ class AnnotationIndex:
         if not text:
             return ()
         return tuple(int(item) for item in text.split(b",") if item)
+
+    @staticmethod
+    def _block_offsets(
+        blocks: Sequence[tuple[int, int]],
+        strand: bytes,
+    ) -> tuple[int, ...]:
+        """Return translation offsets aligned to genomic-order blocks."""
+        lengths = [end - start for start, end in blocks]
+        offsets = [0] * len(lengths)
+        running = 0
+        indices = (
+            range(len(lengths))
+            if strand == b"+"
+            else range(len(lengths) - 1, -1, -1)
+        )
+        for index in indices:
+            offsets[index] = running
+            running += lengths[index]
+        return tuple(offsets)
+
+    def overlapping_annotated_orfs(
+        self,
+        candidate: "Candidate",
+    ) -> Iterator[AnnotatedORF]:
+        """Yield unique annotated ORFs overlapping a candidate span."""
+        span_first_bin = candidate.blocks[0][0] // ANNOTATION_BIN_SIZE
+        span_last_bin = (
+            candidate.blocks[-1][1] - 1
+        ) // ANNOTATION_BIN_SIZE
+        if span_first_bin == span_last_bin:
+            indices: Iterable[int] = self.annotated_bins.get(
+                (candidate.chrom, candidate.strand, span_first_bin),
+                (),
+            )
+        else:
+            unique_indices: set[int] = set()
+            for block_start, block_end in candidate.blocks:
+                first_bin = block_start // ANNOTATION_BIN_SIZE
+                last_bin = (block_end - 1) // ANNOTATION_BIN_SIZE
+                for bin_number in range(first_bin, last_bin + 1):
+                    unique_indices.update(
+                        self.annotated_bins.get(
+                            (candidate.chrom, candidate.strand, bin_number),
+                            (),
+                        )
+                    )
+            indices = unique_indices
+
+        candidate_start = candidate.blocks[0][0]
+        candidate_end = candidate.blocks[-1][1]
+        for annotated_index in indices:
+            annotated_orf = self.annotated_orfs[annotated_index]
+            if (
+                annotated_orf.genomic_start < candidate_end
+                and annotated_orf.genomic_end > candidate_start
+            ):
+                yield annotated_orf
 
     def is_safe_cut(self, annotation_order: int) -> bool:
         """Return whether no gene spans the cut after one transcript order."""
@@ -366,7 +509,7 @@ class _ColumnPlan:
 
         filter_header = list(input_header)
         filter_lookup = dict(lookup)
-        for name in FILTER_COLUMNS:
+        for name in (*FILTER_COLUMNS, *ANNOTATED_OVERLAP_COLUMNS):
             if name not in filter_lookup:
                 filter_lookup[name] = len(filter_header)
                 filter_header.append(name)
@@ -615,6 +758,7 @@ class ClusterSummary:
     input_orfs: int = 0
     basic_passed: int = 0
     basic_removed: int = 0
+    annotated_overlap_removed: int = 0
     lnc_morf_removed: int = 0
     exact_duplicates_collapsed: int = 0
     alt_starts_collapsed: int = 0
@@ -631,6 +775,7 @@ class ClusterSummary:
         self.input_orfs += other.input_orfs
         self.basic_passed += other.basic_passed
         self.basic_removed += other.basic_removed
+        self.annotated_overlap_removed += other.annotated_overlap_removed
         self.lnc_morf_removed += other.lnc_morf_removed
         self.exact_duplicates_collapsed += other.exact_duplicates_collapsed
         self.alt_starts_collapsed += other.alt_starts_collapsed
@@ -858,6 +1003,10 @@ class _ClusterEngine:
         self.i_structure = lookup[b"structure_status"]
         self.i_filter_status = lookup[b"filter_status"]
         self.i_filter_reason = lookup[b"filter_reason"]
+        self.i_matched_annotated = lookup[b"matched_annotated_orf_id"]
+        self.i_annotated_relation = lookup[b"annotated_overlap_relation"]
+        self.i_annotated_overlap_nt = lookup[b"annotated_overlap_nt"]
+        self.i_annotated_overlap_codon = lookup[b"annotated_overlap_codon"]
 
     @staticmethod
     def _parse_int(value: bytes) -> int | None:
@@ -1260,33 +1409,184 @@ class _ClusterEngine:
             candidate.orf_id,
         )
 
-    def _remove_lnc_morf_matches(
+    @staticmethod
+    def _phase_compatible_overlap(
+        candidate: Candidate,
+        annotated_orf: AnnotatedORF,
+    ) -> AnnotatedOverlap | None:
+        """Require every shared segment to use one genomic coding phase."""
+        candidate_offsets = AnnotationIndex._block_offsets(
+            candidate.blocks,
+            candidate.strand,
+        )
+        candidate_index = 0
+        annotated_index = 0
+        overlap_nt = 0
+        overlap_codon = 0
+
+        while (
+            candidate_index < len(candidate.blocks)
+            and annotated_index < len(annotated_orf.blocks)
+        ):
+            candidate_start, candidate_end = candidate.blocks[candidate_index]
+            annotated_start, annotated_end = annotated_orf.blocks[
+                annotated_index
+            ]
+            shared_start = max(candidate_start, annotated_start)
+            shared_end = min(candidate_end, annotated_end)
+
+            if shared_end > shared_start:
+                shared_length = shared_end - shared_start
+                if candidate.strand == b"+":
+                    candidate_offset = (
+                        candidate_offsets[candidate_index]
+                        + shared_start
+                        - candidate_start
+                    )
+                    annotated_offset = (
+                        annotated_orf.block_offsets[annotated_index]
+                        + shared_start
+                        - annotated_start
+                    )
+                else:
+                    candidate_offset = (
+                        candidate_offsets[candidate_index]
+                        + candidate_end
+                        - shared_end
+                    )
+                    annotated_offset = (
+                        annotated_orf.block_offsets[annotated_index]
+                        + annotated_end
+                        - shared_end
+                    )
+
+                if (candidate_offset - annotated_offset) % 3 != 0:
+                    return None
+
+                overlap_nt += shared_length
+                skip_to_codon = (-candidate_offset) % 3
+                available = shared_length - skip_to_codon
+                if available >= 3:
+                    overlap_codon += available // 3
+
+            if candidate_end <= annotated_end:
+                candidate_index += 1
+            if annotated_end <= candidate_end:
+                annotated_index += 1
+
+        if overlap_nt == 0 or overlap_codon == 0:
+            return None
+
+        candidate_length = sum(end - start for start, end in candidate.blocks)
+        if candidate.blocks == annotated_orf.blocks:
+            relation = b"matches_annotated_ORF"
+        elif overlap_nt == candidate_length:
+            relation = b"contained_in_annotated_ORF_same_frame"
+        elif overlap_nt == annotated_orf.nt_length:
+            relation = b"extends_annotated_ORF_same_frame"
+        else:
+            relation = b"partial_overlap_annotated_ORF_same_frame"
+
+        return AnnotatedOverlap(
+            annotated_orf=annotated_orf,
+            relation=relation,
+            overlap_nt=overlap_nt,
+            overlap_codon=overlap_codon,
+        )
+
+    def _best_annotated_overlap(
         self,
-        gene_id: bytes,
+        candidate: Candidate,
+    ) -> AnnotatedOverlap | None:
+        """Return the strongest global annotated-ORF overlap match."""
+        if candidate.category in ANNOTATED_CATEGORIES:
+            return None
+
+        relation_rank = {
+            b"matches_annotated_ORF": 0,
+            b"contained_in_annotated_ORF_same_frame": 1,
+            b"extends_annotated_ORF_same_frame": 2,
+            b"partial_overlap_annotated_ORF_same_frame": 3,
+        }
+        best_match: AnnotatedOverlap | None = None
+        best_rank: tuple[Any, ...] | None = None
+        for annotated_orf in self.annotation.overlapping_annotated_orfs(
+            candidate
+        ):
+            match = self._phase_compatible_overlap(candidate, annotated_orf)
+            if match is None:
+                continue
+            rank = (
+                relation_rank[match.relation],
+                annotated_orf.gene_id != candidate.gene_id,
+                -match.overlap_codon,
+                -match.overlap_nt,
+                annotated_orf.annotated_orf_id,
+            )
+            if best_rank is None or rank < best_rank:
+                best_rank = rank
+                best_match = match
+        return best_match
+
+    def _remove_annotated_overlaps(
+        self,
         candidates: list[Candidate],
         summary: ClusterSummary,
         writer: _ShardWriter,
     ) -> list[Candidate]:
-        morf_keys = self.annotation.morf_keys_by_gene.get(gene_id)
-        if not morf_keys:
-            return candidates
+        """Remove non-annotated ORFs sharing translated codons with mORFs."""
         retained: list[Candidate] = []
+        overlap_cache: dict[
+            tuple[
+                bytes,
+                bytes,
+                bytes,
+                tuple[tuple[int, int], ...],
+            ],
+            AnnotatedOverlap | None,
+        ] = {}
         for candidate in candidates:
-            if (
-                candidate.source_strand == b"sense"
-                and candidate.category == b"lncORF"
-                and candidate.morf_key in morf_keys
-            ):
-                fields = list(candidate.fields)
-                fields[self.i_filter_status] = b"FAIL"
-                fields[self.i_filter_reason] = b"lncORF_matches_annotated_mORF"
-                writer.write_removed(fields)
-                summary.lnc_morf_removed += 1
-                summary.removal_reasons[
-                    "lncORF_matches_annotated_mORF"
-                ] += 1
-            else:
+            if candidate.category in ANNOTATED_CATEGORIES:
                 retained.append(candidate)
+                continue
+            cache_key = (
+                candidate.gene_id,
+                candidate.chrom,
+                candidate.strand,
+                candidate.blocks,
+            )
+            if cache_key in overlap_cache:
+                match = overlap_cache[cache_key]
+            else:
+                match = self._best_annotated_overlap(candidate)
+                overlap_cache[cache_key] = match
+            if match is None:
+                retained.append(candidate)
+                continue
+
+            fields = list(candidate.fields)
+            fields[self.i_filter_status] = b"FAIL"
+            fields[self.i_filter_reason] = match.relation
+            fields[self.i_matched_annotated] = (
+                match.annotated_orf.annotated_orf_id
+            )
+            fields[self.i_annotated_relation] = match.relation
+            fields[self.i_annotated_overlap_nt] = str(
+                match.overlap_nt
+            ).encode("ascii")
+            fields[self.i_annotated_overlap_codon] = str(
+                match.overlap_codon
+            ).encode("ascii")
+            writer.write_removed(fields)
+
+            reason = match.relation.decode("ascii")
+            summary.annotated_overlap_removed += 1
+            summary.removal_reasons[reason] += 1
+            if (
+                candidate.category == b"lncORF"
+                and match.relation == b"matches_annotated_ORF"
+            ):
+                summary.lnc_morf_removed += 1
         return retained
 
     def _deduplicate_exact(
@@ -1574,10 +1874,9 @@ class _ClusterEngine:
             writer=writer,
         )
         local_family_number = 0
-        for gene_id, candidates in self._iter_gene_groups(transcript_groups):
+        for _gene_id, candidates in self._iter_gene_groups(transcript_groups):
             summary.genes_processed += 1
-            candidates = self._remove_lnc_morf_matches(
-                gene_id,
+            candidates = self._remove_annotated_overlaps(
                 candidates,
                 summary,
                 writer,
@@ -1875,9 +2174,13 @@ class SmORFCluster:
                 "input_orfs": summary.input_orfs,
                 "basic_passed": summary.basic_passed,
                 "basic_removed": summary.basic_removed,
+                "annotated_overlap_removed": (
+                    summary.annotated_overlap_removed
+                ),
                 "lnc_morf_removed": summary.lnc_morf_removed,
                 "post_annotation_retained": (
-                    summary.basic_passed - summary.lnc_morf_removed
+                    summary.basic_passed
+                    - summary.annotated_overlap_removed
                 ),
                 "exact_duplicates_collapsed": summary.exact_duplicates_collapsed,
                 "alt_starts_collapsed": summary.alt_starts_collapsed,
