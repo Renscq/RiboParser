@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "RiboParser"
-version = "0.3.2"
+version = "0.3.3"
 authors = [{ name = "Ren Shuchao", email = "rensc0718@163.com" }]
 description = "A pipeline for ribosome profiling data analysis"
 readme = "README.md"
@@ -81,9 +81,8 @@ serp_properties = "utils.serp_properties:main"
 # smORF
 smorf_scanner = "utils.smorf_scanner:main"
 smorf_cluster = "utils.smorf_cluster:main"
-smorf_filter = "utils.smorf_filter:main"
 smorf_evidence = "utils.smorf_evidence:main"
-smorf_integrate = "utils.smorf_integrate:main"
+smorf_quant = "utils.smorf_quant:main"
 
 # bedgraph
 bg2meta = "scripts.bedgraph.bg2meta:main"

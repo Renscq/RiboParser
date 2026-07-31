@@ -3,10 +3,10 @@
 
 # Author: Rensc
 # Date: 2026-07-31
-# Version: 0.2.8.24-dev.015
+# Version: 0.2.8.24-dev.016
 # Function: Evaluate family evidence while separating calibration controls.
-# Input: smorf_cluster family tables, source ORF table, and density design table.
-# Output: Family evidence, non-annotated reliable smORFs, summary, and log.
+# Input: Family tables, scanner ORF table/genePred, and density design table.
+# Output: Family evidence, reliable smORFs/genePred, summary, and log.
 
 """Bottom-up family-aware smORF evidence engine.
 
@@ -49,7 +49,7 @@ from utils.smorf.smorf_riboseq_density import (
     prepare_density,
 )
 
-ENGINE_VERSION: Final[str] = "0.2.8.24-dev.015"
+ENGINE_VERSION: Final[str] = "0.2.8.24-dev.016"
 SCHEMA_VERSION: Final[int] = 4
 STOP_CODONS: Final[frozenset[str]] = frozenset({"TAA", "TAG", "TGA"})
 ANNOTATED_CATEGORIES: Final[frozenset[str]] = frozenset(
@@ -240,6 +240,7 @@ class EngineResult:
 
     master_output: str
     reliable_output: str
+    reliable_genepred_output: str
     summary_output: str
     total_families: int
     reliable_families: int
@@ -370,6 +371,7 @@ def _run_signature(args: object, tracks: Sequence[DensityTrack]) -> str:
         "family_table": _file_signature(args.family_table),
         "family_members": _file_signature(args.family_members),
         "orf_source": _file_signature(args.orf_source),
+        "orf_genepred": _file_signature(args.orf_genepred),
         "tracks": [_file_signature(track.path) for track in tracks],
     }
     options = {
@@ -2625,6 +2627,128 @@ def _process_chromosome(task: ChromosomeTask) -> ChromosomeResult:
     )
 
 
+def _reliable_matches(
+    connection: sqlite3.Connection,
+    orf_ids: Sequence[str],
+) -> dict[str, int]:
+    """Return reliable-index match states for one genePred input batch."""
+    unique_ids = tuple(dict.fromkeys(orf_ids))
+    matches: dict[str, int] = {}
+    query_size = 800
+    for start in range(0, len(unique_ids), query_size):
+        chunk = unique_ids[start : start + query_size]
+        placeholders = ",".join("?" for _ in chunk)
+        query = (
+            "SELECT orf_id, matched FROM reliable_export "
+            f"WHERE orf_id IN ({placeholders})"
+        )
+        for row in connection.execute(query, chunk):
+            matches[str(row["orf_id"])] = int(row["matched"])
+    return matches
+
+
+def _export_reliable_genepred(
+    source_path: str | Path,
+    temporary_path: Path,
+    connection: sqlite3.Connection,
+) -> int:
+    """Filter scanner genePred records using the validated Reliable ID index."""
+    expected = int(
+        connection.execute(
+            "SELECT COUNT(*) FROM reliable_export"
+        ).fetchone()[0]
+    )
+    if expected == 0:
+        temporary_path.write_text("", encoding="utf-8")
+        return 0
+
+    duplicate_count = 0
+    duplicate_examples: list[str] = []
+    batch: list[tuple[str, str, int]] = []
+    batch_size = 25_000
+
+    def flush_batch(output_handle: TextIO) -> None:
+        nonlocal duplicate_count
+        if not batch:
+            return
+        matches = _reliable_matches(
+            connection,
+            [orf_id for orf_id, _line, _number in batch],
+        )
+        newly_matched: set[str] = set()
+        for orf_id, raw_line, line_number in batch:
+            matched = matches.get(orf_id)
+            if matched is None:
+                continue
+            if matched or orf_id in newly_matched:
+                duplicate_count += 1
+                if len(duplicate_examples) < 10:
+                    duplicate_examples.append(
+                        f"{orf_id}@line{line_number}"
+                    )
+                continue
+            if len(raw_line.rstrip("\r\n").split("\t")) < 10:
+                raise EvidenceEngineError(
+                    "Reliable genePred record has fewer than 10 columns at "
+                    f"line {line_number}: {orf_id}"
+                )
+            output_handle.write(raw_line)
+            if not raw_line.endswith(("\n", "\r")):
+                output_handle.write("\n")
+            newly_matched.add(orf_id)
+        if newly_matched:
+            connection.executemany(
+                "UPDATE reliable_export SET matched=1 WHERE orf_id=?",
+                ((orf_id,) for orf_id in newly_matched),
+            )
+        batch.clear()
+
+    with _smart_open(source_path, "rt") as source, temporary_path.open(
+        "w",
+        encoding="utf-8",
+        buffering=8 * 1024 * 1024,
+    ) as target:
+        for line_number, raw_line in enumerate(source, start=1):
+            if raw_line.startswith("#"):
+                flush_batch(target)
+                target.write(raw_line)
+                continue
+            text = raw_line.rstrip("\r\n")
+            if not text:
+                continue
+            orf_id = text.split("\t", 1)[0]
+            batch.append((orf_id, raw_line, line_number))
+            if len(batch) >= batch_size:
+                flush_batch(target)
+        flush_batch(target)
+
+    if duplicate_count:
+        raise EvidenceEngineError(
+            "Scanner genePred contains duplicate records for "
+            f"{duplicate_count:,} Reliable ORF occurrence(s). Examples: "
+            + ", ".join(duplicate_examples)
+        )
+
+    missing_count = int(
+        connection.execute(
+            "SELECT COUNT(*) FROM reliable_export WHERE matched=0"
+        ).fetchone()[0]
+    )
+    if missing_count:
+        examples = [
+            str(row[0])
+            for row in connection.execute(
+                "SELECT orf_id FROM reliable_export "
+                "WHERE matched=0 ORDER BY orf_id LIMIT 10"
+            )
+        ]
+        raise EvidenceEngineError(
+            f"Scanner genePred is missing {missing_count:,} Reliable ORF(s). "
+            "Examples: " + ", ".join(examples)
+        )
+    return expected
+
+
 def _merge_outputs(
     output_prefix: Path,
     chromosome_results: Sequence[ChromosomeResult],
@@ -2632,24 +2756,24 @@ def _merge_outputs(
     config: EngineConfig,
     sample_count: int,
     effective_workers: int,
+    orf_genepred: str | Path,
+    logger: _StageLogger | None = None,
 ) -> EngineResult:
-    """Merge chromosome shards into three focused outputs."""
+    """Merge evidence and atomically export the reliable ORF annotation."""
     master_path = Path(str(output_prefix) + ".smorf_evidence.txt.gz")
     reliable_path = Path(str(output_prefix) + ".reliable_smorf.txt")
+    genepred_path = Path(str(output_prefix) + ".reliable_smorf.genepred")
     summary_path = Path(str(output_prefix) + ".evidence_summary.txt")
     master_tmp = master_path.with_name(master_path.name + ".tmp")
     reliable_tmp = reliable_path.with_name(reliable_path.name + ".tmp")
-
-    with gzip.open(master_tmp, "wt", encoding="utf-8", compresslevel=1) as handle:
-        handle.write("\t".join(_output_columns()) + "\n")
-    with master_tmp.open("ab") as target:
-        for result in chromosome_results:
-            with Path(result.part_path).open("rb") as source:
-                shutil.copyfileobj(source, target, length=16 * 1024 * 1024)
-    os.replace(master_tmp, master_path)
-
-    connection = sqlite3.connect(database_path)
-    connection.row_factory = sqlite3.Row
+    genepred_tmp = genepred_path.with_name(genepred_path.name + ".tmp")
+    summary_tmp = summary_path.with_name(summary_path.name + ".tmp")
+    temporary_paths = (
+        master_tmp,
+        reliable_tmp,
+        genepred_tmp,
+        summary_tmp,
+    )
     reliable_columns = (
         "family_id", "gene_id", "chrom", "strand", "category",
         "family_type", "family_size", "structural_primary",
@@ -2661,12 +2785,40 @@ def _merge_outputs(
     )
     reliable_smorfs_written = 0
     annotated_controls_excluded = 0
+    reliable_genepred_records = 0
+    connection: sqlite3.Connection | None = None
     try:
+        with gzip.open(
+            master_tmp,
+            "wt",
+            encoding="utf-8",
+            compresslevel=1,
+        ) as handle:
+            handle.write("\t".join(_output_columns()) + "\n")
+        with master_tmp.open("ab") as target:
+            for result in chromosome_results:
+                with Path(result.part_path).open("rb") as source:
+                    shutil.copyfileobj(
+                        source,
+                        target,
+                        length=16 * 1024 * 1024,
+                    )
+
+        connection = sqlite3.connect(database_path)
+        connection.row_factory = sqlite3.Row
+        connection.execute(
+            """
+            CREATE TEMP TABLE reliable_export (
+                orf_id TEXT PRIMARY KEY,
+                matched INTEGER NOT NULL DEFAULT 0
+            ) WITHOUT ROWID
+            """
+        )
         with reliable_tmp.open(
             "w", encoding="utf-8", buffering=8 * 1024 * 1024
         ) as output_handle:
             output_handle.write("\t".join(reliable_columns) + "\n")
-            with gzip.open(master_path, "rt", encoding="utf-8") as input_handle:
+            with gzip.open(master_tmp, "rt", encoding="utf-8") as input_handle:
                 reader = csv.DictReader(input_handle, delimiter="\t")
                 for row in reader:
                     if not (
@@ -2687,10 +2839,24 @@ def _merge_outputs(
                         (row["evidence_primary"],),
                     ).fetchone()
                     if geometry is None:
-                        continue
+                        raise EvidenceEngineError(
+                            "Reliable evidence primary is absent from the "
+                            f"geometry index: {row['evidence_primary']}"
+                        )
                     if _is_annotated_category(geometry["category"]):
                         annotated_controls_excluded += 1
                         continue
+                    try:
+                        connection.execute(
+                            "INSERT INTO reliable_export (orf_id) VALUES (?)",
+                            (row["evidence_primary"],),
+                        )
+                    except sqlite3.IntegrityError as error:
+                        raise EvidenceEngineError(
+                            "One ORF is the evidence primary of multiple "
+                            "reliable families: "
+                            f"{row['evidence_primary']}"
+                        ) from error
                     output = {
                         **row,
                         "transcript_id": geometry["transcript_id"],
@@ -2702,91 +2868,144 @@ def _merge_outputs(
                         "exon_ends": geometry["exon_ends"],
                     }
                     output_handle.write(
-                        "\t".join(_format_value(output.get(column, "")) for column in reliable_columns)
+                        "\t".join(
+                            _format_value(output.get(column, ""))
+                            for column in reliable_columns
+                        )
                         + "\n"
                     )
                     reliable_smorfs_written += 1
+        connection.commit()
+
+        if logger is not None:
+            logger.write(
+                "Stage6: Export reliable smORF genePred annotation."
+            )
+        reliable_genepred_records = _export_reliable_genepred(
+            source_path=orf_genepred,
+            temporary_path=genepred_tmp,
+            connection=connection,
+        )
+        if reliable_genepred_records != reliable_smorfs_written:
+            raise EvidenceEngineError(
+                "Reliable output and genePred record counts differ: "
+                f"table={reliable_smorfs_written:,}, "
+                f"genePred={reliable_genepred_records:,}."
+            )
+
+        totals = {
+            "total_families": sum(
+                item.total_families for item in chromosome_results
+            ),
+            "reliable_families": sum(
+                item.reliable_families for item in chromosome_results
+            ),
+            "uncertain_families": sum(
+                item.uncertain_families for item in chromosome_results
+            ),
+            "no_evidence_families": sum(
+                item.no_evidence_families for item in chromosome_results
+            ),
+            "reliable_smorfs": reliable_smorfs_written,
+            "invalid_families": sum(
+                item.invalid_families for item in chromosome_results
+            ),
+        }
+        evidence_counts: dict[str, int] = defaultdict(int)
+        reason_counts: dict[str, int] = defaultdict(int)
+        replicated_signal_families = 0
+        with gzip.open(master_tmp, "rt", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle, delimiter="\t")
+            for row in reader:
+                evidence_counts[row.get("best_sample_evidence", "")] += 1
+                reason_counts[row.get("reliability_reason", "")] += 1
+                try:
+                    supported = int(
+                        row.get("supported_sample_count", "0") or 0
+                    )
+                    if supported >= config.reliable_sample:
+                        replicated_signal_families += 1
+                except ValueError:
+                    pass
+
+        with summary_tmp.open("w", encoding="utf-8") as handle:
+            handle.write("metric\tvalue\n")
+            handle.write(f"engine_version\t{ENGINE_VERSION}\n")
+            handle.write(f"sample_count\t{sample_count}\n")
+            handle.write(f"effective_workers\t{effective_workers}\n")
+            for key, value in totals.items():
+                handle.write(f"{key}\t{value}\n")
+            handle.write(
+                "reliable_genepred_records\t"
+                f"{reliable_genepred_records}\n"
+            )
+            handle.write(
+                "annotated_controls_excluded_from_reliable_smorf\t"
+                f"{annotated_controls_excluded}\n"
+            )
+            handle.write(
+                "reliable_family_definition\t"
+                "Medium/High common-body evidence in at least "
+                f"{config.reliable_sample} independent samples\n"
+            )
+            handle.write(
+                "reliable_smorf_definition\t"
+                "Reliable family with a singleton start or replicated "
+                "contiguous alternative-start extension support\n"
+            )
+            handle.write(
+                "uncertain_definition\t"
+                "Signal without sufficient independent-sample replication, "
+                "localized long-ORF signal, or invalid family geometry\n"
+            )
+            handle.write(f"evidence_mode\t{config.evidence_mode}\n")
+            handle.write(f"group_column\t{config.group_column}\n")
+            handle.write(f"reliable_sample\t{config.reliable_sample}\n")
+            handle.write(f"short_max_codons\t{config.short_max_codons}\n")
+            handle.write(f"long_min_codons\t{config.long_min_codons}\n")
+            handle.write(f"window_codons\t{config.window_codons}\n")
+            handle.write(f"window_step_codons\t{config.window_step_codons}\n")
+            handle.write(f"min_supported_windows\t{config.min_supported_windows}\n")
+            handle.write(f"min_window_gap_codons\t{config.min_window_gap_codons}\n")
+            handle.write(f"min_signal_span\t{config.min_signal_span}\n")
+            handle.write(f"localized_span_max\t{config.localized_span_max}\n")
+            handle.write(
+                "localized_top_window_fraction\t"
+                f"{config.localized_top_window_fraction}\n"
+            )
+            handle.write(f"boundary_codons\t{config.boundary_codons}\n")
+            handle.write(
+                f"families_with_replicated_medium_high_support\t"
+                f"{replicated_signal_families}\n"
+            )
+            for label, count in sorted(evidence_counts.items()):
+                handle.write(
+                    f"best_sample_evidence_{label or 'NA'}\t{count}\n"
+                )
+            for reason, count in sorted(reason_counts.items()):
+                handle.write(
+                    f"reliability_reason_{reason or 'NA'}\t{count}\n"
+                )
+    except BaseException:
+        for path in temporary_paths:
+            path.unlink(missing_ok=True)
+        raise
     finally:
-        connection.close()
-    os.replace(reliable_tmp, reliable_path)
+        if connection is not None:
+            connection.close()
 
-    totals = {
-        "total_families": sum(item.total_families for item in chromosome_results),
-        "reliable_families": sum(item.reliable_families for item in chromosome_results),
-        "uncertain_families": sum(item.uncertain_families for item in chromosome_results),
-        "no_evidence_families": sum(item.no_evidence_families for item in chromosome_results),
-        "reliable_smorfs": reliable_smorfs_written,
-        "invalid_families": sum(item.invalid_families for item in chromosome_results),
-    }
-    evidence_counts: dict[str, int] = defaultdict(int)
-    reason_counts: dict[str, int] = defaultdict(int)
-    replicated_signal_families = 0
-    with gzip.open(master_path, "rt", encoding="utf-8") as handle:
-        reader = csv.DictReader(handle, delimiter="\t")
-        for row in reader:
-            evidence_counts[row.get("best_sample_evidence", "")] += 1
-            reason_counts[row.get("reliability_reason", "")] += 1
-            try:
-                if int(row.get("supported_sample_count", "0") or 0) >= config.reliable_sample:
-                    replicated_signal_families += 1
-            except ValueError:
-                pass
-
-    with summary_path.open("w", encoding="utf-8") as handle:
-        handle.write("metric\tvalue\n")
-        handle.write(f"engine_version\t{ENGINE_VERSION}\n")
-        handle.write(f"sample_count\t{sample_count}\n")
-        handle.write(f"effective_workers\t{effective_workers}\n")
-        for key, value in totals.items():
-            handle.write(f"{key}\t{value}\n")
-        handle.write(
-            "annotated_controls_excluded_from_reliable_smorf\t"
-            f"{annotated_controls_excluded}\n"
-        )
-        handle.write(
-            "reliable_family_definition\t"
-            f"Medium/High common-body evidence in at least {config.reliable_sample} independent samples\n"
-        )
-        handle.write(
-            "reliable_smorf_definition\t"
-            "Reliable family with a singleton start or replicated contiguous alternative-start extension support\n"
-        )
-        handle.write(
-            "uncertain_definition\t"
-            "Signal without sufficient independent-sample replication, localized long-ORF signal, or invalid family geometry\n"
-        )
-        handle.write(f"evidence_mode\t{config.evidence_mode}\n")
-        handle.write(f"group_column\t{config.group_column}\n")
-        handle.write(f"reliable_sample\t{config.reliable_sample}\n")
-        handle.write(f"short_max_codons\t{config.short_max_codons}\n")
-        handle.write(f"long_min_codons\t{config.long_min_codons}\n")
-        handle.write(f"window_codons\t{config.window_codons}\n")
-        handle.write(f"window_step_codons\t{config.window_step_codons}\n")
-        handle.write(f"min_supported_windows\t{config.min_supported_windows}\n")
-        handle.write(f"min_window_gap_codons\t{config.min_window_gap_codons}\n")
-        handle.write(f"min_signal_span\t{config.min_signal_span}\n")
-        handle.write(f"localized_span_max\t{config.localized_span_max}\n")
-        handle.write(
-            "localized_top_window_fraction\t"
-            f"{config.localized_top_window_fraction}\n"
-        )
-        handle.write(f"boundary_codons\t{config.boundary_codons}\n")
-        handle.write(
-            f"families_with_replicated_medium_high_support\t"
-            f"{replicated_signal_families}\n"
-        )
-        for label, count in sorted(evidence_counts.items()):
-            handle.write(
-                f"best_sample_evidence_{label or 'NA'}\t{count}\n"
-            )
-        for reason, count in sorted(reason_counts.items()):
-            handle.write(
-                f"reliability_reason_{reason or 'NA'}\t{count}\n"
-            )
+    for temporary, final in (
+        (master_tmp, master_path),
+        (reliable_tmp, reliable_path),
+        (genepred_tmp, genepred_path),
+        (summary_tmp, summary_path),
+    ):
+        os.replace(temporary, final)
 
     return EngineResult(
         master_output=str(master_path),
         reliable_output=str(reliable_path),
+        reliable_genepred_output=str(genepred_path),
         summary_output=str(summary_path),
         sample_count=sample_count,
         effective_workers=effective_workers,
@@ -2972,6 +3191,8 @@ def run_family_evidence_engine(args: object) -> EngineResult:
             config,
             sample_count=len({track.sample for track in tracks}),
             effective_workers=workers,
+            orf_genepred=args.orf_genepred,
+            logger=logger,
         )
         logger.write(
             "Completed: total={total:,}, reliable={reliable:,}, uncertain={uncertain:,}, no_evidence={none:,}.".format(

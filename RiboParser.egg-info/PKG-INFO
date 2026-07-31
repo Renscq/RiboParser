@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: RiboParser
-Version: 0.3.2
+Version: 0.3.3
 Summary: A pipeline for ribosome profiling data analysis
 Author-email: Ren Shuchao <rensc0718@163.com>
 License-Expression: GPL-3.0-or-later

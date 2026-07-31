@@ -101,6 +101,7 @@ utils/smorf_cluster.py
 utils/smorf_evidence.py
 utils/smorf_filter.py
 utils/smorf_integrate.py
+utils/smorf_quant.py
 utils/smorf_scanner.py
 utils/data/RiboParser.py
 utils/ribo/ArgsParser.py
@@ -150,6 +151,7 @@ utils/smorf/smorf_kozak.py
 utils/smorf/smorf_models.py
 utils/smorf/smorf_overlap.py
 utils/smorf/smorf_pipeline.py
+utils/smorf/smorf_quant.py
 utils/smorf/smorf_riboseq_adaptive.py
 utils/smorf/smorf_riboseq_constants.py
 utils/smorf/smorf_riboseq_density.py
