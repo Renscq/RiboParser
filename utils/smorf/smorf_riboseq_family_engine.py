@@ -2,18 +2,19 @@
 # -*- coding: utf-8 -*-
 
 # Author: Rensc
-# Date: 2026-07-31
-# Version: 0.2.8.24-dev.016
-# Function: Evaluate family evidence while separating calibration controls.
+# Date: 2026-08-01
+# Version: dev022
+# Function: Resolve candidate-first translation units and audit ORF phase.
 # Input: Family tables, scanner ORF table/genePred, and density design table.
-# Output: Family evidence, reliable smORFs/genePred, summary, and log.
+# Output: Family evidence, reliable smORFs/genePred, and summary.
 
 """Bottom-up family-aware smORF evidence engine.
 
 The engine deliberately avoids the previous representative-by-unit workflow.
 It builds a SQLite family index, caches each density track once, evaluates one
-family scaffold per sample, derives project reliability from independent sample support across all
-sample groups, and resolves alternative starts from replicated extension evidence.
+family scaffold per sample, derives project reliability from independent sample
+support across all sample groups, and resolves translated extents without
+requiring every adjacent alternative-start segment to pass independently.
 
 Only standard-library modules, NumPy, and the existing RiboParser density reader
 are required. A malformed family is recorded as uncertain instead of aborting
@@ -32,7 +33,6 @@ import os
 import shutil
 import sqlite3
 import tempfile
-import traceback
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, replace
@@ -49,8 +49,7 @@ from utils.smorf.smorf_riboseq_density import (
     prepare_density,
 )
 
-ENGINE_VERSION: Final[str] = "0.2.8.24-dev.016"
-SCHEMA_VERSION: Final[int] = 4
+SCHEMA_VERSION: Final[int] = 9
 STOP_CODONS: Final[frozenset[str]] = frozenset({"TAA", "TAG", "TGA"})
 ANNOTATED_CATEGORIES: Final[frozenset[str]] = frozenset(
     {"annotated_orf", "annotated_morf"}
@@ -87,7 +86,27 @@ ADVANCED_DEFAULTS: Final[dict[str, float | int]] = {
     "localized_span_max": 0.20,
     "localized_top_window_fraction": 0.70,
     "boundary_codons": 5,
+    "extent_bins": 5,
+    "min_extent_bins": 3,
+    "start_resolution_codons": 5,
+    "min_frame_margin": 0.10,
+    "leading_window_codons": 20,
+    "min_exclusion_codons": 10,
+    "silent_extension_density_ratio": 0.20,
+    "noncanonical_min_exclusive_codons": 8,
+    "noncanonical_override_density_ratio": 0.75,
+    "noncanonical_override_min_coverage_ratio": 0.50,
+    "noncanonical_override_min_frame_margin": 0.25,
+    "nested_min_frame_margin": 0.15,
+    "nested_min_phase_rpf": 10.0,
+    "high_overlap_fraction": 0.70,
+    "overlap_min_frame_margin": 0.25,
+    "overlap_min_phase_rpf": 15.0,
 }
+SHORT_MODEL_FLOOR: Final[int] = 20
+SHORT_MODEL_CEILING: Final[int] = 30
+LONG_MODEL_FLOOR: Final[int] = 90
+LONG_MODEL_CEILING: Final[int] = 100
 TARGET_LENGTH_CATEGORIES: Final[frozenset[str]] = frozenset(
     {"uorf", "dorf", "lncorf"}
 )
@@ -148,6 +167,24 @@ class EngineConfig:
     localized_span_max: float = 0.20
     localized_top_window_fraction: float = 0.70
     boundary_codons: int = 5
+    extent_bins: int = 5
+    min_extent_bins: int = 3
+    start_resolution_codons: int = 5
+    min_frame_margin: float = 0.10
+    leading_window_codons: int = 20
+    min_exclusion_codons: int = 10
+    silent_extension_density_ratio: float = 0.20
+    noncanonical_min_exclusive_codons: int = 8
+    noncanonical_override_density_ratio: float = 0.75
+    noncanonical_override_min_coverage_ratio: float = 0.50
+    noncanonical_override_min_frame_margin: float = 0.25
+    nested_min_frame_margin: float = 0.15
+    nested_min_phase_rpf: float = 10.0
+    high_overlap_fraction: float = 0.70
+    overlap_min_frame_margin: float = 0.25
+    overlap_min_phase_rpf: float = 15.0
+    estimated_short_max_codons: int = 30
+    estimated_long_min_codons: int = 100
     hidden_overrides: frozenset[str] = frozenset()
 
     positive_quantile: float = 0.20
@@ -171,6 +208,8 @@ class RepresentativeGeometry:
     starts: tuple[int, ...]
     ends: tuple[int, ...]
     start_offset: int
+    stop_codon: str = "TGA"
+    completeness: str = "complete"
 
 
 @dataclass(frozen=True, slots=True)
@@ -234,6 +273,270 @@ class SegmentFeatures:
     score: float
 
 
+class ScaffoldProfile:
+    """Store prefix-indexed codon and frame profiles for one family/sample."""
+
+    __slots__ = (
+        "codon_count",
+        "codon_prefix",
+        "covered_prefix",
+        "frame_prefixes",
+        "nonzero_codons",
+    )
+
+    def __init__(
+        self,
+        positions: np.ndarray,
+        values: np.ndarray,
+        coding_nt_length: int,
+    ) -> None:
+        self.codon_count = max(0, int(coding_nt_length) // 3)
+        valid = (
+            (positions >= 0)
+            & (positions < self.codon_count * 3)
+            & np.isfinite(values)
+            & (values > 0)
+        )
+        local_positions = positions[valid].astype(np.int64, copy=False)
+        local_values = values[valid].astype(np.float64, copy=False)
+        codons = local_positions // 3
+        frames = local_positions % 3
+        codon_profile = np.bincount(
+            codons,
+            weights=local_values,
+            minlength=self.codon_count,
+        ).astype(np.float64, copy=False)
+        self.codon_prefix = np.empty(self.codon_count + 1, dtype=np.float64)
+        self.codon_prefix[0] = 0.0
+        np.cumsum(codon_profile, out=self.codon_prefix[1:])
+        self.covered_prefix = np.empty(self.codon_count + 1, dtype=np.int64)
+        self.covered_prefix[0] = 0
+        np.cumsum(
+            (codon_profile > 0).astype(np.int64),
+            out=self.covered_prefix[1:],
+        )
+        self.frame_prefixes: tuple[np.ndarray, ...] = tuple(
+            self._prefix(
+                np.bincount(
+                    codons[frames == frame],
+                    weights=local_values[frames == frame],
+                    minlength=self.codon_count,
+                ).astype(np.float64, copy=False)
+            )
+            for frame in range(3)
+        )
+        self.nonzero_codons = np.flatnonzero(codon_profile > 0)
+
+    @staticmethod
+    def _prefix(profile: np.ndarray) -> np.ndarray:
+        """Return a zero-leading cumulative sum array."""
+        output = np.empty(profile.size + 1, dtype=np.float64)
+        output[0] = 0.0
+        np.cumsum(profile, out=output[1:])
+        return output
+
+    def region_features(
+        self,
+        start: int,
+        end: int,
+        thresholds: Thresholds,
+        config: EngineConfig,
+    ) -> SegmentFeatures:
+        """Calculate one codon-aligned region from prefix indexes."""
+        start_codon = max(0, int(start) // 3)
+        end_codon = min(self.codon_count, int(end) // 3)
+        codon_count = max(0, end_codon - start_codon)
+        if codon_count <= 0:
+            return _empty_segment_features()
+
+        rpf_sum = float(
+            self.codon_prefix[end_codon] - self.codon_prefix[start_codon]
+        )
+        if rpf_sum <= 0:
+            return _empty_segment_features()
+        covered = int(
+            self.covered_prefix[end_codon]
+            - self.covered_prefix[start_codon]
+        )
+        coverage_ratio = covered / codon_count
+        local_phase = int(start) % 3
+        frame_order = (
+            local_phase,
+            (local_phase + 1) % 3,
+            (local_phase + 2) % 3,
+        )
+        frame_density = [
+            float(
+                self.frame_prefixes[frame][end_codon]
+                - self.frame_prefixes[frame][start_codon]
+            )
+            for frame in frame_order
+        ]
+        frame_total = sum(frame_density)
+        frame0_ratio = frame_density[0] / frame_total if frame_total else 0.0
+
+        nonzero_left = int(
+            np.searchsorted(self.nonzero_codons, start_codon, side="left")
+        )
+        nonzero_right = int(
+            np.searchsorted(self.nonzero_codons, end_codon, side="left")
+        )
+        if nonzero_right > nonzero_left:
+            first_nonzero = int(self.nonzero_codons[nonzero_left])
+            last_nonzero = int(self.nonzero_codons[nonzero_right - 1])
+            signal_span = (last_nonzero - first_nonzero + 1) / codon_count
+        else:
+            signal_span = 0.0
+
+        boundary = min(config.boundary_codons, codon_count)
+        start_rpf = float(
+            self.codon_prefix[start_codon + boundary]
+            - self.codon_prefix[start_codon]
+        )
+        end_rpf = float(
+            self.codon_prefix[end_codon]
+            - self.codon_prefix[end_codon - boundary]
+        )
+        body_start = start_codon + boundary
+        body_end = max(body_start, end_codon - boundary)
+        body_rpf = float(
+            self.codon_prefix[body_end] - self.codon_prefix[body_start]
+        )
+
+        supported_windows = 0
+        supported_starts: list[int] = []
+        top_window = 0.0
+        if codon_count >= config.window_codons:
+            window_starts = list(
+                range(
+                    0,
+                    codon_count - config.window_codons + 1,
+                    config.window_step_codons,
+                )
+            )
+            last_start = codon_count - config.window_codons
+            if not window_starts or window_starts[-1] != last_start:
+                window_starts.append(last_start)
+            for relative_start in window_starts:
+                left = start_codon + relative_start
+                right = left + config.window_codons
+                window_sum = float(
+                    self.codon_prefix[right] - self.codon_prefix[left]
+                )
+                top_window = max(top_window, window_sum)
+                window_covered = int(
+                    self.covered_prefix[right] - self.covered_prefix[left]
+                )
+                window_frames = [
+                    float(
+                        self.frame_prefixes[frame][right]
+                        - self.frame_prefixes[frame][left]
+                    )
+                    for frame in frame_order
+                ]
+                window_total = sum(window_frames)
+                window_frame0 = (
+                    window_frames[0] / window_total if window_total else 0.0
+                )
+                if (
+                    window_sum >= thresholds.min_window_rpf
+                    and window_covered >= thresholds.min_window_covered
+                    and window_frame0 >= thresholds.moderate_periodicity
+                ):
+                    supported_windows += 1
+                    supported_starts.append(relative_start)
+
+        top_window_fraction = top_window / rpf_sum if rpf_sum else 0.0
+        distributed = 0
+        if supported_starts:
+            selected = [supported_starts[0]]
+            for value in supported_starts[1:]:
+                if value - selected[-1] >= config.min_window_gap_codons:
+                    selected.append(value)
+            distributed = len(selected)
+        localized_only = (
+            codon_count >= config.long_min_codons
+            and signal_span <= config.localized_span_max
+            and top_window_fraction >= config.localized_top_window_fraction
+        )
+        abundance_score = min(
+            1.0,
+            rpf_sum / max(thresholds.min_rpf_sum, 1e-9),
+        )
+        coverage_score = min(
+            1.0,
+            coverage_ratio / max(thresholds.min_coverage_ratio, 1e-9),
+        )
+        periodicity_score = max(
+            0.0,
+            min(1.0, (frame0_ratio - 1.0 / 3.0) / (2.0 / 3.0)),
+        )
+        distribution_score = min(
+            1.0,
+            max(
+                signal_span,
+                distributed / max(config.min_supported_windows, 1),
+            ),
+        )
+        score = (
+            0.30 * abundance_score
+            + 0.25 * coverage_score
+            + 0.30 * periodicity_score
+            + 0.15 * distribution_score
+        )
+        return SegmentFeatures(
+            rpf_sum=rpf_sum,
+            rpf_per_codon=rpf_sum / codon_count,
+            covered_codon=covered,
+            coverage_ratio=coverage_ratio,
+            frame0_density=frame_density[0],
+            frame1_density=frame_density[1],
+            frame2_density=frame_density[2],
+            frame0_ratio=frame0_ratio,
+            supported_windows=supported_windows,
+            distributed_windows=distributed,
+            signal_span=signal_span,
+            top_window_fraction=top_window_fraction,
+            start_rpf=start_rpf,
+            body_rpf=body_rpf,
+            end_rpf=end_rpf,
+            localized_only=localized_only,
+            score=score,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ExtentResolution:
+    """Store the translated-extent and start-site resolution for one family."""
+
+    quant_primary: str
+    evidence_primary: str
+    translated_extent_status: str
+    extent_supported_sample_count: int
+    extent_supporting_samples: tuple[str, ...]
+    extent_supported_bins: tuple[int, ...]
+    extension_rpf_sum: float
+    extension_frame0_ratio: float
+    start_site_status: str
+    start_site_reason: str
+    start_interval_orf_ids: tuple[str, ...]
+    frame_margin: float
+    selection_policy: str
+    selection_reason: str
+    canonical_anchor_orf: str
+    longest_candidate_orf: str
+    prior_override_status: str
+    leading_support_sample_count: int
+    leading_negative_sample_count: int
+    noncanonical_extension_support_sample_count: int
+    noncanonical_extension_density_ratio: float
+    pooled_extent_rpf_sum: float
+    pooled_extent_frame0_ratio: float
+    pooled_start_rpf_sum: float
+    pooled_end_rpf_sum: float
+    pooled_extent_sample_count: int
+
+
 @dataclass(frozen=True, slots=True)
 class EngineResult:
     """Store formal output paths and project counts."""
@@ -282,7 +585,7 @@ class ChromosomeResult:
 
 @dataclass(slots=True)
 class _FamilyAccumulator:
-    """Accumulate sample, replicate-group, and start-extension evidence."""
+    """Accumulate family translation and candidate-level extent evidence."""
 
     any_signal: bool
     any_evidence: bool
@@ -296,10 +599,21 @@ class _FamilyAccumulator:
     best_score: float
     best_sample: str
     best_features: SegmentFeatures | None
-    segment_support_counts: list[int]
-    segment_group_support_counts: list[dict[int, int]]
-    segment_best_scores: list[float]
-    segment_support_samples: list[list[str]]
+    candidate_full_support_counts: list[int]
+    candidate_extension_support_counts: list[int]
+    candidate_support_samples: list[list[str]]
+    candidate_bin_support_counts: list[list[int]]
+    candidate_bin_support_samples: list[list[str]]
+    candidate_cohort_support_samples: list[list[str]]
+    candidate_bin_pooled_stats: list[list[list[float]]]
+    candidate_boundary_pooled_stats: list[list[list[float]]]
+    candidate_best_full_features: list[SegmentFeatures | None]
+    candidate_best_extension_features: list[SegmentFeatures | None]
+    candidate_pooled_frame_density: list[list[float]]
+    candidate_leading_support_counts: list[int]
+    candidate_leading_negative_counts: list[int]
+    candidate_noncanonical_extension_support_counts: list[int]
+    candidate_best_noncanonical_density_ratios: list[float]
 
 
 
@@ -308,23 +622,13 @@ class EvidenceEngineError(RuntimeError):
 
 
 class _StageLogger:
-    """Write a persistent stage log and mirror messages to stdout."""
-
-    def __init__(self, path: Path) -> None:
-        self.path = path
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+    """Report stage messages to the active console or nohup stream."""
 
     def write(self, message: str) -> None:
-        text = str(message)
-        message_print(text)
-        with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(text + "\n")
+        message_print(str(message))
 
     def error(self, stage: str, error: BaseException) -> None:
-        with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(f"ERROR stage={stage}: {error}\n")
-            handle.write(traceback.format_exc())
-            handle.write("\n")
+        warning_print(f"ERROR stage={stage}: {error}")
 
 
 def _smart_open(path: str | Path, mode: str = "rt") -> TextIO:
@@ -382,7 +686,6 @@ def _run_signature(args: object, tracks: Sequence[DensityTrack]) -> str:
     }
     payload = json.dumps(
         {
-            "engine": ENGINE_VERSION,
             "schema": SCHEMA_VERSION,
             "files": files,
             "options": options,
@@ -1049,6 +1352,8 @@ def _build_family_geometry(rows: Sequence[sqlite3.Row]) -> FamilyGeometry | Inva
                     starts=record["starts"],
                     ends=record["ends"],
                     start_offset=difference,
+                    stop_codon=record["stop_codon"],
+                    completeness=record["completeness"],
                 )
             )
         representatives.sort(key=lambda item: (item.start_offset, item.orf_id))
@@ -1227,6 +1532,14 @@ def _extract_sparse_signals(
     return output
 
 
+def _empty_segment_features() -> SegmentFeatures:
+    """Return an all-zero segment feature record."""
+    return SegmentFeatures(
+        0.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, False, 0.0,
+    )
+
+
 def segment_features(
     positions: np.ndarray,
     values: np.ndarray,
@@ -1236,149 +1549,11 @@ def segment_features(
     config: EngineConfig,
 ) -> SegmentFeatures:
     """Calculate sufficient statistics for one scaffold segment."""
-    length = max(0, int(end) - int(start))
-    codon_count = length // 3
-    if codon_count <= 0 or positions.size == 0:
-        return SegmentFeatures(
-            0.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, False, 0.0,
-        )
-    left = int(np.searchsorted(positions, start, side="left"))
-    right = int(np.searchsorted(positions, end, side="left"))
-    if right <= left:
-        return SegmentFeatures(
-            0.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, False, 0.0,
-        )
-
-    local_positions = positions[left:right] - start
-    local_values = values[left:right]
-    valid = local_positions < codon_count * 3
-    local_positions = local_positions[valid]
-    local_values = local_values[valid]
-    if local_positions.size == 0:
-        return SegmentFeatures(
-            0.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, False, 0.0,
-        )
-
-    frames = local_positions % 3
-    codons = local_positions // 3
-    rpf_sum = float(local_values.sum())
-    frame_density = np.bincount(frames, weights=local_values, minlength=3)
-    total_frame = float(frame_density.sum())
-    frame0_ratio = float(frame_density[0] / total_frame) if total_frame else 0.0
-    codon_profile = np.bincount(
-        codons,
-        weights=local_values,
-        minlength=codon_count,
-    ).astype(np.float64, copy=False)
-    covered = int(np.count_nonzero(codon_profile > 0))
-    coverage_ratio = covered / codon_count
-    nonzero_codons = np.flatnonzero(codon_profile > 0)
-    signal_span = (
-        (int(nonzero_codons[-1]) - int(nonzero_codons[0]) + 1) / codon_count
-        if nonzero_codons.size else 0.0
-    )
-
-    boundary = min(config.boundary_codons, codon_count)
-    start_rpf = float(codon_profile[:boundary].sum())
-    end_rpf = float(codon_profile[-boundary:].sum())
-    body_start = boundary
-    body_end = max(body_start, codon_count - boundary)
-    body_rpf = float(codon_profile[body_start:body_end].sum())
-
-    supported_windows = 0
-    supported_starts: list[int] = []
-    top_window = 0.0
-    if codon_count >= config.window_codons:
-        prefix = np.empty(codon_count + 1, dtype=np.float64)
-        prefix[0] = 0.0
-        np.cumsum(codon_profile, out=prefix[1:])
-        covered_prefix = np.empty(codon_count + 1, dtype=np.int64)
-        covered_prefix[0] = 0
-        np.cumsum((codon_profile > 0).astype(np.int64), out=covered_prefix[1:])
-        frame_profiles = [
-            np.bincount(
-                codons[frames == frame],
-                weights=local_values[frames == frame],
-                minlength=codon_count,
-            )
-            for frame in range(3)
-        ]
-        frame_prefixes = []
-        for profile in frame_profiles:
-            current = np.empty(codon_count + 1, dtype=np.float64)
-            current[0] = 0.0
-            np.cumsum(profile, out=current[1:])
-            frame_prefixes.append(current)
-        starts = list(range(0, codon_count - config.window_codons + 1, config.window_step_codons))
-        last_start = codon_count - config.window_codons
-        if not starts or starts[-1] != last_start:
-            starts.append(last_start)
-        for window_start in starts:
-            window_end = window_start + config.window_codons
-            window_sum = float(prefix[window_end] - prefix[window_start])
-            top_window = max(top_window, window_sum)
-            window_covered = int(
-                covered_prefix[window_end] - covered_prefix[window_start]
-            )
-            window_frames = [
-                float(item[window_end] - item[window_start])
-                for item in frame_prefixes
-            ]
-            window_total = sum(window_frames)
-            window_frame0 = window_frames[0] / window_total if window_total else 0.0
-            if (
-                window_sum >= thresholds.min_window_rpf
-                and window_covered >= thresholds.min_window_covered
-                and window_frame0 >= thresholds.moderate_periodicity
-            ):
-                supported_windows += 1
-                supported_starts.append(window_start)
-    top_window_fraction = top_window / rpf_sum if rpf_sum else 0.0
-    distributed = 0
-    if supported_starts:
-        selected = [supported_starts[0]]
-        for value in supported_starts[1:]:
-            if value - selected[-1] >= config.min_window_gap_codons:
-                selected.append(value)
-        distributed = len(selected)
-    localized_only = (
-        codon_count >= config.long_min_codons
-        and signal_span <= config.localized_span_max
-        and top_window_fraction >= config.localized_top_window_fraction
-    )
-    abundance_score = min(1.0, rpf_sum / max(thresholds.min_rpf_sum, 1e-9))
-    coverage_score = min(1.0, coverage_ratio / max(thresholds.min_coverage_ratio, 1e-9))
-    periodicity_score = max(0.0, min(1.0, (frame0_ratio - 1.0 / 3.0) / (2.0 / 3.0)))
-    distribution_score = min(1.0, max(signal_span, distributed / max(config.min_supported_windows, 1)))
-    score = (
-        0.30 * abundance_score
-        + 0.25 * coverage_score
-        + 0.30 * periodicity_score
-        + 0.15 * distribution_score
-    )
-    return SegmentFeatures(
-        rpf_sum=rpf_sum,
-        rpf_per_codon=rpf_sum / codon_count,
-        covered_codon=covered,
-        coverage_ratio=coverage_ratio,
-        frame0_density=float(frame_density[0]),
-        frame1_density=float(frame_density[1]),
-        frame2_density=float(frame_density[2]),
-        frame0_ratio=frame0_ratio,
-        supported_windows=supported_windows,
-        distributed_windows=distributed,
-        signal_span=signal_span,
-        top_window_fraction=top_window_fraction,
-        start_rpf=start_rpf,
-        body_rpf=body_rpf,
-        end_rpf=end_rpf,
-        localized_only=localized_only,
-        score=score,
-    )
-
+    return ScaffoldProfile(
+        positions,
+        values,
+        max(0, int(end)),
+    ).region_features(start, end, thresholds, config)
 
 def classify_sample(
     features: SegmentFeatures,
@@ -1436,15 +1611,434 @@ def classify_sample(
 
 def classify_extension(
     features: SegmentFeatures,
+    extension_codons: int,
     thresholds: Thresholds,
+    config: EngineConfig,
 ) -> bool:
-    """Return whether one alternative-start-specific segment is supported."""
-    return (
+    """Return whether one cumulative start-specific extension is supported."""
+    if extension_codons <= 0:
+        return True
+    minimum_covered = min(
+        max(1, thresholds.min_window_covered),
+        max(1, extension_codons),
+    )
+    core_support = (
         features.rpf_sum >= max(1.0, thresholds.min_window_rpf * 0.5)
-        and features.covered_codon >= 1
-        and features.coverage_ratio >= 0.10
+        and features.covered_codon >= minimum_covered
         and features.frame0_ratio >= thresholds.moderate_periodicity
     )
+    if not core_support or features.localized_only:
+        return False
+    if extension_codons < config.long_min_codons:
+        return True
+    return (
+        features.distributed_windows >= 1
+        or features.signal_span >= max(0.20, config.min_signal_span * 0.75)
+    )
+
+
+def classify_candidate_extent(
+    full_features: SegmentFeatures,
+    extension_features: SegmentFeatures,
+    full_codons: int,
+    extension_codons: int,
+    thresholds: Thresholds,
+    config: EngineConfig,
+) -> tuple[bool, bool]:
+    """Classify one candidate's full range and cumulative extension."""
+    full_level, _reason = classify_sample(
+        full_features,
+        full_codons,
+        thresholds,
+        config,
+    )
+    full_supported = LEVEL_RANK[full_level] >= LEVEL_RANK["MediumConfidence"]
+    extension_supported = classify_extension(
+        extension_features,
+        extension_codons,
+        thresholds,
+        config,
+    )
+    return full_supported, extension_supported
+
+
+def _canonical_anchor_index(family: FamilyGeometry) -> int | None:
+    """Return the longest canonical ATG representative, if present."""
+    canonical = [
+        index
+        for index, representative in enumerate(family.representatives)
+        if representative.start_codon.upper() == "ATG"
+    ]
+    return min(
+        canonical,
+        key=lambda index: (
+            family.representatives[index].start_offset,
+            family.representatives[index].orf_id,
+        ),
+        default=None,
+    )
+
+
+def _leading_region_end(
+    family: FamilyGeometry,
+    candidate_index: int,
+    canonical_index: int | None,
+    config: EngineConfig,
+) -> int:
+    """Return the diagnostic N-terminal boundary for one candidate."""
+    representative = family.representatives[candidate_index]
+    boundary = min(
+        family.common_body_end,
+        representative.start_offset + config.leading_window_codons * 3,
+    )
+    if canonical_index is not None:
+        canonical_start = family.representatives[canonical_index].start_offset
+        if representative.start_offset < canonical_start:
+            boundary = min(boundary, canonical_start)
+    return max(representative.start_offset, boundary)
+
+
+def _leading_region_is_supported(
+    features: SegmentFeatures,
+    codon_count: int,
+    thresholds: Thresholds,
+    config: EngineConfig,
+) -> bool:
+    """Return whether a candidate-specific N terminus contains translation."""
+    if codon_count < config.min_exclusion_codons:
+        return False
+    return (
+        features.rpf_sum >= thresholds.min_window_rpf
+        and features.covered_codon >= thresholds.min_window_covered
+        and features.frame0_ratio >= thresholds.moderate_periodicity
+        and not features.localized_only
+    )
+
+
+def _leading_region_is_negative(
+    leading: SegmentFeatures,
+    common_body: SegmentFeatures,
+    codon_count: int,
+    thresholds: Thresholds,
+    config: EngineConfig,
+) -> bool:
+    """Return whether an observable N terminus is silent relative to its body."""
+    if codon_count < config.min_exclusion_codons:
+        return False
+    if (
+        common_body.rpf_sum < thresholds.min_rpf_sum
+        or common_body.rpf_per_codon < thresholds.min_rpf_per_codon
+        or common_body.frame0_ratio < thresholds.moderate_periodicity
+    ):
+        return False
+    relative_density = leading.rpf_per_codon / max(
+        common_body.rpf_per_codon,
+        1e-12,
+    )
+    weak_abundance = (
+        leading.rpf_sum < thresholds.min_window_rpf
+        or leading.covered_codon < thresholds.min_window_covered
+    )
+    weak_phase = leading.frame0_ratio < thresholds.moderate_periodicity
+    return (
+        relative_density <= config.silent_extension_density_ratio
+        and (weak_abundance or weak_phase)
+    )
+
+
+def _noncanonical_extension_is_strong(
+    extension: SegmentFeatures,
+    canonical_body: SegmentFeatures,
+    extension_codons: int,
+    thresholds: Thresholds,
+    config: EngineConfig,
+) -> bool:
+    """Require strong exclusive evidence before replacing a canonical ATG."""
+    if extension_codons < config.noncanonical_min_exclusive_codons:
+        return False
+    if not (
+        canonical_body.rpf_sum >= thresholds.min_rpf_sum
+        and canonical_body.rpf_per_codon
+        >= thresholds.min_rpf_per_codon
+        and canonical_body.frame0_ratio
+        >= thresholds.moderate_periodicity
+    ):
+        return False
+    density_floor = max(
+        thresholds.min_rpf_per_codon,
+        canonical_body.rpf_per_codon
+        * config.noncanonical_override_density_ratio,
+    )
+    if not (
+        extension.rpf_sum >= max(
+            thresholds.min_rpf_sum,
+            thresholds.min_window_rpf,
+        )
+        and extension.rpf_per_codon >= density_floor
+        and extension.covered_codon >= thresholds.min_window_covered
+        and extension.coverage_ratio >= max(
+            thresholds.min_coverage_ratio,
+            config.noncanonical_override_min_coverage_ratio,
+        )
+        and extension.frame0_ratio >= thresholds.strong_periodicity
+        and (
+            extension.frame0_ratio
+            - max(
+                extension.frame1_density,
+                extension.frame2_density,
+            )
+            / max(
+                extension.frame0_density
+                + extension.frame1_density
+                + extension.frame2_density,
+                1e-12,
+            )
+            >= config.noncanonical_override_min_frame_margin
+        )
+        and not extension.localized_only
+    ):
+        return False
+    if extension_codons < config.long_min_codons:
+        return True
+    return (
+        extension.distributed_windows >= 1
+        or extension.signal_span >= max(0.20, config.min_signal_span * 0.75)
+    )
+
+
+def _candidate_bin_ranges(
+    start: int,
+    end: int,
+    bin_count: int,
+) -> tuple[tuple[int, int], ...]:
+    """Split one candidate coding region into codon-aligned extent bins."""
+    codons = max(0, (int(end) - int(start)) // 3)
+    if codons <= 0:
+        return ()
+    effective_bins = min(max(1, int(bin_count)), codons)
+    boundaries = [
+        (index * codons) // effective_bins
+        for index in range(effective_bins + 1)
+    ]
+    return tuple(
+        (start + boundaries[index] * 3, start + boundaries[index + 1] * 3)
+        for index in range(effective_bins)
+        if boundaries[index + 1] > boundaries[index]
+    )
+
+
+def _bin_is_supported(
+    features: SegmentFeatures,
+    thresholds: Thresholds,
+) -> bool:
+    """Return whether one longitudinal extent bin contains phased signal."""
+    return (
+        features.rpf_sum >= max(1.0, thresholds.min_window_rpf * 0.5)
+        and features.covered_codon
+        >= max(1, math.ceil(thresholds.min_window_covered * 0.5))
+        and features.frame0_ratio >= thresholds.moderate_periodicity
+    )
+
+
+def _accumulate_pooled_segment(
+    pooled: list[float],
+    features: SegmentFeatures,
+) -> None:
+    """Accumulate raw segment sufficient statistics across samples."""
+    pooled[0] += features.rpf_sum
+    pooled[1] += features.covered_codon
+    pooled[2] += features.frame0_density
+    pooled[3] += features.frame1_density
+    pooled[4] += features.frame2_density
+    if features.rpf_sum > 0:
+        pooled[5] += 1
+
+
+def _pooled_segment_is_supported(
+    pooled: Sequence[float],
+    config: EngineConfig,
+) -> bool:
+    """Return whether pooled subthreshold observations form phased evidence."""
+    if len(pooled) < 6 or pooled[5] < 1:
+        return False
+    frames = pooled[2:5]
+    total = float(sum(frames))
+    if total <= 0:
+        return False
+    return (
+        pooled[0] >= max(1.0, config.min_window_rpf)
+        and pooled[1] >= max(2, math.ceil(config.min_window_covered * 0.50))
+        and frames[0] / total >= config.moderate_periodicity
+        and _frame_margin(frames) >= config.min_frame_margin
+    )
+
+
+def _candidate_is_complete(representative: RepresentativeGeometry) -> bool:
+    """Return whether scanner geometry describes a complete start-to-stop ORF."""
+    completeness = representative.completeness.strip().lower()
+    complete = completeness in {
+        "", "complete", "cmpl", "full", "true", "yes",
+    }
+    return complete and representative.stop_codon.upper() in STOP_CODONS
+
+
+def _candidate_supported_bin_indices(
+    accumulator: _FamilyAccumulator,
+    candidate_index: int,
+    config: EngineConfig,
+) -> list[int]:
+    """Return bins supported either directly or by pooled raw statistics."""
+    binary = accumulator.candidate_bin_support_counts[candidate_index]
+    pooled = accumulator.candidate_bin_pooled_stats[candidate_index]
+    return [
+        index
+        for index in range(max(len(binary), len(pooled)))
+        if (
+            (index < len(binary) and binary[index] > 0)
+            or (
+                index < len(pooled)
+                and _pooled_segment_is_supported(pooled[index], config)
+            )
+        )
+    ]
+
+
+def _candidate_boundary_support(
+    accumulator: _FamilyAccumulator,
+    candidate_index: int,
+    config: EngineConfig,
+) -> tuple[bool, bool]:
+    """Return pooled start- and stop-window support for one candidate."""
+    boundary = accumulator.candidate_boundary_pooled_stats[candidate_index]
+    start_supported = bool(
+        boundary
+        and _pooled_segment_is_supported(boundary[0], config)
+    )
+    end_supported = bool(
+        len(boundary) > 1
+        and _pooled_segment_is_supported(boundary[1], config)
+    )
+    binary = accumulator.candidate_bin_support_counts[candidate_index]
+    if binary:
+        start_supported = start_supported or binary[0] > 0
+        end_supported = end_supported or binary[-1] > 0
+    return start_supported, end_supported
+
+
+def _candidate_cohort_sample_count(
+    accumulator: _FamilyAccumulator,
+    candidate_index: int,
+) -> int:
+    """Return independent samples contributing candidate-phased evidence."""
+    samples = set(accumulator.candidate_cohort_support_samples[candidate_index])
+    samples.update(accumulator.candidate_bin_support_samples[candidate_index])
+    samples.update(accumulator.candidate_support_samples[candidate_index])
+    return len(samples)
+
+
+def _candidate_cohort_extent_status(
+    family: FamilyGeometry,
+    accumulator: _FamilyAccumulator,
+    candidate_index: int,
+    config: EngineConfig,
+) -> str:
+    """Classify long-ORF extent assembled across independent samples.
+
+    A long ORF may be sparsely covered in each sample while distinct samples
+    support different parts of the same coding range. The cohort model accepts
+    that distributed evidence, but it never treats a middle-only signal as
+    proof of the complete parent ORF.
+    """
+    representative = family.representatives[candidate_index]
+    codon_count = representative.coding_nt_length // 3
+    bin_counts = accumulator.candidate_bin_support_counts[candidate_index]
+    if (
+        codon_count < config.long_min_codons
+        or not bin_counts
+        or not _candidate_is_complete(representative)
+    ):
+        return ""
+    sample_count = _candidate_cohort_sample_count(
+        accumulator,
+        candidate_index,
+    )
+    if sample_count < config.reliable_sample:
+        return ""
+    supported_bins = _candidate_supported_bin_indices(
+        accumulator,
+        candidate_index,
+        config,
+    )
+    minimum_bins = min(config.min_extent_bins, len(bin_counts))
+    if len(supported_bins) < minimum_bins:
+        return ""
+    segmented_frames = _candidate_segmented_frame_density(
+        accumulator,
+        candidate_index,
+        supported_bins,
+    )
+    if _frame_margin(segmented_frames) < config.min_frame_margin:
+        return ""
+    if segmented_frames[0] < max(
+        config.min_window_rpf * minimum_bins,
+        config.min_rpf_sum * config.reliable_sample,
+    ):
+        return ""
+    start_supported, end_supported = _candidate_boundary_support(
+        accumulator,
+        candidate_index,
+        config,
+    )
+    if supported_bins[0] != 0 or not start_supported:
+        return ""
+
+    span_fraction = (
+        supported_bins[-1] - supported_bins[0] + 1
+    ) / len(bin_counts)
+    if (
+        supported_bins[-1] == len(bin_counts) - 1
+        and end_supported
+    ):
+        return "Supported"
+    downstream_start = max(1, math.floor(len(bin_counts) * 0.60))
+    if (
+        span_fraction >= max(0.60, config.min_signal_span)
+        and any(index >= downstream_start for index in supported_bins)
+    ):
+        return "Compatible"
+    return ""
+
+
+def _candidate_segmented_frame_density(
+    accumulator: _FamilyAccumulator,
+    candidate_index: int,
+    supported_bins: Sequence[int] | None = None,
+) -> tuple[float, float, float]:
+    """Return pooled frame counts from candidate-phased supported bins.
+
+    Strong signal from an independently translated overlapping frame may
+    dominate whole-ORF counts. Restricting the decision statistic to bins that
+    independently support the candidate prevents that unrelated signal from
+    vetoing a distributed complete ORF while retaining an explicit whole-ORF
+    phase audit in the output.
+    """
+    pooled = accumulator.candidate_bin_pooled_stats[candidate_index]
+    indices = (
+        range(len(pooled))
+        if supported_bins is None
+        else supported_bins
+    )
+    frames = [0.0, 0.0, 0.0]
+    for index in indices:
+        if index < 0 or index >= len(pooled):
+            continue
+        frames[0] += float(pooled[index][2])
+        frames[1] += float(pooled[index][3])
+        frames[2] += float(pooled[index][4])
+    if sum(frames) <= 0:
+        fallback = accumulator.candidate_pooled_frame_density[candidate_index]
+        return float(fallback[0]), float(fallback[1]), float(fallback[2])
+    return frames[0], frames[1], frames[2]
 
 
 def _manual_thresholds(
@@ -1486,9 +2080,12 @@ def resolve_length_models(
     """Resolve robust short and long cutoffs from target-smORF distributions.
 
     Equal-tertile cutoffs are inappropriate for smORFs because their length
-    distribution is strongly right-skewed. The short boundary is estimated
-    from the lower quartile and constrained to 10-30 codons. The long boundary
-    is estimated from the upper decile and constrained to 60-100 codons.
+    distribution is strongly right-skewed. The raw short boundary is estimated
+    from the median category-specific lower quartile, and the raw long boundary
+    from the median category-specific upper decile. Conservative floors prevent
+    project-specific distributions from switching evidence models at implausibly
+    small values. These thresholds classify evidence models; they do not filter
+    ORFs by length.
     """
     by_category: dict[str, list[int]] = defaultdict(list)
     connection = sqlite3.connect(database_path)
@@ -1524,30 +2121,43 @@ def resolve_length_models(
         short_values.append(float(np.quantile(lengths, 0.25)))
         long_values.append(float(np.quantile(lengths, 0.90)))
 
+    estimated_short = (
+        int(round(float(np.median(short_values))))
+        if short_values
+        else config.short_max_codons
+    )
+    estimated_long = (
+        int(round(float(np.median(long_values))))
+        if long_values
+        else config.long_min_codons
+    )
     short_cutoff = config.short_max_codons
     long_cutoff = config.long_min_codons
     if "short_max_codons" not in config.hidden_overrides and short_values:
         short_cutoff = int(
             np.clip(
-                round(float(np.median(short_values))),
-                10,
-                30,
+                estimated_short,
+                SHORT_MODEL_FLOOR,
+                SHORT_MODEL_CEILING,
             )
         )
     if "long_min_codons" not in config.hidden_overrides and long_values:
         long_cutoff = int(
             np.clip(
-                round(float(np.median(long_values))),
-                60,
-                100,
+                estimated_long,
+                LONG_MODEL_FLOOR,
+                LONG_MODEL_CEILING,
             )
         )
     if long_cutoff <= short_cutoff:
-        long_cutoff = max(60, short_cutoff + 1)
+        long_cutoff = max(LONG_MODEL_FLOOR, short_cutoff + 1)
 
     logger.write(
-        "Length models: short<=%d codons, medium=%d-%d codons, long>=%d codons."
+        "Length models: estimated short<=%d and long>=%d codons; "
+        "applied short<=%d, medium=%d-%d, long>=%d codons."
         % (
+            estimated_short,
+            estimated_long,
             short_cutoff,
             short_cutoff + 1,
             long_cutoff - 1,
@@ -1558,6 +2168,8 @@ def resolve_length_models(
         config,
         short_max_codons=short_cutoff,
         long_min_codons=long_cutoff,
+        estimated_short_max_codons=estimated_short,
+        estimated_long_min_codons=estimated_long,
     )
 
 
@@ -2125,9 +2737,10 @@ def calibrate_samples(
 
 def _new_accumulator(
     family: FamilyGeometry,
+    config: EngineConfig,
 ) -> _FamilyAccumulator:
     """Create a bounded accumulator for one family."""
-    segment_count = max(0, len(family.representatives) - 1)
+    candidate_count = len(family.representatives)
     return _FamilyAccumulator(
         any_signal=False,
         any_evidence=False,
@@ -2141,14 +2754,67 @@ def _new_accumulator(
         best_score=-1.0,
         best_sample="",
         best_features=None,
-        segment_support_counts=[0] * segment_count,
-        segment_group_support_counts=[
-            {} for _ in range(segment_count)
+        candidate_full_support_counts=[0] * candidate_count,
+        candidate_extension_support_counts=[0] * candidate_count,
+        candidate_support_samples=[[] for _ in range(candidate_count)],
+        candidate_bin_support_counts=[
+            (
+                [0] * min(
+                    family.representatives[index].coding_nt_length // 3,
+                    config.extent_bins,
+                )
+                if family.representatives[index].coding_nt_length // 3
+                >= config.long_min_codons
+                else []
+            )
+            for index in range(candidate_count)
         ],
-        segment_best_scores=[0.0] * segment_count,
-        segment_support_samples=[
-            [] for _ in range(segment_count)
+        candidate_bin_support_samples=[
+            [] for _ in range(candidate_count)
         ],
+        candidate_cohort_support_samples=[
+            [] for _ in range(candidate_count)
+        ],
+        candidate_bin_pooled_stats=[
+            (
+                [
+                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                    for _ in range(
+                        min(
+                            family.representatives[index].coding_nt_length // 3,
+                            config.extent_bins,
+                        )
+                    )
+                ]
+                if family.representatives[index].coding_nt_length // 3
+                >= config.long_min_codons
+                else []
+            )
+            for index in range(candidate_count)
+        ],
+        candidate_boundary_pooled_stats=[
+            (
+                [
+                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                ]
+                if family.representatives[index].coding_nt_length // 3
+                >= config.long_min_codons
+                else []
+            )
+            for index in range(candidate_count)
+        ],
+        candidate_best_full_features=[None] * candidate_count,
+        candidate_best_extension_features=[None] * candidate_count,
+        candidate_pooled_frame_density=[
+            [0.0, 0.0, 0.0] for _ in range(candidate_count)
+        ],
+        candidate_leading_support_counts=[0] * candidate_count,
+        candidate_leading_negative_counts=[0] * candidate_count,
+        candidate_noncanonical_extension_support_counts=[0]
+        * candidate_count,
+        candidate_best_noncanonical_density_ratios=[0.0]
+        * candidate_count,
     )
 
 
@@ -2158,9 +2824,28 @@ def _output_columns() -> tuple[str, ...]:
     return (
         "family_id", "gene_id", "chrom", "strand", "category",
         "family_type", "family_size", "structural_primary",
-        "common_body_orf", "evidence_primary", "evidence_status",
+        "common_body_orf", "provisional_primary", "quant_primary",
+        "evidence_primary",
+        "translation_unit_id", "translation_unit_index",
+        "translation_unit_count", "translation_unit_status",
+        "evidence_status", "family_translation_status",
+        "translated_extent_status", "extent_supported_sample_count",
+        "extent_supporting_samples", "extent_supported_bins",
+        "extension_rpf_sum", "extension_frame0_ratio",
         "family_translation_evidence", "reliability_reason",
-        "start_site_status", "start_site_reason", "reliable_group",
+        "start_site_status", "start_site_reason", "start_interval_orf_ids",
+        "selection_policy", "selection_reason", "canonical_anchor_orf",
+        "longest_candidate_orf", "prior_override_status",
+        "leading_support_sample_count", "leading_negative_sample_count",
+        "noncanonical_extension_support_sample_count",
+        "noncanonical_extension_density_ratio",
+        "pooled_extent_rpf_sum", "pooled_extent_frame0_ratio",
+        "pooled_start_rpf_sum", "pooled_end_rpf_sum",
+        "pooled_extent_sample_count",
+        "nested_competition_status", "dominant_parent_orf",
+        "competition_overlap_fraction", "competition_frame_relation",
+        "competition_reason", "frame_margin",
+        "reliable_group",
         "supported_sample_count", "max_group_sample_support",
         "high_confidence_sample_count", "supporting_group_count",
         "supporting_groups", "supporting_samples", "best_sample",
@@ -2171,49 +2856,531 @@ def _output_columns() -> tuple[str, ...]:
         "best_top_window_fraction", "best_localized_only",
         "representative_count", "representative_orf_ids",
         "representative_start_codons", "invalid_family_reason",
+        "complete_candidate_count", "complete_candidate_orf_ids",
+        "candidate_audit_status", "candidate_failure_reasons",
+        "pooled_frame0_density", "pooled_frame1_density",
+        "pooled_frame2_density", "pooled_dominant_frame",
+        "suggested_psite_shift_nt", "phase_audit_status",
     )
 
 
 
-def _resolve_start(
+def _candidate_extent_supported(
+    family: FamilyGeometry,
+    accumulator: _FamilyAccumulator,
+    candidate_index: int,
+    config: EngineConfig,
+) -> bool:
+    """Return whether one candidate has direct or cohort-wide extent support."""
+    representative = family.representatives[candidate_index]
+    codon_count = representative.coding_nt_length // 3
+    cohort_status = _candidate_cohort_extent_status(
+        family,
+        accumulator,
+        candidate_index,
+        config,
+    )
+    if cohort_status in {"Supported", "Compatible"}:
+        return True
+    if (
+        accumulator.candidate_full_support_counts[candidate_index]
+        >= config.reliable_sample
+    ):
+        return True
+    if (
+        codon_count < config.long_min_codons
+        and _frame_margin(
+            accumulator.candidate_pooled_frame_density[candidate_index]
+        )
+        < config.min_frame_margin
+    ):
+        return False
+    extension_codons = max(
+        0,
+        (family.common_body_start - representative.start_offset) // 3,
+    )
+    extension_supported = (
+        extension_codons <= config.start_resolution_codons
+        or accumulator.candidate_extension_support_counts[candidate_index]
+        >= config.reliable_sample
+    )
+    bin_counts = accumulator.candidate_bin_support_counts[candidate_index]
+    supported_bins = _candidate_supported_bin_indices(
+        accumulator,
+        candidate_index,
+        config,
+    )
+    minimum_bins = min(config.min_extent_bins, len(bin_counts))
+    upstream_limit = max(1, math.ceil(len(bin_counts) * 0.40))
+    upstream_supported = any(index < upstream_limit for index in supported_bins)
+    return (
+        accumulator.support_count >= config.reliable_sample
+        and extension_supported
+        and len(supported_bins) >= minimum_bins
+        and upstream_supported
+    )
+
+
+def _prior_candidate_index(family: FamilyGeometry) -> int:
+    """Return the structural prior used for candidate-level auditing."""
+    canonical_index = _canonical_anchor_index(family)
+    if canonical_index is not None:
+        return canonical_index
+    return min(
+        range(len(family.representatives)),
+        key=lambda index: (
+            family.representatives[index].start_offset,
+            family.representatives[index].orf_id,
+        ),
+    )
+
+
+def _candidate_failure_reasons(
+    family: FamilyGeometry,
+    accumulator: _FamilyAccumulator,
+    candidate_index: int,
+    config: EngineConfig,
+) -> tuple[str, ...]:
+    """Return explicit unmet candidate-first evidence requirements."""
+    representative = family.representatives[candidate_index]
+    reasons: list[str] = []
+    if not _candidate_is_complete(representative):
+        reasons.append("incomplete_start_to_stop_candidate")
+    pooled_frames = accumulator.candidate_pooled_frame_density[candidate_index]
+    if sum(pooled_frames) <= 0:
+        reasons.append("no_candidate_p_site_signal")
+    sample_count = _candidate_cohort_sample_count(accumulator, candidate_index)
+    if sample_count < config.reliable_sample:
+        reasons.append(
+            f"candidate_sample_replication_{sample_count}_below_"
+            f"{config.reliable_sample}"
+        )
+    bin_counts = accumulator.candidate_bin_support_counts[candidate_index]
+    supported_bins = _candidate_supported_bin_indices(
+        accumulator,
+        candidate_index,
+        config,
+    )
+    if bin_counts:
+        minimum_bins = min(config.min_extent_bins, len(bin_counts))
+        if len(supported_bins) < minimum_bins:
+            reasons.append(
+                f"supported_extent_bins_{len(supported_bins)}_below_"
+                f"{minimum_bins}"
+            )
+        start_supported, end_supported = _candidate_boundary_support(
+            accumulator,
+            candidate_index,
+            config,
+        )
+        if not supported_bins or supported_bins[0] != 0 or not start_supported:
+            reasons.append("missing_candidate_N_terminal_phase_support")
+        downstream_start = max(1, math.floor(len(bin_counts) * 0.60))
+        if not any(index >= downstream_start for index in supported_bins):
+            reasons.append("missing_candidate_downstream_extent_support")
+        if (
+            supported_bins
+            and supported_bins[-1] == len(bin_counts) - 1
+            and not end_supported
+        ):
+            reasons.append("missing_candidate_terminal_phase_support")
+        segmented_frames = _candidate_segmented_frame_density(
+            accumulator,
+            candidate_index,
+            supported_bins,
+        )
+        if (
+            supported_bins
+            and _frame_margin(segmented_frames) < config.min_frame_margin
+        ):
+            reasons.append("candidate_segmented_frame_margin_below_threshold")
+    elif (
+        sum(pooled_frames) > 0
+        and _frame_margin(pooled_frames) < config.min_frame_margin
+    ):
+        reasons.append("candidate_frame_margin_below_threshold")
+    if not reasons and not _candidate_extent_supported(
+        family,
+        accumulator,
+        candidate_index,
+        config,
+    ):
+        reasons.append("candidate_extent_not_reliably_resolved")
+    return tuple(reasons)
+
+
+def _phase_audit(
+    frame_density: Sequence[float],
+    min_margin: float,
+) -> tuple[int, int, str]:
+    """Return dominant frame, suggested coordinate shift, and audit status."""
+    frames = [float(value) for value in frame_density]
+    total = sum(frames)
+    if total <= 0:
+        return -1, 0, "NoSignal"
+    order = sorted(range(3), key=lambda index: frames[index], reverse=True)
+    best = order[0]
+    advantage = (frames[best] - frames[order[1]]) / total
+    if advantage < min_margin:
+        return best, 0, "AmbiguousFrame"
+    if best == 0:
+        return 0, 0, "Frame0Consistent"
+    suggested_shift = -1 if best == 1 else 1
+    return best, suggested_shift, "AlternativeFrameDominant"
+
+
+def _frame_margin(frame_density: Sequence[float]) -> float:
+    """Calculate the candidate frame-0 advantage over the alternative frames."""
+    total = float(sum(frame_density))
+    if total <= 0:
+        return 0.0
+    ratios = [float(value) / total for value in frame_density]
+    return ratios[0] - max(ratios[1], ratios[2])
+
+
+def _resolve_candidate_extent(
     family: FamilyGeometry,
     accumulator: _FamilyAccumulator,
     config: EngineConfig,
-) -> tuple[str, str, str]:
-    """Resolve a contiguous start chain replicated across independent samples."""
-    representatives = family.representatives
-    if len(representatives) == 1:
+) -> ExtentResolution:
+    """Select an ORF using canonical/length priors plus replicated evidence."""
+    selection_policy = (
+        "canonical_ATG_then_longest_unless_replicated_RPF_override"
+    )
+    supported_indices = [
+        index
+        for index in range(len(family.representatives))
+        if _candidate_extent_supported(family, accumulator, index, config)
+    ]
+    canonical_index = _canonical_anchor_index(family)
+    longest_index = min(
+        range(len(family.representatives)),
+        key=lambda index: (
+            family.representatives[index].start_offset,
+            family.representatives[index].orf_id,
+        ),
+    )
+    prior_index = canonical_index if canonical_index is not None else longest_index
+
+    def contradicted(index: int) -> bool:
         return (
-            representatives[0].orf_id,
-            "Resolved",
-            "singleton_family",
+            accumulator.candidate_leading_negative_counts[index]
+            >= config.reliable_sample
+            and accumulator.candidate_leading_support_counts[index]
+            < config.reliable_sample
         )
 
-    selected_index = len(representatives) - 1
-    moved = False
-    for segment_index in range(
-        len(representatives) - 2,
-        -1,
-        -1,
-    ):
-        if (
-            accumulator.segment_support_counts[segment_index]
+    selected_index = prior_index
+    if canonical_index is not None:
+        strong_upstream_noncanonical = [
+            index
+            for index, representative in enumerate(family.representatives)
+            if representative.start_offset
+            < family.representatives[canonical_index].start_offset
+            and representative.start_codon.upper() != "ATG"
+            and accumulator.candidate_noncanonical_extension_support_counts[
+                index
+            ]
             >= config.reliable_sample
-        ):
-            selected_index = segment_index
-            moved = True
+            and (
+                accumulator.candidate_leading_support_counts[index]
+                >= config.reliable_sample
+                or (
+                    family.representatives[canonical_index].start_offset
+                    - representative.start_offset
+                )
+                // 3
+                < config.min_exclusion_codons
+            )
+            and not contradicted(index)
+        ]
+        if strong_upstream_noncanonical:
+            selected_index = min(
+                strong_upstream_noncanonical,
+                key=lambda index: (
+                    family.representatives[index].start_offset,
+                    family.representatives[index].orf_id,
+                ),
+            )
+            selection_reason = (
+                "upstream_noncanonical_start_has_strong_exclusive_"
+                "replicated_translation"
+            )
+            override_status = "OverriddenByStrongNoncanonicalExtension"
         else:
-            break
-    if moved:
-        return (
-            representatives[selected_index].orf_id,
-            "Resolved",
-            "replicated_contiguous_extension_support",
+            selection_reason = "longest_canonical_ATG_retained"
+            override_status = "CanonicalATGRetained"
+    else:
+        selection_reason = "longest_candidate_retained"
+        override_status = "LongestCandidateRetained"
+
+    if selected_index == prior_index and contradicted(prior_index):
+        downstream_supported = [
+            index
+            for index in supported_indices
+            if family.representatives[index].start_offset
+            > family.representatives[prior_index].start_offset
+            and not contradicted(index)
+        ]
+        if downstream_supported:
+            selected_index = min(
+                downstream_supported,
+                key=lambda index: (
+                    family.representatives[index].start_codon.upper() != "ATG",
+                    family.representatives[index].start_offset,
+                    family.representatives[index].orf_id,
+                ),
+            )
+            selection_reason = (
+                "longer_prior_rejected_by_replicated_N_terminal_silence_"
+                "and_internal_extent_support"
+            )
+            override_status = "ShortenedByReplicatedNterminalSilence"
+        else:
+            diagnostic_frames = (
+                accumulator.candidate_pooled_frame_density[prior_index]
+            )
+            diagnostic_total = float(sum(diagnostic_frames))
+            diagnostic_boundary = (
+                accumulator.candidate_boundary_pooled_stats[prior_index]
+            )
+            diagnostic_extension = (
+                accumulator.candidate_best_extension_features[prior_index]
+            )
+            diagnostic_bins = tuple(
+                index + 1
+                for index in _candidate_supported_bin_indices(
+                    accumulator,
+                    prior_index,
+                    config,
+                )
+            )
+            diagnostic_samples = tuple(
+                dict.fromkeys(
+                    accumulator.candidate_support_samples[prior_index]
+                    + accumulator.candidate_bin_support_samples[prior_index]
+                    + accumulator.candidate_cohort_support_samples[prior_index]
+                )
+            )
+            return ExtentResolution(
+                quant_primary=family.representatives[prior_index].orf_id,
+                evidence_primary="",
+                translated_extent_status="Partial",
+                extent_supported_sample_count=_candidate_cohort_sample_count(
+                    accumulator,
+                    prior_index,
+                ),
+                extent_supporting_samples=diagnostic_samples,
+                extent_supported_bins=diagnostic_bins,
+                extension_rpf_sum=(
+                    0.0
+                    if diagnostic_extension is None
+                    else diagnostic_extension.rpf_sum
+                ),
+                extension_frame0_ratio=(
+                    0.0
+                    if diagnostic_extension is None
+                    else diagnostic_extension.frame0_ratio
+                ),
+                start_site_status="Unresolved",
+                start_site_reason=(
+                    "longer_prior_contradicted_without_supported_internal_"
+                    "replacement"
+                ),
+                start_interval_orf_ids=tuple(
+                    family.representatives[index].orf_id
+                    for index in supported_indices
+                ),
+                frame_margin=_frame_margin(diagnostic_frames),
+                selection_policy=selection_policy,
+                selection_reason=(
+                    "replicated_N_terminal_silence_without_replacement"
+                ),
+                canonical_anchor_orf=(
+                    ""
+                    if canonical_index is None
+                    else family.representatives[canonical_index].orf_id
+                ),
+                longest_candidate_orf=(
+                    family.representatives[longest_index].orf_id
+                ),
+                prior_override_status="NoDefensibleExtent",
+                leading_support_sample_count=(
+                    accumulator.candidate_leading_support_counts[prior_index]
+                ),
+                leading_negative_sample_count=(
+                    accumulator.candidate_leading_negative_counts[prior_index]
+                ),
+                noncanonical_extension_support_sample_count=0,
+                noncanonical_extension_density_ratio=0.0,
+                pooled_extent_rpf_sum=diagnostic_total,
+                pooled_extent_frame0_ratio=(
+                    diagnostic_frames[0] / diagnostic_total
+                    if diagnostic_total > 0
+                    else 0.0
+                ),
+                pooled_start_rpf_sum=(
+                    float(diagnostic_boundary[0][0])
+                    if diagnostic_boundary
+                    else 0.0
+                ),
+                pooled_end_rpf_sum=(
+                    float(diagnostic_boundary[1][0])
+                    if len(diagnostic_boundary) > 1
+                    else 0.0
+                ),
+                pooled_extent_sample_count=_candidate_cohort_sample_count(
+                    accumulator,
+                    prior_index,
+                ),
+            )
+
+    selected = family.representatives[selected_index]
+    selected_is_directly_supported = selected_index in supported_indices
+    cohort_extent_status = _candidate_cohort_extent_status(
+        family,
+        accumulator,
+        selected_index,
+        config,
+    )
+    interval_ids = tuple(
+        dict.fromkeys(
+            [selected.orf_id]
+            + [
+                family.representatives[index].orf_id
+                for index in supported_indices
+            ]
         )
-    return (
-        "",
-        "Ambiguous",
-        "common_body_supported_but_replicated_extensions_unresolved",
+    )
+    nearby = [
+        item.orf_id
+        for item in family.representatives
+        if abs(item.start_offset - selected.start_offset)
+        <= config.start_resolution_codons * 3
+    ]
+    if len(family.representatives) == 1 and selected_is_directly_supported:
+        start_status = "UniqueCandidate"
+        start_reason = "singleton_family"
+        evidence_primary = selected.orf_id
+    elif not selected_is_directly_supported:
+        start_status = "Compatible"
+        start_reason = selection_reason + "_without_negative_counterevidence"
+        evidence_primary = ""
+    elif len(nearby) > 1:
+        start_status = "Compatible"
+        start_reason = selection_reason + "_nearby_starts_not_separable"
+        evidence_primary = ""
+    elif len(supported_indices) == 1:
+        start_status = "Exact"
+        start_reason = selection_reason + "_unique_supported_boundary"
+        evidence_primary = selected.orf_id
+    else:
+        start_status = "Interval"
+        start_reason = selection_reason + "_multiple_supported_boundaries"
+        evidence_primary = ""
+
+    full_features = accumulator.candidate_best_full_features[selected_index]
+    extension_features = accumulator.candidate_best_extension_features[selected_index]
+    pooled_frames = accumulator.candidate_pooled_frame_density[selected_index]
+    supported_bins = tuple(
+        index + 1
+        for index in _candidate_supported_bin_indices(
+            accumulator,
+            selected_index,
+            config,
+        )
+    )
+    support_samples = tuple(
+        dict.fromkeys(
+            accumulator.candidate_support_samples[selected_index]
+            + accumulator.candidate_bin_support_samples[selected_index]
+            + accumulator.candidate_cohort_support_samples[selected_index]
+            + accumulator.supporting_samples
+        )
+    )
+    extension_total = (
+        0.0 if extension_features is None else extension_features.rpf_sum
+    )
+    extension_frame0 = (
+        0.0 if extension_features is None else extension_features.frame0_ratio
+    )
+    pooled_total = float(sum(pooled_frames))
+    boundary = accumulator.candidate_boundary_pooled_stats[selected_index]
+    return ExtentResolution(
+        quant_primary=selected.orf_id,
+        evidence_primary=evidence_primary,
+        translated_extent_status=(
+            "Supported"
+            if selected_is_directly_supported
+            else (
+                cohort_extent_status
+                if cohort_extent_status
+                else "Compatible"
+            )
+        ),
+        extent_supported_sample_count=max(
+            accumulator.candidate_full_support_counts[selected_index],
+            accumulator.candidate_extension_support_counts[selected_index],
+            accumulator.candidate_leading_support_counts[selected_index],
+            len(
+                set(
+                    accumulator.candidate_bin_support_samples[
+                        selected_index
+                    ]
+                )
+            ),
+            _candidate_cohort_sample_count(
+                accumulator,
+                selected_index,
+            ),
+        ),
+        extent_supporting_samples=support_samples,
+        extent_supported_bins=supported_bins,
+        extension_rpf_sum=extension_total,
+        extension_frame0_ratio=extension_frame0,
+        start_site_status=start_status,
+        start_site_reason=start_reason,
+        start_interval_orf_ids=interval_ids,
+        frame_margin=_frame_margin(pooled_frames),
+        selection_policy=selection_policy,
+        selection_reason=selection_reason,
+        canonical_anchor_orf=(
+            ""
+            if canonical_index is None
+            else family.representatives[canonical_index].orf_id
+        ),
+        longest_candidate_orf=family.representatives[longest_index].orf_id,
+        prior_override_status=override_status,
+        leading_support_sample_count=(
+            accumulator.candidate_leading_support_counts[selected_index]
+        ),
+        leading_negative_sample_count=(
+            accumulator.candidate_leading_negative_counts[selected_index]
+        ),
+        noncanonical_extension_support_sample_count=(
+            accumulator.candidate_noncanonical_extension_support_counts[
+                selected_index
+            ]
+        ),
+        noncanonical_extension_density_ratio=(
+            accumulator.candidate_best_noncanonical_density_ratios[
+                selected_index
+            ]
+        ),
+        pooled_extent_rpf_sum=pooled_total,
+        pooled_extent_frame0_ratio=(
+            pooled_frames[0] / pooled_total if pooled_total > 0 else 0.0
+        ),
+        pooled_start_rpf_sum=(
+            float(boundary[0][0]) if boundary else 0.0
+        ),
+        pooled_end_rpf_sum=(
+            float(boundary[1][0]) if len(boundary) > 1 else 0.0
+        ),
+        pooled_extent_sample_count=_candidate_cohort_sample_count(
+            accumulator,
+            selected_index,
+        ),
     )
 
 
@@ -2243,36 +3410,116 @@ def _family_output_row(
         default=0,
     )
 
-    if accumulator.support_count >= config.reliable_sample:
+    resolution = _resolve_candidate_extent(
+        family,
+        accumulator,
+        config,
+    )
+    provisional_primary = resolution.quant_primary
+    selected_index = next(
+        (
+            index
+            for index, representative in enumerate(family.representatives)
+            if representative.orf_id == provisional_primary
+        ),
+        _prior_candidate_index(family),
+    )
+    candidate_extent_indices = [
+        index
+        for index in range(len(family.representatives))
+        if _candidate_extent_supported(
+            family,
+            accumulator,
+            index,
+            config,
+        )
+    ]
+    cohort_extent_candidates = [
+        (index, status)
+        for index in range(len(family.representatives))
+        if (
+            status := _candidate_cohort_extent_status(
+                family,
+                accumulator,
+                index,
+                config,
+            )
+        )
+        in {"Supported", "Compatible"}
+    ]
+    common_body_reliable = (
+        accumulator.support_count >= config.reliable_sample
+    )
+    candidate_extent_reliable = bool(candidate_extent_indices)
+    cohort_extent_reliable = bool(cohort_extent_candidates)
+
+    if (
+        common_body_reliable
+        or candidate_extent_reliable
+        or cohort_extent_reliable
+    ):
         status = "Reliable"
         final_evidence = (
             "HighConfidence"
-            if accumulator.high_count >= config.reliable_sample
+            if common_body_reliable
+            and accumulator.high_count >= config.reliable_sample
             else "MediumConfidence"
         )
-        reason = (
-            f"common_body_supported_by_{accumulator.support_count}_"
-            f"independent_samples_across_"
-            f"{len(supporting_group_indices)}_groups"
-        )
-        evidence_primary, start_status, start_reason = _resolve_start(
-            family,
-            accumulator,
-            config,
-        )
-        reliable_group = (
-            str(group_names[supporting_group_indices[0]])
-            if len(supporting_group_indices) == 1
-            else "cross_group"
-        )
+        if common_body_reliable:
+            reason = (
+                f"common_body_supported_by_{accumulator.support_count}_"
+                f"independent_samples_across_"
+                f"{len(supporting_group_indices)}_groups"
+            )
+        else:
+            extent_candidates = (
+                cohort_extent_candidates
+                if cohort_extent_candidates
+                else [
+                    (index, "Supported")
+                    for index in candidate_extent_indices
+                ]
+            )
+            best_index, best_status = max(
+                extent_candidates,
+                key=lambda item: (
+                    item[1] == "Supported",
+                    _candidate_cohort_sample_count(
+                        accumulator,
+                        item[0],
+                    ),
+                    -family.representatives[item[0]].start_offset,
+                ),
+            )
+            reason = (
+                "distributed_long_ORF_extent_"
+                f"{best_status.lower()}_by_"
+                f"{_candidate_cohort_sample_count(accumulator, best_index)}_"
+                "independent_samples"
+            )
+        if len(supporting_group_indices) == 1:
+            reliable_group = str(
+                group_names[supporting_group_indices[0]]
+            )
+        elif len(supporting_group_indices) > 1:
+            reliable_group = "cross_group"
+        else:
+            reliable_group = "cohort_distributed"
     elif not accumulator.any_signal:
         status = "NoEvidence"
         final_evidence = "NoEvidence"
         reliable_group = ""
         reason = "no_common_body_p_site_signal_in_any_sample"
-        evidence_primary = ""
-        start_status = "NotEvaluated"
-        start_reason = "family_translation_not_detected"
+        resolution = replace(
+            resolution,
+            quant_primary="",
+            evidence_primary="",
+            translated_extent_status="NotEvaluated",
+            start_site_status="NotEvaluated",
+            start_site_reason="family_translation_not_detected",
+            selection_reason="family_translation_not_detected",
+            prior_override_status="NotEvaluated",
+        )
     else:
         status = "Uncertain"
         final_evidence = accumulator.best_level
@@ -2282,11 +3529,51 @@ def _family_output_row(
             if accumulator.any_evidence
             else "signal_present_but_no_sample_passed_translation_thresholds"
         )
-        evidence_primary = ""
-        start_status = "Unresolved"
-        start_reason = "family_translation_not_reliably_replicated"
+        failure_reasons = _candidate_failure_reasons(
+            family,
+            accumulator,
+            selected_index,
+            config,
+        )
+        resolution = replace(
+            resolution,
+            quant_primary="",
+            evidence_primary="",
+            translated_extent_status="Unsupported",
+            start_site_status="Unresolved",
+            start_site_reason=(
+                ";".join(failure_reasons)
+                if failure_reasons
+                else "family_translation_not_reliably_replicated"
+            ),
+            selection_reason="candidate_first_resolution_unresolved",
+        )
 
     features = accumulator.best_features
+    complete_candidates = tuple(
+        item.orf_id
+        for item in family.representatives
+        if _candidate_is_complete(item)
+    )
+    failure_reasons = _candidate_failure_reasons(
+        family,
+        accumulator,
+        selected_index,
+        config,
+    )
+    selected_frames = accumulator.candidate_pooled_frame_density[
+        selected_index
+    ]
+    dominant_frame, suggested_shift, phase_status = _phase_audit(
+        selected_frames,
+        config.min_frame_margin,
+    )
+    if resolution.quant_primary:
+        candidate_audit_status = "InputCompleteCandidateSelected"
+    elif complete_candidates:
+        candidate_audit_status = "InputCompleteCandidateUnresolved"
+    else:
+        candidate_audit_status = "NoCompleteInputCandidate"
     return {
         "family_id": family.family_id,
         "gene_id": family.gene_id,
@@ -2297,12 +3584,65 @@ def _family_output_row(
         "family_size": family.family_size,
         "structural_primary": family.structural_primary,
         "common_body_orf": family.common_body_orf,
-        "evidence_primary": evidence_primary,
+        "provisional_primary": provisional_primary,
+        "quant_primary": resolution.quant_primary,
+        "evidence_primary": resolution.evidence_primary,
+        "translation_unit_id": "",
+        "translation_unit_index": 0,
+        "translation_unit_count": 0,
+        "translation_unit_status": "NotAssigned",
         "evidence_status": status,
+        "family_translation_status": status,
+        "translated_extent_status": resolution.translated_extent_status,
+        "extent_supported_sample_count": (
+            resolution.extent_supported_sample_count
+        ),
+        "extent_supporting_samples": ",".join(
+            resolution.extent_supporting_samples
+        ),
+        "extent_supported_bins": ",".join(
+            str(value) for value in resolution.extent_supported_bins
+        ),
+        "extension_rpf_sum": resolution.extension_rpf_sum,
+        "extension_frame0_ratio": resolution.extension_frame0_ratio,
         "family_translation_evidence": final_evidence,
         "reliability_reason": reason,
-        "start_site_status": start_status,
-        "start_site_reason": start_reason,
+        "start_site_status": resolution.start_site_status,
+        "start_site_reason": resolution.start_site_reason,
+        "start_interval_orf_ids": ",".join(
+            resolution.start_interval_orf_ids
+        ),
+        "selection_policy": resolution.selection_policy,
+        "selection_reason": resolution.selection_reason,
+        "canonical_anchor_orf": resolution.canonical_anchor_orf,
+        "longest_candidate_orf": resolution.longest_candidate_orf,
+        "prior_override_status": resolution.prior_override_status,
+        "leading_support_sample_count": (
+            resolution.leading_support_sample_count
+        ),
+        "leading_negative_sample_count": (
+            resolution.leading_negative_sample_count
+        ),
+        "noncanonical_extension_support_sample_count": (
+            resolution.noncanonical_extension_support_sample_count
+        ),
+        "noncanonical_extension_density_ratio": (
+            resolution.noncanonical_extension_density_ratio
+        ),
+        "pooled_extent_rpf_sum": resolution.pooled_extent_rpf_sum,
+        "pooled_extent_frame0_ratio": resolution.pooled_extent_frame0_ratio,
+        "pooled_start_rpf_sum": resolution.pooled_start_rpf_sum,
+        "pooled_end_rpf_sum": resolution.pooled_end_rpf_sum,
+        "pooled_extent_sample_count": resolution.pooled_extent_sample_count,
+        "nested_competition_status": (
+            "Pending"
+            if status == "Reliable"
+            and resolution.translated_extent_status
+            in {"Supported", "Compatible"}
+            else "NotEvaluated"
+        ),
+        "dominant_parent_orf": "",
+        "frame_margin": resolution.frame_margin,
         "reliable_group": reliable_group,
         "supported_sample_count": accumulator.support_count,
         "max_group_sample_support": max_group_support,
@@ -2354,6 +3694,16 @@ def _family_output_row(
             item.start_codon for item in family.representatives
         ),
         "invalid_family_reason": "",
+        "complete_candidate_count": len(complete_candidates),
+        "complete_candidate_orf_ids": ",".join(complete_candidates),
+        "candidate_audit_status": candidate_audit_status,
+        "candidate_failure_reasons": ";".join(failure_reasons),
+        "pooled_frame0_density": selected_frames[0],
+        "pooled_frame1_density": selected_frames[1],
+        "pooled_frame2_density": selected_frames[2],
+        "pooled_dominant_frame": dominant_frame,
+        "suggested_psite_shift_nt": suggested_shift,
+        "phase_audit_status": phase_status,
     }
 
 
@@ -2371,12 +3721,45 @@ def _invalid_output_row(family: InvalidFamily) -> dict[str, Any]:
         "family_size": family.family_size,
         "structural_primary": family.structural_primary,
         "common_body_orf": "",
+        "provisional_primary": "",
+        "quant_primary": "",
         "evidence_primary": "",
+        "translation_unit_id": "",
+        "translation_unit_index": 0,
+        "translation_unit_count": 0,
+        "translation_unit_status": "NotAssigned",
         "evidence_status": "Uncertain",
+        "family_translation_status": "Uncertain",
+        "translated_extent_status": "NotEvaluated",
+        "extent_supported_sample_count": 0,
+        "extent_supporting_samples": "",
+        "extent_supported_bins": "",
+        "extension_rpf_sum": 0.0,
+        "extension_frame0_ratio": 0.0,
         "family_translation_evidence": "InvalidFamilyGeometry",
         "reliability_reason": "family_geometry_validation_failed",
         "start_site_status": "Unresolved",
         "start_site_reason": "invalid_family_geometry",
+        "start_interval_orf_ids": "",
+        "selection_policy": (
+            "canonical_ATG_then_longest_unless_replicated_RPF_override"
+        ),
+        "selection_reason": "invalid_family_geometry",
+        "canonical_anchor_orf": "",
+        "longest_candidate_orf": "",
+        "prior_override_status": "NotEvaluated",
+        "leading_support_sample_count": 0,
+        "leading_negative_sample_count": 0,
+        "noncanonical_extension_support_sample_count": 0,
+        "noncanonical_extension_density_ratio": 0.0,
+        "pooled_extent_rpf_sum": 0.0,
+        "pooled_extent_frame0_ratio": 0.0,
+        "pooled_start_rpf_sum": 0.0,
+        "pooled_end_rpf_sum": 0.0,
+        "pooled_extent_sample_count": 0,
+        "nested_competition_status": "NotEvaluated",
+        "dominant_parent_orf": "",
+        "frame_margin": 0.0,
         "reliable_group": "",
         "supported_sample_count": 0,
         "max_group_sample_support": 0,
@@ -2400,6 +3783,16 @@ def _invalid_output_row(family: InvalidFamily) -> dict[str, Any]:
         "representative_orf_ids": "",
         "representative_start_codons": "",
         "invalid_family_reason": family.reason,
+        "complete_candidate_count": 0,
+        "complete_candidate_orf_ids": "",
+        "candidate_audit_status": "InvalidFamilyGeometry",
+        "candidate_failure_reasons": "invalid_family_geometry",
+        "pooled_frame0_density": 0.0,
+        "pooled_frame1_density": 0.0,
+        "pooled_frame2_density": 0.0,
+        "pooled_dominant_frame": -1,
+        "suggested_psite_shift_nt": 0,
+        "phase_audit_status": "NotEvaluated",
     }
 
 
@@ -2494,7 +3887,36 @@ def _process_chromosome(task: ChromosomeTask) -> ChromosomeResult:
         ):
             valid_families = [item for item in batch if isinstance(item, FamilyGeometry)]
             invalid_families = [item for item in batch if isinstance(item, InvalidFamily)]
-            accumulators = [_new_accumulator(family) for family in valid_families]
+            accumulators = [
+                _new_accumulator(family, task.config)
+                for family in valid_families
+            ]
+            canonical_indices = [
+                _canonical_anchor_index(family)
+                for family in valid_families
+            ]
+            diagnostic_index_sets = []
+            for family, canonical_index in zip(
+                valid_families,
+                canonical_indices,
+            ):
+                if canonical_index is None:
+                    diagnostic_index_sets.append({0})
+                    continue
+                canonical_start = family.representatives[
+                    canonical_index
+                ].start_offset
+                diagnostic_index_sets.append(
+                    {canonical_index}
+                    | {
+                        index
+                        for index, representative in enumerate(
+                            family.representatives
+                        )
+                        if representative.start_offset < canonical_start
+                        and representative.start_codon.upper() != "ATG"
+                    }
+                )
 
             for sample in samples:
                 threshold = thresholds_by_sample[sample]
@@ -2512,8 +3934,12 @@ def _process_chromosome(task: ChromosomeTask) -> ChromosomeResult:
                         family_index = indices[subset_index]
                         family = valid_families[family_index]
                         accumulator = accumulators[family_index]
-                        features = segment_features(
-                            signal[0], signal[1],
+                        profile = ScaffoldProfile(
+                            signal[0],
+                            signal[1],
+                            family.scaffold_coding_nt_length,
+                        )
+                        features = profile.region_features(
                             family.common_body_start,
                             family.common_body_end,
                             threshold,
@@ -2560,28 +3986,265 @@ def _process_chromosome(task: ChromosomeTask) -> ChromosomeResult:
                                     + 1
                                 )
 
-                        representatives = family.representatives
-                        for segment_index in range(len(representatives) - 1):
-                            segment_start = representatives[segment_index].start_offset
-                            segment_end = representatives[segment_index + 1].start_offset
-                            extension = segment_features(
-                                signal[0], signal[1],
-                                segment_start, segment_end,
+                        canonical_index = canonical_indices[family_index]
+                        diagnostic_indices = diagnostic_index_sets[family_index]
+                        canonical_features = features
+                        canonical_start: int | None = None
+                        if canonical_index is not None:
+                            canonical_start = family.representatives[
+                                canonical_index
+                            ].start_offset
+                            if canonical_start != family.common_body_start:
+                                canonical_features = profile.region_features(
+                                    canonical_start,
+                                    family.common_body_end,
+                                    threshold,
+                                    task.config,
+                                )
+
+                        for candidate_index, representative in enumerate(
+                            family.representatives
+                        ):
+                            candidate_start = representative.start_offset
+                            candidate_end = family.common_body_end
+                            extension_end = family.common_body_start
+                            full = (
+                                features
+                                if candidate_start == family.common_body_start
+                                else profile.region_features(
+                                    candidate_start, candidate_end,
+                                    threshold, task.config,
+                                )
+                            )
+                            if full.rpf_sum > 0:
+                                accumulator.any_signal = True
+                            extension = profile.region_features(
+                                candidate_start, extension_end,
                                 threshold, task.config,
                             )
-                            if classify_extension(extension, threshold):
-                                accumulator.segment_support_counts[segment_index] += 1
-                                accumulator.segment_support_samples[segment_index].append(sample)
-                                group_counts = (
-                                    accumulator
-                                    .segment_group_support_counts[segment_index]
+                            full_codons = max(
+                                0, (candidate_end - candidate_start) // 3
+                            )
+                            extension_codons = max(
+                                0, (extension_end - candidate_start) // 3
+                            )
+                            full_supported, extension_supported = (
+                                classify_candidate_extent(
+                                    full,
+                                    extension,
+                                    full_codons,
+                                    extension_codons,
+                                    threshold,
+                                    task.config,
                                 )
-                                group_counts[group_id] = (
-                                    group_counts.get(group_id, 0) + 1
+                            )
+                            if full_supported:
+                                accumulator.candidate_full_support_counts[
+                                    candidate_index
+                                ] += 1
+                            if extension_supported:
+                                accumulator.candidate_extension_support_counts[
+                                    candidate_index
+                                ] += 1
+                            if full_supported or (
+                                extension_supported and extension.rpf_sum > 0
+                            ):
+                                accumulator.candidate_support_samples[
+                                    candidate_index
+                                ].append(sample)
+
+                            if candidate_index in diagnostic_indices:
+                                leading_end = _leading_region_end(
+                                    family,
+                                    candidate_index,
+                                    canonical_index,
+                                    task.config,
                                 )
-                                accumulator.segment_best_scores[segment_index] = max(
-                                    accumulator.segment_best_scores[segment_index],
-                                    extension.score,
+                                leading_codons = max(
+                                    0,
+                                    (leading_end - candidate_start) // 3,
+                                )
+                                leading = profile.region_features(
+                                    candidate_start,
+                                    leading_end,
+                                    threshold,
+                                    task.config,
+                                )
+                                if _leading_region_is_supported(
+                                    leading,
+                                    leading_codons,
+                                    threshold,
+                                    task.config,
+                                ):
+                                    accumulator.candidate_leading_support_counts[
+                                        candidate_index
+                                    ] += 1
+                                if (
+                                    LEVEL_RANK[level]
+                                    >= LEVEL_RANK["MediumConfidence"]
+                                    and _leading_region_is_negative(
+                                        leading,
+                                        features,
+                                        leading_codons,
+                                        threshold,
+                                        task.config,
+                                    )
+                                ):
+                                    accumulator.candidate_leading_negative_counts[
+                                        candidate_index
+                                    ] += 1
+
+                            if (
+                                canonical_index is not None
+                                and canonical_start is not None
+                                and candidate_start < canonical_start
+                                and representative.start_codon.upper() != "ATG"
+                            ):
+                                noncanonical_extension = (
+                                    profile.region_features(
+                                        candidate_start,
+                                        canonical_start,
+                                        threshold,
+                                        task.config,
+                                    )
+                                )
+                                noncanonical_codons = (
+                                    canonical_start - candidate_start
+                                ) // 3
+                                density_ratio = (
+                                    noncanonical_extension.rpf_per_codon
+                                    / canonical_features.rpf_per_codon
+                                    if canonical_features.rpf_per_codon > 0
+                                    else 0.0
+                                )
+                                accumulator.candidate_best_noncanonical_density_ratios[
+                                    candidate_index
+                                ] = max(
+                                    accumulator.candidate_best_noncanonical_density_ratios[
+                                        candidate_index
+                                    ],
+                                    density_ratio,
+                                )
+                                if _noncanonical_extension_is_strong(
+                                    noncanonical_extension,
+                                    canonical_features,
+                                    noncanonical_codons,
+                                    threshold,
+                                    task.config,
+                                ):
+                                    accumulator.candidate_noncanonical_extension_support_counts[
+                                        candidate_index
+                                    ] += 1
+
+                            previous_full = (
+                                accumulator.candidate_best_full_features[
+                                    candidate_index
+                                ]
+                            )
+                            if (
+                                previous_full is None
+                                or full.score > previous_full.score
+                            ):
+                                accumulator.candidate_best_full_features[
+                                    candidate_index
+                                ] = full
+                            previous_extension = (
+                                accumulator.candidate_best_extension_features[
+                                    candidate_index
+                                ]
+                            )
+                            if (
+                                previous_extension is None
+                                or extension.score > previous_extension.score
+                            ):
+                                accumulator.candidate_best_extension_features[
+                                    candidate_index
+                                ] = extension
+                            pooled = accumulator.candidate_pooled_frame_density[
+                                candidate_index
+                            ]
+                            pooled[0] += full.frame0_density
+                            pooled[1] += full.frame1_density
+                            pooled[2] += full.frame2_density
+                            if (
+                                full.rpf_sum > 0
+                                and full.frame0_density >= 1.0
+                                and _frame_margin(
+                                    (
+                                        full.frame0_density,
+                                        full.frame1_density,
+                                        full.frame2_density,
+                                    )
+                                )
+                                >= task.config.min_frame_margin
+                            ):
+                                accumulator.candidate_cohort_support_samples[
+                                    candidate_index
+                                ].append(sample)
+
+                            bin_ranges = (
+                                _candidate_bin_ranges(
+                                    candidate_start,
+                                    candidate_end,
+                                    task.config.extent_bins,
+                                )
+                                if full_codons >= task.config.long_min_codons
+                                else ()
+                            )
+                            sample_has_supported_bin = False
+                            for bin_index, (bin_start, bin_end) in enumerate(
+                                bin_ranges
+                            ):
+                                bin_features = profile.region_features(
+                                    bin_start, bin_end,
+                                    threshold, task.config,
+                                )
+                                _accumulate_pooled_segment(
+                                    accumulator.candidate_bin_pooled_stats[
+                                        candidate_index
+                                    ][bin_index],
+                                    bin_features,
+                                )
+                                if _bin_is_supported(
+                                    bin_features,
+                                    threshold,
+                                ):
+                                    accumulator.candidate_bin_support_counts[
+                                        candidate_index
+                                    ][bin_index] += 1
+                                    sample_has_supported_bin = True
+                            if sample_has_supported_bin:
+                                accumulator.candidate_bin_support_samples[
+                                    candidate_index
+                                ].append(sample)
+                            if bin_ranges:
+                                boundary_codons = min(
+                                    task.config.window_codons,
+                                    full_codons,
+                                )
+                                start_boundary = profile.region_features(
+                                    candidate_start,
+                                    candidate_start + boundary_codons * 3,
+                                    threshold,
+                                    task.config,
+                                )
+                                end_boundary = profile.region_features(
+                                    candidate_end - boundary_codons * 3,
+                                    candidate_end,
+                                    threshold,
+                                    task.config,
+                                )
+                                _accumulate_pooled_segment(
+                                    accumulator.candidate_boundary_pooled_stats[
+                                        candidate_index
+                                    ][0],
+                                    start_boundary,
+                                )
+                                _accumulate_pooled_segment(
+                                    accumulator.candidate_boundary_pooled_stats[
+                                        candidate_index
+                                    ][1],
+                                    end_boundary,
                                 )
 
             rows: list[Mapping[str, Any]] = []
@@ -2594,7 +4257,9 @@ def _process_chromosome(task: ChromosomeTask) -> ChromosomeResult:
                 if row["evidence_status"] == "Reliable":
                     counts["reliable_families"] += 1
                     if (
-                        row["start_site_status"] == "Resolved"
+                        row["translated_extent_status"]
+                        in {"Supported", "Compatible"}
+                        and row["quant_primary"]
                         and not _is_annotated_category(row["category"])
                     ):
                         counts["reliable_smorfs"] += 1
@@ -2616,7 +4281,7 @@ def _process_chromosome(task: ChromosomeTask) -> ChromosomeResult:
     os.replace(temporary, part_path)
     count_path.write_text(json.dumps(counts, indent=2), encoding="utf-8")
     done_path.write_text(
-        json.dumps({"engine": ENGINE_VERSION, "chromosome": task.chromosome}),
+        json.dumps({"chromosome": task.chromosome}),
         encoding="utf-8",
     )
     return ChromosomeResult(
@@ -2749,6 +4414,624 @@ def _export_reliable_genepred(
     return expected
 
 
+def _geometry_blocks(row: Mapping[str, Any]) -> tuple[tuple[int, int], ...]:
+    """Return sorted genomic blocks from one geometry row."""
+    starts = _split_ints(row["exon_starts"])
+    ends = _split_ints(row["exon_ends"])
+    return tuple(sorted(zip(starts, ends), key=lambda item: item[0]))
+
+
+def _blocks_contain(
+    parent: Sequence[tuple[int, int]],
+    child: Sequence[tuple[int, int]],
+) -> bool:
+    """Return whether every child coding block is covered by parent blocks."""
+    parent_index = 0
+    for child_start, child_end in child:
+        while (
+            parent_index < len(parent)
+            and parent[parent_index][1] <= child_start
+        ):
+            parent_index += 1
+        if parent_index >= len(parent):
+            return False
+        parent_start, parent_end = parent[parent_index]
+        if parent_start > child_start or parent_end < child_end:
+            return False
+    return True
+
+
+def _block_length(blocks: Sequence[tuple[int, int]]) -> int:
+    """Return the total spliced length of genomic blocks."""
+    return sum(max(0, end - start) for start, end in blocks)
+
+
+def _block_overlap_length(
+    first: Sequence[tuple[int, int]],
+    second: Sequence[tuple[int, int]],
+) -> int:
+    """Return the genomic overlap length between two sorted block sets."""
+    first_index = 0
+    second_index = 0
+    overlap = 0
+    while first_index < len(first) and second_index < len(second):
+        first_start, first_end = first[first_index]
+        second_start, second_end = second[second_index]
+        overlap += max(
+            0,
+            min(first_end, second_end) - max(first_start, second_start),
+        )
+        if first_end <= second_end:
+            first_index += 1
+        else:
+            second_index += 1
+    return overlap
+
+
+def _shorter_overlap_fraction(
+    first: Sequence[tuple[int, int]],
+    second: Sequence[tuple[int, int]],
+) -> float:
+    """Return overlap as a fraction of the shorter spliced ORF."""
+    denominator = min(_block_length(first), _block_length(second))
+    if denominator <= 0:
+        return 0.0
+    return _block_overlap_length(first, second) / denominator
+
+
+def _first_overlap_position(
+    first: Sequence[tuple[int, int]],
+    second: Sequence[tuple[int, int]],
+    strand: str,
+) -> int | None:
+    """Return the first shared genomic base in transcript orientation."""
+    overlaps: list[tuple[int, int]] = []
+    first_index = 0
+    second_index = 0
+    while first_index < len(first) and second_index < len(second):
+        start = max(first[first_index][0], second[second_index][0])
+        end = min(first[first_index][1], second[second_index][1])
+        if end > start:
+            overlaps.append((start, end))
+        if first[first_index][1] <= second[second_index][1]:
+            first_index += 1
+        else:
+            second_index += 1
+    if not overlaps:
+        return None
+    return overlaps[0][0] if strand == "+" else overlaps[-1][1] - 1
+
+
+def _same_overlap_frame(
+    first_blocks: Sequence[tuple[int, int]],
+    second_blocks: Sequence[tuple[int, int]],
+    strand: str,
+) -> bool:
+    """Return whether two overlapping ORFs use the same coding frame."""
+    position = _first_overlap_position(first_blocks, second_blocks, strand)
+    if position is None:
+        return False
+    first_offset = _transcript_offset(first_blocks, strand, position)
+    second_offset = _transcript_offset(second_blocks, strand, position)
+    return (
+        first_offset is not None
+        and second_offset is not None
+        and first_offset % 3 == second_offset % 3
+    )
+
+
+def _transcript_offset(
+    blocks: Sequence[tuple[int, int]],
+    strand: str,
+    genomic_position: int,
+) -> int | None:
+    """Map one genomic base to a spliced offset from the parent ORF start."""
+    offset = 0
+    for start, end in _oriented_blocks(
+        [item[0] for item in blocks],
+        [item[1] for item in blocks],
+        strand,
+    ):
+        if start <= genomic_position < end:
+            return (
+                offset + genomic_position - start
+                if strand == "+"
+                else offset + end - 1 - genomic_position
+            )
+        offset += end - start
+    return None
+
+
+def _same_coding_frame(
+    parent_blocks: Sequence[tuple[int, int]],
+    child_blocks: Sequence[tuple[int, int]],
+    strand: str,
+) -> bool:
+    """Return whether the child start is frame-compatible with the parent."""
+    oriented_child = _oriented_blocks(
+        [item[0] for item in child_blocks],
+        [item[1] for item in child_blocks],
+        strand,
+    )
+    if not oriented_child:
+        return False
+    child_start = (
+        oriented_child[0][0]
+        if strand == "+"
+        else oriented_child[0][1] - 1
+    )
+    offset = _transcript_offset(parent_blocks, strand, child_start)
+    return offset is not None and offset % 3 == 0
+
+
+def _assign_translation_units(
+    parsed: Sequence[
+        tuple[sqlite3.Row, tuple[tuple[int, int], ...]]
+    ],
+) -> dict[str, tuple[str, int, int, str]]:
+    """Assign overlap-connected ORFs to independent transcript units."""
+    if not parsed:
+        return {}
+    parents = list(range(len(parsed)))
+
+    def find(index: int) -> int:
+        while parents[index] != index:
+            parents[index] = parents[parents[index]]
+            index = parents[index]
+        return index
+
+    def union(first: int, second: int) -> None:
+        first_root = find(first)
+        second_root = find(second)
+        if first_root != second_root:
+            parents[second_root] = first_root
+
+    interval_order = sorted(
+        range(len(parsed)),
+        key=lambda index: (
+            min(start for start, _ in parsed[index][1]),
+            max(end for _, end in parsed[index][1]),
+        ),
+    )
+    active: list[int] = []
+    for index in interval_order:
+        blocks = parsed[index][1]
+        left = min(start for start, _ in blocks)
+        active = [
+            other
+            for other in active
+            if max(end for _, end in parsed[other][1]) > left
+        ]
+        for other in active:
+            if _block_overlap_length(blocks, parsed[other][1]) > 0:
+                union(index, other)
+        active.append(index)
+
+    components: dict[int, list[int]] = defaultdict(list)
+    for index in range(len(parsed)):
+        components[find(index)].append(index)
+    first_row = parsed[0][0]
+    strand = str(first_row["strand"])
+    ordered_components = sorted(
+        components.values(),
+        key=lambda indices: (
+            min(
+                start
+                for index in indices
+                for start, _ in parsed[index][1]
+            )
+            if strand == "+"
+            else -max(
+                end
+                for index in indices
+                for _, end in parsed[index][1]
+            )
+        ),
+    )
+    unit_count = len(ordered_components)
+    gene_id = str(first_row["gene_id"])
+    transcript_id = str(first_row["transcript_id"])
+    assignments: dict[str, tuple[str, int, int, str]] = {}
+    for unit_index, indices in enumerate(ordered_components, start=1):
+        unit_id = f"{gene_id}|{transcript_id}|TU{unit_index:03d}"
+        unit_status = (
+            "OverlappingCompetitionUnit"
+            if len(indices) > 1
+            else "IndependentNonOverlappingUnit"
+        )
+        for index in indices:
+            assignments[str(parsed[index][0]["family_id"])] = (
+                unit_id,
+                unit_index,
+                unit_count,
+                unit_status,
+            )
+    return assignments
+
+
+def _apply_nested_competition(
+    raw_master_path: Path,
+    final_master_path: Path,
+    connection: sqlite3.Connection,
+    config: EngineConfig,
+) -> tuple[dict[str, int], dict[str, int]]:
+    """Assign transcript units and suppress explainable nested ORFs."""
+    connection.execute("DROP TABLE IF EXISTS temp.candidate_calls")
+    connection.execute(
+        """
+        CREATE TEMP TABLE candidate_calls (
+            family_id TEXT PRIMARY KEY,
+            orf_id TEXT NOT NULL,
+            gene_id TEXT NOT NULL,
+            chrom TEXT NOT NULL,
+            strand TEXT NOT NULL,
+            category TEXT NOT NULL,
+            evidence_status TEXT NOT NULL,
+            frame_margin REAL NOT NULL,
+            phase_rpf REAL NOT NULL,
+            extent_sample_count INTEGER NOT NULL,
+            extent_status TEXT NOT NULL,
+            start_site_status TEXT NOT NULL,
+            prior_override_status TEXT NOT NULL,
+            leading_support_count INTEGER NOT NULL,
+            noncanonical_support_count INTEGER NOT NULL,
+            competition_status TEXT NOT NULL DEFAULT 'Independent',
+            dominant_parent_orf TEXT NOT NULL DEFAULT '',
+            overlap_fraction REAL NOT NULL DEFAULT 0.0,
+            frame_relation TEXT NOT NULL DEFAULT 'NotEvaluated',
+            competition_reason TEXT NOT NULL DEFAULT ''
+        ) WITHOUT ROWID
+        """
+    )
+    batch: list[tuple[Any, ...]] = []
+    with gzip.open(raw_master_path, "rt", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        for row in reader:
+            provisional_primary = (
+                row.get("provisional_primary")
+                or row.get("quant_primary")
+                or ""
+            )
+            if not provisional_primary:
+                continue
+            if (
+                int(row.get("complete_candidate_count", "0") or 0) < 1
+                and not row.get("quant_primary")
+            ):
+                continue
+            batch.append(
+                (
+                    row["family_id"],
+                    provisional_primary,
+                    row["gene_id"],
+                    row["chrom"],
+                    row["strand"],
+                    row["category"],
+                    row.get("evidence_status", "Uncertain"),
+                    float(row.get("frame_margin", "0") or 0.0),
+                    float(
+                        row.get("pooled_frame0_density", "0")
+                        or row.get("best_rpf_sum", "0")
+                        or 0.0
+                    ),
+                    int(
+                        row.get("pooled_extent_sample_count", "0")
+                        or row.get("extent_supported_sample_count", "0")
+                        or 0
+                    ),
+                    row.get("translated_extent_status", ""),
+                    row.get("start_site_status", ""),
+                    row.get("prior_override_status", ""),
+                    int(row.get("leading_support_sample_count", "0") or 0),
+                    int(
+                        row.get(
+                            "noncanonical_extension_support_sample_count",
+                            "0",
+                        )
+                        or 0
+                    ),
+                )
+            )
+            if len(batch) >= SQL_BATCH_SIZE:
+                connection.executemany(
+                    "INSERT INTO candidate_calls "
+                    "(family_id,orf_id,gene_id,chrom,strand,category,"
+                    "evidence_status,frame_margin,phase_rpf,"
+                    "extent_sample_count,extent_status,start_site_status,"
+                    "prior_override_status,leading_support_count,"
+                    "noncanonical_support_count) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    batch,
+                )
+                batch.clear()
+        if batch:
+            connection.executemany(
+                "INSERT INTO candidate_calls "
+                "(family_id,orf_id,gene_id,chrom,strand,category,"
+                "evidence_status,frame_margin,phase_rpf,"
+                "extent_sample_count,extent_status,start_site_status,"
+                "prior_override_status,leading_support_count,"
+                "noncanonical_support_count) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                batch,
+            )
+    connection.execute(
+        "CREATE INDEX candidate_calls_group_idx ON "
+        "candidate_calls(gene_id, chrom, strand)"
+    )
+
+    query = """
+        SELECT c.*, g.transcript_id, g.start_codon, g.nt_length,
+               g.exon_starts, g.exon_ends
+        FROM candidate_calls c
+        JOIN geometry g ON g.orf_id=c.orf_id
+        ORDER BY c.gene_id, g.transcript_id, c.chrom, c.strand,
+                 g.nt_length DESC, c.orf_id
+    """
+    updates: list[tuple[str, str, float, str, str, str]] = []
+    group_rows: list[sqlite3.Row] = []
+    group_key: tuple[str, str, str, str] | None = None
+    unit_assignments: dict[str, tuple[str, int, int, str]] = {}
+
+    def resolve_group(rows: Sequence[sqlite3.Row]) -> None:
+        parsed: list[tuple[sqlite3.Row, tuple[tuple[int, int], ...]]] = [
+            (row, _geometry_blocks(row)) for row in rows
+        ]
+        current_units = _assign_translation_units(parsed)
+        unit_assignments.update(current_units)
+        suppressed_parent_families: set[str] = set()
+        for child_index, (child, child_blocks) in enumerate(parsed):
+            competitors: list[
+                tuple[
+                    sqlite3.Row,
+                    tuple[tuple[int, int], ...],
+                    float,
+                    bool,
+                ]
+            ] = []
+            for parent, parent_blocks in parsed[:child_index]:
+                if (
+                    current_units[str(parent["family_id"])][0]
+                    != current_units[str(child["family_id"])][0]
+                ):
+                    continue
+                if str(parent["family_id"]) in suppressed_parent_families:
+                    continue
+                if str(parent["evidence_status"]) != "Reliable":
+                    continue
+                if int(parent["nt_length"]) <= int(child["nt_length"]):
+                    continue
+                contained = _blocks_contain(parent_blocks, child_blocks)
+                overlap_fraction = _shorter_overlap_fraction(
+                    parent_blocks,
+                    child_blocks,
+                )
+                if (
+                    contained
+                    or overlap_fraction >= config.high_overlap_fraction
+                ):
+                    competitors.append(
+                        (
+                            parent,
+                            parent_blocks,
+                            overlap_fraction,
+                            contained,
+                        )
+                    )
+            if not competitors:
+                continue
+            parent, parent_blocks, overlap_fraction, contained = max(
+                competitors,
+                key=lambda value: (
+                    value[2],
+                    str(value[0]["start_codon"]).upper() == "ATG",
+                    int(value[0]["nt_length"]),
+                    str(value[0]["orf_id"]),
+                ),
+            )
+            same_frame = _same_overlap_frame(
+                parent_blocks,
+                child_blocks,
+                str(child["strand"]),
+            )
+            frame_relation = "SameFrame" if same_frame else "DifferentFrame"
+            parent_noncanonical_supported = (
+                str(parent["start_codon"]).upper() != "ATG"
+                and str(parent["extent_status"]) == "Supported"
+                and int(parent["leading_support_count"])
+                >= config.reliable_sample
+                and int(parent["noncanonical_support_count"])
+                >= config.reliable_sample
+                and str(parent["prior_override_status"])
+                == "OverriddenByStrongNoncanonicalExtension"
+            )
+            canonical_child_over_parent = (
+                same_frame
+                and str(child["start_codon"]).upper() == "ATG"
+                and str(parent["start_codon"]).upper() != "ATG"
+                and not parent_noncanonical_supported
+            )
+            if canonical_child_over_parent:
+                updates.append(
+                    (
+                        "ShadowedByCanonicalATG",
+                        str(child["orf_id"]),
+                        overlap_fraction,
+                        frame_relation,
+                        "canonical_ATG_preferred_without_replicated_"
+                        "noncanonical_exclusive_translation",
+                        str(parent["family_id"]),
+                    )
+                )
+                suppressed_parent_families.add(str(parent["family_id"]))
+                continue
+            strong_overlap = (
+                overlap_fraction >= config.high_overlap_fraction
+            )
+            required_margin = (
+                config.overlap_min_frame_margin
+                if strong_overlap
+                else config.nested_min_frame_margin
+            )
+            required_rpf = (
+                config.overlap_min_phase_rpf
+                if strong_overlap
+                else config.nested_min_phase_rpf
+            )
+            if (
+                str(parent["start_codon"]).upper() == "ATG"
+                and str(child["start_codon"]).upper() != "ATG"
+            ):
+                required_margin += 0.05
+                required_rpf *= 1.25
+            required_rpf = max(
+                required_rpf,
+                float(parent["phase_rpf"]) * 0.25,
+            )
+            independent_phase = (
+                str(child["extent_status"]) == "Supported"
+                and
+                float(child["frame_margin"])
+                >= required_margin
+                and float(child["phase_rpf"])
+                >= required_rpf
+                and int(child["extent_sample_count"])
+                >= config.reliable_sample
+            )
+            start_site_resolved = str(child["start_site_status"]) in {
+                "Exact",
+                "UniqueCandidate",
+            }
+            noncanonical_start_resolved = (
+                str(child["start_codon"]).upper() == "ATG"
+                or (
+                    str(child["prior_override_status"])
+                    == "OverriddenByStrongNoncanonicalExtension"
+                    and int(child["leading_support_count"])
+                    >= config.reliable_sample
+                    and int(child["noncanonical_support_count"])
+                    >= config.reliable_sample
+                )
+            )
+            independent_start = (
+                start_site_resolved and noncanonical_start_resolved
+            )
+            if not same_frame and independent_phase and independent_start:
+                updates.append(
+                    (
+                        "IndependentOverlappingORF",
+                        str(parent["orf_id"]),
+                        overlap_fraction,
+                        frame_relation,
+                        "independent_frame_advantage_and_replicated_"
+                        "translation_support",
+                        str(child["family_id"]),
+                    )
+                )
+            else:
+                status = (
+                    "ShadowedByLongORF"
+                    if contained
+                    else "ShadowedByHighOverlapORF"
+                )
+                reason = (
+                    "same_frame_overlap_explained_by_longer_ORF"
+                    if same_frame
+                    else "insufficient_independent_start_frame_or_"
+                    "abundance_evidence_in_high_overlap_region"
+                )
+                updates.append(
+                    (
+                        status,
+                        str(parent["orf_id"]),
+                        overlap_fraction,
+                        frame_relation,
+                        reason,
+                        str(child["family_id"]),
+                    )
+                )
+
+    for row in connection.execute(query):
+        current_key = (
+            str(row["gene_id"]),
+            str(row["transcript_id"]),
+            str(row["chrom"]),
+            str(row["strand"]),
+        )
+        if group_key is None:
+            group_key = current_key
+        elif current_key != group_key:
+            resolve_group(group_rows)
+            group_rows = []
+            group_key = current_key
+        group_rows.append(row)
+    if group_rows:
+        resolve_group(group_rows)
+    if updates:
+        connection.executemany(
+            "UPDATE candidate_calls SET competition_status=?, "
+            "dominant_parent_orf=?, overlap_fraction=?, frame_relation=?, "
+            "competition_reason=? WHERE family_id=?",
+            updates,
+        )
+
+    competition = {
+        str(row["family_id"]): (
+            str(row["competition_status"]),
+            str(row["dominant_parent_orf"]),
+            float(row["overlap_fraction"]),
+            str(row["frame_relation"]),
+            str(row["competition_reason"]),
+        )
+        for row in connection.execute(
+            "SELECT family_id, competition_status, dominant_parent_orf, "
+            "overlap_fraction, frame_relation, competition_reason "
+            "FROM candidate_calls"
+        )
+    }
+    counts: dict[str, int] = defaultdict(int)
+    unit_counts: dict[str, int] = defaultdict(int)
+    for unit_id, _, _, unit_status in set(unit_assignments.values()):
+        unit_counts[unit_status] += 1
+    with gzip.open(raw_master_path, "rt", encoding="utf-8") as source, final_master_path.open(
+        "w",
+        encoding="utf-8",
+        buffering=8 * 1024 * 1024,
+        newline="",
+    ) as target:
+        reader = csv.DictReader(source, delimiter="\t")
+        writer = csv.DictWriter(
+            target,
+            fieldnames=_output_columns(),
+            delimiter="\t",
+            lineterminator="\n",
+            extrasaction="ignore",
+        )
+        writer.writeheader()
+        for row in reader:
+            status = competition.get(row["family_id"])
+            if status is not None:
+                row["nested_competition_status"] = status[0]
+                row["dominant_parent_orf"] = status[1]
+                row["competition_overlap_fraction"] = status[2]
+                row["competition_frame_relation"] = status[3]
+                row["competition_reason"] = status[4]
+                counts[status[0]] += 1
+            unit = unit_assignments.get(row["family_id"])
+            if unit is not None:
+                row["translation_unit_id"] = unit[0]
+                row["translation_unit_index"] = unit[1]
+                row["translation_unit_count"] = unit[2]
+                row["translation_unit_status"] = unit[3]
+            writer.writerow(
+                {
+                    column: _format_value(row.get(column, ""))
+                    for column in _output_columns()
+                }
+            )
+    return dict(counts), dict(unit_counts)
+
+
 def _merge_outputs(
     output_prefix: Path,
     chromosome_results: Sequence[ChromosomeResult],
@@ -2760,15 +5043,17 @@ def _merge_outputs(
     logger: _StageLogger | None = None,
 ) -> EngineResult:
     """Merge evidence and atomically export the reliable ORF annotation."""
-    master_path = Path(str(output_prefix) + ".smorf_evidence.txt.gz")
+    master_path = Path(str(output_prefix) + ".smorf_evidence.txt")
     reliable_path = Path(str(output_prefix) + ".reliable_smorf.txt")
     genepred_path = Path(str(output_prefix) + ".reliable_smorf.genepred")
     summary_path = Path(str(output_prefix) + ".evidence_summary.txt")
+    master_raw_tmp = master_path.with_name(master_path.name + ".raw.tmp")
     master_tmp = master_path.with_name(master_path.name + ".tmp")
     reliable_tmp = reliable_path.with_name(reliable_path.name + ".tmp")
     genepred_tmp = genepred_path.with_name(genepred_path.name + ".tmp")
     summary_tmp = summary_path.with_name(summary_path.name + ".tmp")
     temporary_paths = (
+        master_raw_tmp,
         master_tmp,
         reliable_tmp,
         genepred_tmp,
@@ -2777,11 +5062,35 @@ def _merge_outputs(
     reliable_columns = (
         "family_id", "gene_id", "chrom", "strand", "category",
         "family_type", "family_size", "structural_primary",
-        "evidence_primary", "transcript_id", "start_codon", "stop_codon",
+        "provisional_primary", "quant_primary", "evidence_primary",
+        "transcript_id",
+        "translation_unit_id", "translation_unit_index",
+        "translation_unit_count", "translation_unit_status",
+        "start_codon", "stop_codon",
         "nt_length", "aa_length", "exon_starts", "exon_ends",
+        "family_translation_status", "translated_extent_status",
+        "extent_supported_sample_count", "extent_supporting_samples",
+        "extent_supported_bins", "start_site_status",
+        "start_interval_orf_ids", "selection_policy", "selection_reason",
+        "canonical_anchor_orf", "longest_candidate_orf",
+        "prior_override_status", "leading_support_sample_count",
+        "leading_negative_sample_count",
+        "noncanonical_extension_support_sample_count",
+        "noncanonical_extension_density_ratio",
+        "pooled_extent_rpf_sum", "pooled_extent_frame0_ratio",
+        "pooled_start_rpf_sum", "pooled_end_rpf_sum",
+        "pooled_extent_sample_count",
+        "nested_competition_status",
+        "dominant_parent_orf", "competition_overlap_fraction",
+        "competition_frame_relation", "competition_reason", "frame_margin",
         "supported_sample_count", "supporting_samples", "best_sample",
         "best_sample_evidence", "best_rpf_sum", "best_coverage_ratio",
         "best_frame0_ratio", "reliability_reason", "start_site_reason",
+        "complete_candidate_count", "complete_candidate_orf_ids",
+        "candidate_audit_status", "candidate_failure_reasons",
+        "pooled_frame0_density", "pooled_frame1_density",
+        "pooled_frame2_density", "pooled_dominant_frame",
+        "suggested_psite_shift_nt", "phase_audit_status",
     )
     reliable_smorfs_written = 0
     annotated_controls_excluded = 0
@@ -2789,13 +5098,13 @@ def _merge_outputs(
     connection: sqlite3.Connection | None = None
     try:
         with gzip.open(
-            master_tmp,
+            master_raw_tmp,
             "wt",
             encoding="utf-8",
             compresslevel=1,
         ) as handle:
             handle.write("\t".join(_output_columns()) + "\n")
-        with master_tmp.open("ab") as target:
+        with master_raw_tmp.open("ab") as target:
             for result in chromosome_results:
                 with Path(result.part_path).open("rb") as source:
                     shutil.copyfileobj(
@@ -2806,6 +5115,17 @@ def _merge_outputs(
 
         connection = sqlite3.connect(database_path)
         connection.row_factory = sqlite3.Row
+        if logger is not None:
+            logger.write(
+                "Stage5b: Resolve transcript translation units and nested "
+                "ORF competition."
+            )
+        competition_counts, translation_unit_counts = _apply_nested_competition(
+            master_raw_tmp,
+            master_tmp,
+            connection,
+            config,
+        )
         connection.execute(
             """
             CREATE TEMP TABLE reliable_export (
@@ -2818,13 +5138,20 @@ def _merge_outputs(
             "w", encoding="utf-8", buffering=8 * 1024 * 1024
         ) as output_handle:
             output_handle.write("\t".join(reliable_columns) + "\n")
-            with gzip.open(master_tmp, "rt", encoding="utf-8") as input_handle:
+            with master_tmp.open("r", encoding="utf-8") as input_handle:
                 reader = csv.DictReader(input_handle, delimiter="\t")
                 for row in reader:
                     if not (
                         row["evidence_status"] == "Reliable"
-                        and row["start_site_status"] == "Resolved"
-                        and row["evidence_primary"]
+                        and row["translated_extent_status"]
+                        in {"Supported", "Compatible"}
+                        and row["quant_primary"]
+                        and row["nested_competition_status"]
+                        not in {
+                            "ShadowedByLongORF",
+                            "ShadowedByHighOverlapORF",
+                            "ShadowedByCanonicalATG",
+                        }
                     ):
                         continue
                     if _is_annotated_category(row.get("category", "")):
@@ -2836,12 +5163,12 @@ def _merge_outputs(
                                nt_length, aa_length, exon_starts, exon_ends
                         FROM geometry WHERE orf_id=?
                         """,
-                        (row["evidence_primary"],),
+                        (row["quant_primary"],),
                     ).fetchone()
                     if geometry is None:
                         raise EvidenceEngineError(
-                            "Reliable evidence primary is absent from the "
-                            f"geometry index: {row['evidence_primary']}"
+                            "Reliable quantification primary is absent from "
+                            f"the geometry index: {row['quant_primary']}"
                         )
                     if _is_annotated_category(geometry["category"]):
                         annotated_controls_excluded += 1
@@ -2849,13 +5176,13 @@ def _merge_outputs(
                     try:
                         connection.execute(
                             "INSERT INTO reliable_export (orf_id) VALUES (?)",
-                            (row["evidence_primary"],),
+                            (row["quant_primary"],),
                         )
                     except sqlite3.IntegrityError as error:
                         raise EvidenceEngineError(
-                            "One ORF is the evidence primary of multiple "
+                            "One ORF is the quantification primary of multiple "
                             "reliable families: "
-                            f"{row['evidence_primary']}"
+                            f"{row['quant_primary']}"
                         ) from error
                     output = {
                         **row,
@@ -2913,12 +5240,23 @@ def _merge_outputs(
         }
         evidence_counts: dict[str, int] = defaultdict(int)
         reason_counts: dict[str, int] = defaultdict(int)
+        phase_audit_counts: dict[str, int] = defaultdict(int)
+        annotated_phase_shift_counts: dict[int, int] = defaultdict(int)
         replicated_signal_families = 0
-        with gzip.open(master_tmp, "rt", encoding="utf-8") as handle:
+        with master_tmp.open("r", encoding="utf-8") as handle:
             reader = csv.DictReader(handle, delimiter="\t")
             for row in reader:
                 evidence_counts[row.get("best_sample_evidence", "")] += 1
                 reason_counts[row.get("reliability_reason", "")] += 1
+                phase_audit_counts[row.get("phase_audit_status", "")] += 1
+                if (
+                    _is_annotated_category(row.get("category", ""))
+                    and row.get("phase_audit_status")
+                    == "AlternativeFrameDominant"
+                ):
+                    annotated_phase_shift_counts[
+                        int(row.get("suggested_psite_shift_nt", "0") or 0)
+                    ] += 1
                 try:
                     supported = int(
                         row.get("supported_sample_count", "0") or 0
@@ -2930,7 +5268,6 @@ def _merge_outputs(
 
         with summary_tmp.open("w", encoding="utf-8") as handle:
             handle.write("metric\tvalue\n")
-            handle.write(f"engine_version\t{ENGINE_VERSION}\n")
             handle.write(f"sample_count\t{sample_count}\n")
             handle.write(f"effective_workers\t{effective_workers}\n")
             for key, value in totals.items():
@@ -2945,13 +5282,15 @@ def _merge_outputs(
             )
             handle.write(
                 "reliable_family_definition\t"
-                "Medium/High common-body evidence in at least "
+                "Candidate-first distributed extent evidence or Medium/High "
+                "common-body evidence in at least "
                 f"{config.reliable_sample} independent samples\n"
             )
             handle.write(
                 "reliable_smorf_definition\t"
-                "Reliable family with a singleton start or replicated "
-                "contiguous alternative-start extension support\n"
+                "Reliable family with a supported or prior-compatible "
+                "translated extent, a quant_primary, and no dominant ORF "
+                "within the same transcript translation unit\n"
             )
             handle.write(
                 "uncertain_definition\t"
@@ -2961,6 +5300,14 @@ def _merge_outputs(
             handle.write(f"evidence_mode\t{config.evidence_mode}\n")
             handle.write(f"group_column\t{config.group_column}\n")
             handle.write(f"reliable_sample\t{config.reliable_sample}\n")
+            handle.write(
+                "estimated_short_max_codons\t"
+                f"{config.estimated_short_max_codons}\n"
+            )
+            handle.write(
+                "estimated_long_min_codons\t"
+                f"{config.estimated_long_min_codons}\n"
+            )
             handle.write(f"short_max_codons\t{config.short_max_codons}\n")
             handle.write(f"long_min_codons\t{config.long_min_codons}\n")
             handle.write(f"window_codons\t{config.window_codons}\n")
@@ -2974,6 +5321,63 @@ def _merge_outputs(
                 f"{config.localized_top_window_fraction}\n"
             )
             handle.write(f"boundary_codons\t{config.boundary_codons}\n")
+            handle.write(f"extent_bins\t{config.extent_bins}\n")
+            handle.write(f"min_extent_bins\t{config.min_extent_bins}\n")
+            handle.write(
+                f"start_resolution_codons\t"
+                f"{config.start_resolution_codons}\n"
+            )
+            handle.write(
+                f"leading_window_codons\t{config.leading_window_codons}\n"
+            )
+            handle.write(
+                f"min_exclusion_codons\t{config.min_exclusion_codons}\n"
+            )
+            handle.write(
+                "silent_extension_density_ratio\t"
+                f"{config.silent_extension_density_ratio}\n"
+            )
+            handle.write(
+                "noncanonical_override_density_ratio\t"
+                f"{config.noncanonical_override_density_ratio}\n"
+            )
+            handle.write(
+                "noncanonical_override_min_coverage_ratio\t"
+                f"{config.noncanonical_override_min_coverage_ratio}\n"
+            )
+            handle.write(
+                "noncanonical_override_min_frame_margin\t"
+                f"{config.noncanonical_override_min_frame_margin}\n"
+            )
+            handle.write(
+                "noncanonical_min_exclusive_codons\t"
+                f"{config.noncanonical_min_exclusive_codons}\n"
+            )
+            handle.write(
+                f"nested_min_frame_margin\t"
+                f"{config.nested_min_frame_margin}\n"
+            )
+            handle.write(
+                f"nested_min_phase_rpf\t{config.nested_min_phase_rpf}\n"
+            )
+            handle.write(
+                f"high_overlap_fraction\t{config.high_overlap_fraction}\n"
+            )
+            handle.write(
+                "overlap_min_frame_margin\t"
+                f"{config.overlap_min_frame_margin}\n"
+            )
+            handle.write(
+                f"overlap_min_phase_rpf\t{config.overlap_min_phase_rpf}\n"
+            )
+            for label, count in sorted(competition_counts.items()):
+                handle.write(f"nested_competition_{label}\t{count}\n")
+            handle.write(
+                "translation_unit_total\t"
+                f"{sum(translation_unit_counts.values())}\n"
+            )
+            for label, count in sorted(translation_unit_counts.items()):
+                handle.write(f"translation_unit_{label}\t{count}\n")
             handle.write(
                 f"families_with_replicated_medium_high_support\t"
                 f"{replicated_signal_families}\n"
@@ -2982,9 +5386,31 @@ def _merge_outputs(
                 handle.write(
                     f"best_sample_evidence_{label or 'NA'}\t{count}\n"
                 )
+            for label, count in sorted(phase_audit_counts.items()):
+                handle.write(
+                    f"phase_audit_{label or 'NA'}\t{count}\n"
+                )
+            for shift, count in sorted(annotated_phase_shift_counts.items()):
+                handle.write(
+                    f"annotated_control_suggested_psite_shift_{shift:+d}_nt\t"
+                    f"{count}\n"
+                )
             for reason, count in sorted(reason_counts.items()):
                 handle.write(
                     f"reliability_reason_{reason or 'NA'}\t{count}\n"
+                )
+        if logger is not None and annotated_phase_shift_counts:
+            dominant_shift, dominant_count = max(
+                annotated_phase_shift_counts.items(),
+                key=lambda item: item[1],
+            )
+            if dominant_count >= config.positive_min_controls:
+                warning_print(
+                    "Annotated ORF phase audit detected a systematic "
+                    f"alternative frame: suggested P-site coordinate shift "
+                    f"{dominant_shift:+d} nt in {dominant_count:,} controls. "
+                    "Verify the upstream P-site offset before interpreting "
+                    "candidate reading frames."
                 )
     except BaseException:
         for path in temporary_paths:
@@ -3001,6 +5427,7 @@ def _merge_outputs(
         (summary_tmp, summary_path),
     ):
         os.replace(temporary, final)
+    master_raw_tmp.unlink(missing_ok=True)
 
     return EngineResult(
         master_output=str(master_path),
@@ -3029,6 +5456,22 @@ def _build_config(args: object) -> EngineConfig:
         "localized_span_max",
         "localized_top_window_fraction",
         "boundary_codons",
+        "extent_bins",
+        "min_extent_bins",
+        "start_resolution_codons",
+        "min_frame_margin",
+        "leading_window_codons",
+        "min_exclusion_codons",
+        "silent_extension_density_ratio",
+        "noncanonical_min_exclusive_codons",
+        "noncanonical_override_density_ratio",
+        "noncanonical_override_min_coverage_ratio",
+        "noncanonical_override_min_frame_margin",
+        "nested_min_frame_margin",
+        "nested_min_phase_rpf",
+        "high_overlap_fraction",
+        "overlap_min_frame_margin",
+        "overlap_min_phase_rpf",
     )
     overrides = frozenset(
         field
@@ -3072,6 +5515,44 @@ def _build_config(args: object) -> EngineConfig:
             advanced("localized_top_window_fraction")
         ),
         boundary_codons=int(advanced("boundary_codons")),
+        extent_bins=int(advanced("extent_bins")),
+        min_extent_bins=int(advanced("min_extent_bins")),
+        start_resolution_codons=int(
+            advanced("start_resolution_codons")
+        ),
+        min_frame_margin=float(advanced("min_frame_margin")),
+        leading_window_codons=int(advanced("leading_window_codons")),
+        min_exclusion_codons=int(advanced("min_exclusion_codons")),
+        silent_extension_density_ratio=float(
+            advanced("silent_extension_density_ratio")
+        ),
+        noncanonical_min_exclusive_codons=int(
+            advanced("noncanonical_min_exclusive_codons")
+        ),
+        noncanonical_override_density_ratio=float(
+            advanced("noncanonical_override_density_ratio")
+        ),
+        noncanonical_override_min_coverage_ratio=float(
+            advanced("noncanonical_override_min_coverage_ratio")
+        ),
+        noncanonical_override_min_frame_margin=float(
+            advanced("noncanonical_override_min_frame_margin")
+        ),
+        nested_min_frame_margin=float(
+            advanced("nested_min_frame_margin")
+        ),
+        nested_min_phase_rpf=float(
+            advanced("nested_min_phase_rpf")
+        ),
+        high_overlap_fraction=float(
+            advanced("high_overlap_fraction")
+        ),
+        overlap_min_frame_margin=float(
+            advanced("overlap_min_frame_margin")
+        ),
+        overlap_min_phase_rpf=float(
+            advanced("overlap_min_phase_rpf")
+        ),
         hidden_overrides=overrides,
         positive_quantile=float(args.positive_quantile),
         positive_min_controls=int(args.positive_min_controls),
@@ -3088,8 +5569,7 @@ def run_family_evidence_engine(args: object) -> EngineResult:
     output_prefix = Path(args.output).expanduser().resolve()
     output_prefix.parent.mkdir(parents=True, exist_ok=True)
     work_directory = Path(str(output_prefix) + ".evidence_work")
-    log_path = Path(str(output_prefix) + ".evidence_run.log")
-    logger = _StageLogger(log_path)
+    logger = _StageLogger()
     signature = _run_signature(args, tracks)
 
     if work_directory.exists():
@@ -3098,7 +5578,7 @@ def run_family_evidence_engine(args: object) -> EngineResult:
     manifest_path = work_directory / "manifest.json"
     manifest_path.write_text(
         json.dumps(
-            {"signature": signature, "engine": ENGINE_VERSION},
+            {"signature": signature},
             indent=2,
         ),
         encoding="utf-8",
@@ -3206,8 +5686,5 @@ def run_family_evidence_engine(args: object) -> EngineResult:
         return result
     except Exception as error:
         logger.error("run_family_evidence_engine", error)
-        warning_print(
-            f"smorf_evidence failed. The exact stage and traceback are saved in: {log_path}"
-        )
         shutil.rmtree(work_directory, ignore_errors=True)
         raise

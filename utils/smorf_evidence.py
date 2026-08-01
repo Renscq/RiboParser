@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 
 # Author: Rensc
-# Date: 2026-07-31
-# Version: 0.2.8.24-dev.016
-# Function: Run family-aware smORF evidence with a minimal stable interface.
+# Date: 2026-08-01
+# Version: dev022
+# Function: Resolve candidate-first translation units and audit ORF phase.
 # Input: smorf_cluster tables, scanner ORF table/genePred, and density design.
-# Output: Family evidence, reliable smORFs/genePred, summary, and failure log.
+# Output: Family evidence, reliable smORFs/genePred, and summary.
 
-"""Command-line entry point for smorf_evidence dev.016."""
+"""Command-line entry point for family-aware smORF evidence analysis."""
 
 from __future__ import annotations
 
@@ -52,12 +52,6 @@ def _build_parser() -> argparse.ArgumentParser:
             "thresholds, annotated-ORF calibration, long-ORF rules, and "
             "replication requirements are controlled internally."
         ),
-    )
-
-    parser.add_argument(
-        "--version",
-        action="version",
-        version="smorf_evidence 0.2.8.24-dev.016 (2026-07-31)",
     )
 
     required = parser.add_argument_group("Required arguments")
@@ -119,7 +113,7 @@ def _build_parser() -> argparse.ArgumentParser:
     evidence.add_argument(
         "--evidence-mode",
         choices=("canonical", "manual"),
-        default="canonical",
+        default="manual",
         type=str,
         help=(
             "Use annotated_ORFs for sample-specific calibration or use "
@@ -221,6 +215,16 @@ def _build_parser() -> argparse.ArgumentParser:
                     "min_signal_span",
                     "localized_span_max",
                     "localized_top_window_fraction",
+                    "min_frame_margin",
+                    "silent_extension_density_ratio",
+                    "noncanonical_override_density_ratio",
+                    "noncanonical_override_min_coverage_ratio",
+                    "noncanonical_override_min_frame_margin",
+                    "nested_min_frame_margin",
+                    "nested_min_phase_rpf",
+                    "high_overlap_fraction",
+                    "overlap_min_frame_margin",
+                    "overlap_min_phase_rpf",
                 }
                 else int
             ),
@@ -308,7 +312,7 @@ def _parse_args(
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    """Run smorf_evidence dev.016."""
+    """Run family-aware smORF evidence analysis."""
     now_time()
     title_print("Evaluate reliable smORF family translation evidence.")
 
@@ -325,11 +329,6 @@ def main(argv: Sequence[str] | None = None) -> None:
         print(
             f"\nsmorf_evidence failed: "
             f"{type(error).__name__}: {error}",
-            file=sys.stderr,
-            flush=True,
-        )
-        print(
-            f"Failure log: {args.output}.evidence_run.log",
             file=sys.stderr,
             flush=True,
         )
