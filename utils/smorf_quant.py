@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 # Author: Rensc
-# Date: 2026-07-31
-# Version: 0.2.8.24-dev.001
+# Date: 2026-08-01
+# Version: dev003
 # Function: Quantify reliable smORF P-site density across Ribo-seq samples.
 # Input: Reliable smORF genePred and a sample/strand density design table.
 # Output: Wide smORF-by-sample raw P-site density count matrix.
@@ -24,7 +24,7 @@ from utils.ribo.ArgsParser import (
     step_print,
     title_print,
 )
-from utils.smorf.smorf_quant import run_smorf_quant
+from utils.smorf.quant import run_smorf_quant
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -39,7 +39,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version",
         action="version",
-        version="smorf_quant 0.2.8.24-dev.001 (2026-07-31)",
+        version="smorf_quant dev003 (2026-08-01)",
     )
 
     required = parser.add_argument_group("Required arguments")
@@ -71,10 +71,7 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="output",
         required=True,
         type=str,
-        help=(
-            "Output prefix. The count matrix is written as "
-            "<prefix>.density_quant.txt."
-        ),
+        help=("Output prefix. The count matrix is written as <prefix>.density_quant.txt."),
     )
 
     quantification = parser.add_argument_group("Quantification arguments")

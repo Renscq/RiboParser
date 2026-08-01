@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 # Author: Rensc
-# Date: 2026-07-25
-# Version: 0.2.8.24-dev.005
+# Date: 2026-08-01
+# Version: dev007
 # Function: Build gene-level smORF families with indexed parallel clustering.
 # Input: ORF message table, source genePred annotation, and optional Kozak PWM.
 # Output: Family representatives, member map, removed ORFs, and cluster summary.
@@ -26,9 +26,7 @@ from utils.ribo.ArgsParser import (
     title_print,
     warning_print,
 )
-from utils.smorf.smorf_cluster_core import SmORFCluster
-from utils.smorf.smorf_filter import ORFTable
-from utils.smorf.smorf_kozak import BUILTIN_MODELS, KozakModel
+from utils.smorf.cluster import BUILTIN_MODELS, KozakModel, ORFTable, SmORFCluster
 
 DEFAULT_CATEGORIES = (
     "uORF,dORF,lncORF,iORF,same_frame_iORF,emORF,"
@@ -137,10 +135,7 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="max_ambiguous_codons",
         default=0,
         type=int,
-        help=(
-            "Maximum ambiguous codon count when available "
-            "(default: %(default)s)."
-        ),
+        help=("Maximum ambiguous codon count when available (default: %(default)s)."),
     )
 
     family_group = parser.add_argument_group("Family clustering arguments")
@@ -232,8 +227,7 @@ def _normalize_rules(args: Namespace) -> None:
     conflict = retained.intersection(removed)
     if conflict:
         raise ValueError(
-            "Category cannot be both retained and removed: "
-            + ", ".join(sorted(conflict))
+            "Category cannot be both retained and removed: " + ", ".join(sorted(conflict))
         )
     args.keep_categories = _join_set(retained)
     args.remove_categories = _join_set(removed)
@@ -251,21 +245,13 @@ def _normalize_rules(args: Namespace) -> None:
 def _validate_codons(value: str, argument: str) -> None:
     """Validate a comma-separated codon list."""
     codons = [
-        codon.strip().upper().replace("U", "T")
-        for codon in value.split(",")
-        if codon.strip()
+        codon.strip().upper().replace("U", "T") for codon in value.split(",") if codon.strip()
     ]
     if not codons:
         raise ValueError(f"{argument} cannot be empty.")
-    invalid = sorted(
-        codon
-        for codon in codons
-        if len(codon) != 3 or set(codon).difference("ACGT")
-    )
+    invalid = sorted(codon for codon in codons if len(codon) != 3 or set(codon).difference("ACGT"))
     if invalid:
-        raise ValueError(
-            f"Invalid codon(s) for {argument}: " + ", ".join(invalid)
-        )
+        raise ValueError(f"Invalid codon(s) for {argument}: " + ", ".join(invalid))
 
 
 def _validate_args(args: Namespace) -> None:
@@ -285,14 +271,8 @@ def _validate_args(args: Namespace) -> None:
         raise ValueError("--thread must be >= 0.")
     if not 0 <= args.min_kozak_score <= 1:
         raise ValueError("--min-kozak-score must be in [0, 1].")
-    if (
-        args.kozak_model == "none"
-        and args.kozak_pwm is None
-        and args.min_kozak_score > 0
-    ):
-        raise ValueError(
-            "--min-kozak-score requires an enabled Kozak model."
-        )
+    if args.kozak_model == "none" and args.kozak_pwm is None and args.min_kozak_score > 0:
+        raise ValueError("--min-kozak-score requires an enabled Kozak model.")
     _normalize_rules(args)
 
 
@@ -324,18 +304,10 @@ def _load_kozak_model(args: Namespace) -> KozakModel | None:
             ORFTable.iter_table(args.input, header),
             minimum_records=AUTO_KOZAK_MINIMUM,
         )
-        message_print(
-            "Auto Kozak model: annotated contexts "
-            f"(n={model.training_count:,})."
-        )
+        message_print(f"Auto Kozak model: annotated contexts (n={model.training_count:,}).")
         return model
     except ValueError as error:
-        warning_print(
-            "{error}. Use built-in {fallback} Kozak model.".format(
-                error=error,
-                fallback=AUTO_KOZAK_FALLBACK,
-            )
-        )
+        warning_print(f"{error}. Use built-in {AUTO_KOZAK_FALLBACK} Kozak model.")
         return KozakModel.from_builtin(AUTO_KOZAK_FALLBACK)
 
 
@@ -401,12 +373,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     _run_cluster_pipeline(args)
     title_print("All done.")
     now_time()
-
-
-def deprecated_main() -> None:
-    """Run the compatibility alias for the former smorf_filter command."""
-    warning_print("smorf_filter is deprecated; use smorf_cluster.")
-    main()
 
 
 if __name__ == "__main__":

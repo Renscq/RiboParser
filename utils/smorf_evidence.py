@@ -3,7 +3,7 @@
 
 # Author: Rensc
 # Date: 2026-08-01
-# Version: dev022
+# Version: dev024
 # Function: Resolve candidate-first translation units and audit ORF phase.
 # Input: smorf_cluster tables, scanner ORF table/genePred, and density design.
 # Output: Family evidence, reliable smORFs/genePred, and summary.
@@ -28,7 +28,7 @@ for _variable in (
 ):
     os.environ.setdefault(_variable, "1")
 
-from utils.ribo.ArgsParser import (
+from utils.ribo.ArgsParser import (  # noqa: E402
     args_print,
     file_check,
     now_time,
@@ -36,7 +36,7 @@ from utils.ribo.ArgsParser import (
     step_print,
     title_print,
 )
-from utils.smorf.smorf_riboseq_family_engine import (
+from utils.smorf.evidence import (  # noqa: E402
     ADVANCED_DEFAULTS,
     MANUAL_THRESHOLD_DEFAULTS,
     run_family_evidence_engine,
@@ -125,20 +125,14 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="group_column",
         default="group",
         type=str,
-        help=(
-            "Density-list column containing biological replicate groups "
-            "(default: %(default)s)."
-        ),
+        help=("Density-list column containing biological replicate groups (default: %(default)s)."),
     )
     evidence.add_argument(
         "--reliable-sample",
         dest="reliable_sample",
         default=2,
         type=int,
-        help=(
-            "Minimum independent samples supporting a reliable family "
-            "(default: %(default)s)."
-        ),
+        help=("Minimum independent samples supporting a reliable family (default: %(default)s)."),
     )
 
     manual = parser.add_argument_group("Manual evidence thresholds")
@@ -211,7 +205,8 @@ def _build_parser() -> argparse.ArgumentParser:
             default=None,
             type=(
                 float
-                if name in {
+                if name
+                in {
                     "min_signal_span",
                     "localized_span_max",
                     "localized_top_window_fraction",
@@ -270,9 +265,7 @@ def _validate_args(args: Namespace) -> None:
     )
     for name in nonnegative:
         if getattr(args, name) < 0:
-            raise ValueError(
-                "--" + name.replace("_", "-") + " must be >= 0."
-            )
+            raise ValueError("--" + name.replace("_", "-") + " must be >= 0.")
     fractions = (
         "min_codon_coverage",
         "moderate_periodicity",
@@ -282,19 +275,13 @@ def _validate_args(args: Namespace) -> None:
     for name in fractions:
         value = getattr(args, name)
         if not 0.0 <= value <= 1.0:
-            raise ValueError(
-                "--" + name.replace("_", "-") + " must be in [0, 1]."
-            )
+            raise ValueError("--" + name.replace("_", "-") + " must be in [0, 1].")
     if args.strong_periodicity < args.moderate_periodicity:
-        raise ValueError(
-            "--strong-periodicity must be >= --moderate-periodicity."
-        )
+        raise ValueError("--strong-periodicity must be >= --moderate-periodicity.")
     if args.positive_min_controls < 1:
         raise ValueError("--positive-min-controls must be >= 1.")
     if args.positive_max_controls < args.positive_min_controls:
-        raise ValueError(
-            "--positive-max-controls must be >= --positive-min-controls."
-        )
+        raise ValueError("--positive-max-controls must be >= --positive-min-controls.")
 
 
 def _parse_args(
@@ -327,8 +314,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         result = run_family_evidence_engine(args)
     except Exception as error:
         print(
-            f"\nsmorf_evidence failed: "
-            f"{type(error).__name__}: {error}",
+            f"\nsmorf_evidence failed: {type(error).__name__}: {error}",
             file=sys.stderr,
             flush=True,
         )

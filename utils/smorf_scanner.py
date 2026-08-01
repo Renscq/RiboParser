@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 # Author: Rensc
-# Date: 2026-07-24
-# Version: 0.2.8.24-dev.001
+# Date: 2026-08-01
+# Version: dev003
 # Function: Scan complete transcript-centric smORFs and discard invalid candidates.
 # Input: Genome FASTA and genePred transcript annotation.
 # Output: smORF genePred, metadata, nucleotide FASTA, and peptide FASTA files.
@@ -23,7 +23,7 @@ from utils.ribo.ArgsParser import (
     step_print,
     title_print,
 )
-from utils.smorf import SmORFPipeline
+from utils.smorf.scanner import SmORFPipeline
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -118,10 +118,7 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="kozak_down",
         default=6,
         type=int,
-        help=(
-            "Downstream Kozak-context length after the start codon "
-            "(default: %(default)s nt)."
-        ),
+        help=("Downstream Kozak-context length after the start codon (default: %(default)s nt)."),
     )
     scanning_group.add_argument(
         "-I",
@@ -129,10 +126,7 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="include_stop",
         action="store_true",
         default=False,
-        help=(
-            "Retain the terminal stop symbol in peptide sequences "
-            "(default: %(default)s)."
-        ),
+        help=("Retain the terminal stop symbol in peptide sequences (default: %(default)s)."),
     )
 
     overlap_group = parser.add_argument_group("Overlap arguments")
@@ -150,10 +144,7 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="remove_discarded",
         action="store_true",
         default=False,
-        help=(
-            "Remove discarded same-frame internal ORFs "
-            "(default: %(default)s)."
-        ),
+        help=("Remove discarded same-frame internal ORFs (default: %(default)s)."),
     )
 
     runtime_group = parser.add_argument_group("Runtime arguments")
@@ -202,22 +193,13 @@ def _validate_args(args: Namespace) -> None:
         raise ValueError("--start-codons must contain at least one codon.")
 
     invalid_codons = [
-        codon
-        for codon in start_codons
-        if len(codon) != 3 or set(codon).difference("ACGT")
+        codon for codon in start_codons if len(codon) != 3 or set(codon).difference("ACGT")
     ]
     if invalid_codons:
-        raise ValueError(
-            "Invalid start codon(s): " + ", ".join(invalid_codons)
-        )
-    stop_as_start = sorted(
-        set(start_codons).intersection({"TAA", "TAG", "TGA"})
-    )
+        raise ValueError("Invalid start codon(s): " + ", ".join(invalid_codons))
+    stop_as_start = sorted(set(start_codons).intersection({"TAA", "TAG", "TGA"}))
     if stop_as_start:
-        raise ValueError(
-            "Stop codons cannot be used as start codons: "
-            + ", ".join(stop_as_start)
-        )
+        raise ValueError("Stop codons cannot be used as start codons: " + ", ".join(stop_as_start))
 
 
 def _parse_args(
@@ -241,8 +223,6 @@ def _parse_args(
 
     args_print(args)
     return args
-
-
 
 
 def _run_scanner_pipeline(args: Namespace) -> None:
