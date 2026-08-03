@@ -1,0 +1,39 @@
+name: conda-build
+
+on:
+  push:
+    tags:
+      - "v0.3.5"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build and upload conda package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract package version from pyproject.toml
+        run: |
+          VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "PACKAGE_VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Set up micromamba with conda-build
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: conda-build
+          create-args: >-
+            conda-build
+            anaconda-client
+            conda-verify
+
+      - name: Build conda package
+        shell: bash -l {0}
+        run: conda-build --output-folder dist/conda recipe
+
+      - name: Upload to anaconda.org
+        shell: bash -l {0}
+        env:
+          ANACONDA_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
+        run: |
+          anaconda -t "$ANACONDA_TOKEN" upload --skip-existing dist/conda/noarch/*.conda
