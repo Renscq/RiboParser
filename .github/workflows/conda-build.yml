@@ -18,6 +18,11 @@ jobs:
           VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
           echo "PACKAGE_VERSION=$VERSION" >> "$GITHUB_ENV"
 
+      - name: Compute source sha256 from PyPI sdist
+        run: |
+          curl -sL "https://pypi.io/packages/source/r/riboparser/riboparser-${PACKAGE_VERSION}.tar.gz" -o /tmp/riboparser-sdist.tar.gz
+          echo "PACKAGE_SHA256=$(sha256sum /tmp/riboparser-sdist.tar.gz | cut -d' ' -f1)" >> "$GITHUB_ENV"
+
       - name: Set up micromamba with conda-build
         uses: mamba-org/setup-micromamba@v2
         with:
