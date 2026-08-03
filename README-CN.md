@@ -48,10 +48,10 @@ conda activate ribo
 
 ```bash
 # conda
-conda install riboparser -c rensc -c conda-forge -c bioconda
+conda install riboparser -c rensc
 
 # mamba
-micromamba install riboparser -c rensc -c conda-forge -c bioconda
+micromamba install riboparser -c rensc
 
 ```
 
