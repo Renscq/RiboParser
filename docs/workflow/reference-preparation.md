@@ -4,17 +4,30 @@
 
 Reference preparation builds all files needed for read classification, alignment, quantification, RPF density construction, and codon-level Ribo-seq analysis.
 
+The workflow is divided into five steps:
+
+```text
+Step 1: Prepare directories and reference files
+Step 2: Build Bowtie indexes (genome, mRNA, rRNA, tRNA, ncRNA)
+Step 3: Build the normalized RiboParser reference (rpf_Reference)
+Step 4: Build the STAR index
+Step 5: Build the RSEM index
+```
+
+All commands are run inside the `1.reference` directory created in Step 1.
+
 ## Inputs
 
-| Input | Description |
-|---|---|
-| genome FASTA | genomic sequence |
-| GTF/GFF3 annotation | gene, transcript, exon, CDS, and UTR annotation |
-| cDNA/transcript FASTA | transcript sequence for rRNA/tRNA/ncRNA/mRNA extraction |
-| feature table | optional NCBI feature table |
-| external tools | Bowtie, STAR, RSEM, gffread |
+| Input | Description | Required |
+|---|---|---|
+| genome FASTA | genomic sequence | yes |
+| GTF/GFF3 annotation | gene, transcript, exon, CDS, and UTR annotation | yes |
+| feature table | optional NCBI feature table | no |
+| external tools | Bowtie, STAR, RSEM, gffread | yes |
 
-## Create directories
+## Step 1: Prepare directories and reference files
+
+### 1.1 Create directories
 
 ```bash
 mkdir -p ./sce/1.reference/
@@ -23,39 +36,47 @@ cd ./sce/1.reference/
 mkdir cdna genome gtf mrna ncrna rrna trna norm rsem-index star-index
 ```
 
-## Download reference files
+### 1.2 Download reference files
+
+Download the genome sequence, annotations, and optional feature table from NCBI. Use the URLs corresponding to your species.
 
 ```bash
+# genome sequence
 wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/146/045/GCF_000146045.2_R64/GCF_000146045.2_R64_genomic.fna.gz
+# GTF or GFF3 annotation
 wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/146/045/GCF_000146045.2_R64/GCF_000146045.2_R64_genomic.gtf.gz
 wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/146/045/GCF_000146045.2_R64/GCF_000146045.2_R64_genomic.gff.gz
-wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/146/045/GCF_000146045.2_R64/GCF_000146045.2_R64_rna.fna.gz
+# optional feature table
 wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/146/045/GCF_000146045.2_R64/GCF_000146045.2_R64_feature_table.txt.gz
 
 gunzip *.gz
 ```
 
-## Generate cDNA from genome and GFF3
+## Step 2: Build Bowtie indexes
+
+### 2.1 Generate cDNA from the genome and GFF3
+
+The transcript FASTA used for mRNA/rRNA/tRNA/ncRNA extraction is generated from the genome and GFF3 with `gffread`, not downloaded directly.
 
 ```bash
 gffread \
-  -g GCF_000146045.2_R64_genomic.fna \
-  GCF_000146045.2_R64_genomic.gff \
+  -g ./GCF_000146045.2_R64_genomic.fna \
+  ./GCF_000146045.2_R64_genomic.gff \
   -F \
-  -w cdna.fa
+  -w ./cdna.fa
 ```
 
-## Build Bowtie genome index
+### 2.2 Build the genome index
 
 ```bash
 bowtie-build \
-  ../GCF_000146045.2_R64_genomic.fna \
+  ./GCF_000146045.2_R64_genomic.fna \
   ./genome/genome \
   --threads 12 \
   &>> ./genome/genome_build.log
 ```
 
-## Build mRNA index
+### 2.3 Build the mRNA index
 
 ```bash
 grep -i 'gbkey=mRNA' ./cdna.fa | cut -d ' ' -f 1 | cut -c 2- > ./mrna/mrna.ids
@@ -69,7 +90,7 @@ retrieve_seq \
 bowtie-build ./mrna/mrna.fa ./mrna/mrna --threads 12 &>> ./mrna/mrna_build.log
 ```
 
-## Build rRNA index
+### 2.4 Build the rRNA index
 
 ```bash
 grep -i 'gbkey=rRNA' ./cdna.fa | cut -d ' ' -f 1 | cut -c 2- > ./rrna/rrna.ids
@@ -83,7 +104,7 @@ retrieve_seq \
 bowtie-build ./rrna/rrna.fa ./rrna/rrna --threads 12 &>> ./rrna/rrna_build.log
 ```
 
-## Build tRNA index
+### 2.5 Build the tRNA index
 
 ```bash
 grep -i 'gbkey=tRNA' ./cdna.fa | cut -d ' ' -f 1 | cut -c 2- > ./trna/trna.ids
@@ -97,7 +118,7 @@ retrieve_seq \
 bowtie-build ./trna/trna.fa ./trna/trna --threads 12 &>> ./trna/trna_build.log
 ```
 
-## Build ncRNA index
+### 2.6 Build the ncRNA index
 
 ```bash
 grep -iE 'gbkey=ncRNA|gbkey=lnc_RNA|gbkey=miRNA|gbkey=snoRNA|gbkey=snRNA|gbkey=misc_RNA' ./cdna.fa \
@@ -114,24 +135,22 @@ retrieve_seq \
 bowtie-build ./ncrna/ncrna.fa ./ncrna/ncrna --threads 12 &>> ./ncrna/ncrna_build.log
 ```
 
-## `rpf_Reference` full help
+## Step 3: Build the normalized RiboParser reference
 
-### Function
+`rpf_Reference` normalizes the GTF/GFF3 annotation into RiboParser-compatible transcript tables and sequences, which are required by most downstream modules (e.g. quality control, gene-level analysis, and codon-level analysis).
 
-Normalize annotation into RiboParser-compatible transcript tables and sequences.
-
-### Command
+### 3.1 Command
 
 ```bash
 rpf_Reference \
-  -g ../GCF_000146045.2_R64_genomic.fna \
-  -t ../GCF_000146045.2_R64_genomic.gff \
+  -g ./GCF_000146045.2_R64_genomic.fna \
+  -t ./GCF_000146045.2_R64_genomic.gff \
   -u 30 \
   -o ./norm/gene \
   &>> ./norm/norm_build.log
 ```
 
-### Required parameters
+### 3.2 Required parameters
 
 | Parameter | Meaning |
 |---|---|
@@ -139,7 +158,7 @@ rpf_Reference \
 | `-t`, `--gtf` | GTF or GFF3 annotation file |
 | `-o`, `--output` | output prefix |
 
-### Optional parameters
+### 3.3 Optional parameters
 
 | Parameter | Meaning |
 |---|---|
@@ -148,7 +167,7 @@ rpf_Reference \
 | `-l` | retain only the longest protein-coding transcript per gene |
 | `-w` | output full message table |
 
-### Outputs
+### 3.4 Outputs
 
 | File | Description |
 |---|---|
@@ -157,7 +176,9 @@ rpf_Reference \
 | `gene.norm.rna.fa` | normalized transcript FASTA |
 | `gene.norm.cds.fa` | normalized CDS FASTA |
 
-## Build STAR index
+## Step 4: Build the STAR index
+
+The STAR index is built from the genome sequence and the normalized GTF, and is used for RNA-seq alignment.
 
 ```bash
 STAR \
@@ -165,17 +186,19 @@ STAR \
   --runThreadN 12 \
   --runMode genomeGenerate \
   --genomeDir ./star-index \
-  --genomeFastaFiles GCF_000146045.2_R64_genomic.fna \
+  --genomeFastaFiles ./GCF_000146045.2_R64_genomic.fna \
   --sjdbGTFfile ./norm/gene.norm.gtf
 ```
 
-## Build RSEM index
+## Step 5: Build the RSEM index
+
+The RSEM index is used for transcript-level quantification.
 
 ```bash
 rsem-prepare-reference \
   -p 12 \
-  --gtf ../norm/gene.norm.gtf \
-  ../GCF_000146045.2_R64_genomic.fna \
+  --gtf ./norm/gene.norm.gtf \
+  ./GCF_000146045.2_R64_genomic.fna \
   ./rsem-index/rsem
 ```
 

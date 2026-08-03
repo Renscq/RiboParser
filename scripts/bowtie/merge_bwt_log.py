@@ -10,9 +10,63 @@
 
 
 import os
+import matplotlib
+
+matplotlib.use("AGG")
+
+import matplotlib.font_manager as fm
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from collections import OrderedDict
 import argparse
+
+def _setup_fonts():
+    """Register Arial / Liberation Sans and set them as the default font.
+
+    Arial is preferred. Liberation Sans is metric-compatible with Arial and
+    is commonly shipped with Linux distributions, so it is used as the
+    fallback when Arial is not installed. DejaVu Sans is the last resort.
+
+    Returns
+    -------
+    None
+    """
+
+    candidates = []
+    for path in fm.findSystemFonts(fontext='ttf'):
+        base = os.path.basename(path).lower()
+        if 'arial' in base or 'liberationsans' in base:
+            candidates.append(path)
+    # also scan a few common font directories manually
+    extra_dirs = [
+        '/usr/share/fonts', '/usr/local/share/fonts',
+        os.path.expanduser('~/.fonts'), os.path.expanduser('~/.local/share/fonts'),
+    ]
+    for d in extra_dirs:
+        if os.path.isdir(d):
+            for root, _, files in os.walk(d):
+                for f in files:
+                    base = f.lower()
+                    if 'arial' in base or 'liberationsans' in base:
+                        candidates.append(os.path.join(root, f))
+
+    seen = set()
+    for path in candidates:
+        path = os.path.abspath(path)
+        if path in seen:
+            continue
+        seen.add(path)
+        try:
+            fm.fontManager.addfont(path)
+        except Exception:
+            pass
+
+    plt.rcParams['font.family'] = 'sans-serif'
+    plt.rcParams['font.sans-serif'] = ['Arial', 'Liberation Sans', 'Helvetica', 'DejaVu Sans']
+
+
+_setup_fonts()
 
 def stat_bwt_args_parser():
 
@@ -157,6 +211,100 @@ def output_table(result_dict, database_list, output_file):
     result_df.to_csv(output_file + '_mapping.txt', sep='\t', index=False)
 
 
+def output_barplot(result_dict, database_list, output_file):
+    """Draw stacked bar plots of mapped read counts and ratios.
+
+    Parameters
+    ----------
+    result_dict : OrderedDict
+        Nested dict storing read counts.
+    database_list : list
+        Database names in mapping order.
+    output_file : str
+        Prefix of the output figure file.
+
+    Returns
+    -------
+    None
+        The function writes the figure to '<output_file>_mapping_barplot.png'
+        and '<output_file>_mapping_barplot.pdf' in place.
+
+    Notes
+    -----
+    The left subplot shows the raw read count of each database, while the
+    right subplot shows the corresponding ratio (%). The ``Paired`` colormap
+    is used for the bars. Sample labels are rotated 90 degrees.
+    """
+
+    mapped_df = pd.DataFrame.from_dict(result_dict, orient='index').fillna(0)
+    ratio_df = mapped_df.div(mapped_df['Total'], axis=0) * 100
+
+    mapped_df = mapped_df.drop('Total', axis=1)
+    ratio_df = ratio_df.drop('Total', axis=1)
+
+    database_list = database_list + ['Others']
+    # keep the column order consistent with database_list
+    mapped_df = mapped_df.reindex(columns=database_list).fillna(0)
+    ratio_df = ratio_df.reindex(columns=database_list).fillna(0)
+
+    sample_list = list(mapped_df.index)
+    x = np.arange(len(sample_list))
+
+    # Paired colormap (cycle if more than 12 databases)
+    paired_cmap = plt.get_cmap('Paired')
+    colors = [paired_cmap(i % 12) for i in range(len(database_list))]
+
+    # bar width: slightly wider to tighten the gaps between samples
+    bar_width = 0.8
+    figure, axes = plt.subplots(
+        1, 2,
+        figsize=(max(8.0, 1.8 * len(sample_list)), 8),
+        dpi=500,
+    )
+
+    # left: count
+    bottom = np.zeros(len(sample_list))
+    for i, db in enumerate(database_list):
+        axes[0].bar(
+            x, mapped_df[db].to_numpy(), bottom=bottom,
+            width=bar_width, label=db, color=colors[i],
+            edgecolor='white', linewidth=0.5,
+        )
+        bottom += mapped_df[db].to_numpy()
+    axes[0].set_xticks(x)
+    axes[0].set_xticklabels(sample_list, rotation=90, ha='center', size=12)
+    axes[0].set_xlabel('Sample', size=14)
+    axes[0].set_ylabel('Count', size=14)
+    axes[0].set_title('Mapped read count', size=14)
+
+    # right: ratio
+    bottom = np.zeros(len(sample_list))
+    for i, db in enumerate(database_list):
+        axes[1].bar(
+            x, ratio_df[db].to_numpy(), bottom=bottom,
+            width=bar_width, label=db, color=colors[i],
+            edgecolor='white', linewidth=0.5,
+        )
+        bottom += ratio_df[db].to_numpy()
+    axes[1].set_xticks(x)
+    axes[1].set_xticklabels(sample_list, rotation=90, ha='center', size=12)
+    axes[1].set_xlabel('Sample', size=14)
+    axes[1].set_ylabel('Ratio (%)', size=14)
+    axes[1].set_title('Mapped read ratio', size=14)
+
+    handles, labels = axes[0].get_legend_handles_labels()
+    figure.legend(
+        handles, labels,
+        loc='upper center', bbox_to_anchor=(0.5, 1.0),
+        ncol=min(len(database_list), 6), frameon=False,
+    )
+
+    figure.tight_layout(rect=[0, 0, 1, 0.94])
+    figure.savefig(output_file + '_mapping_barplot.png', bbox_inches='tight')
+    figure.savefig(output_file + '_mapping_barplot.pdf', bbox_inches='tight')
+    plt.close(figure)
+
+
 def main():
 
     print('Step1: Checking the input Arguments.', flush=True)
@@ -167,6 +315,9 @@ def main():
 
     print('Step3: output the mapping table.', flush=True)
     output_table(result_dict, database_list, args.output)
+
+    print('Step4: draw the mapping barplot.', flush=True)
+    output_barplot(result_dict, database_list, args.output)
 
     print('All done.', flush=True)
 

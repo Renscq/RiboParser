@@ -48,14 +48,3 @@ Reference preparation
 | RiboCode/RiboTISH helpers | `ribocode_bed_format`, `ribotish_format` | external ORF-tool output formatting |
 | Unix helpers | `dos2unix` | line-ending conversion |
 | oligo helpers | `get_overlap_seq`, `get_tissue_freq`, `get_win_seq` | sequence-window and oligo-related processing |
-
-## Example dataset
-
-The original workflow uses `GSE67387` as an example dataset.
-
-```text
-Nedialkova DD, Leidel SA.
-Optimization of Codon Translation Rates via tRNA Modifications Maintains Proteome Integrity.
-Cell 2015 Jun 18;161(7):1606-18.
-PMID: 26052047
-```

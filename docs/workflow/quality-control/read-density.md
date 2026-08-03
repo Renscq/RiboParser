@@ -43,7 +43,7 @@ Read density files are transcript-level tables that represent RNA-seq coverage o
 ### Example
 
 ```bash
-for bam in ../01.check/*.bam
+for bam in ../01.qc/*.bam
 do
     prefix_name=$(basename ${bam} .bam)
 
@@ -103,7 +103,7 @@ done
 ### Example
 
 ```bash
-for bam in ../01.check/*.bam
+for bam in ../01.qc/*.bam
 do
     prefix_name=$(basename ${bam} .bam)
 

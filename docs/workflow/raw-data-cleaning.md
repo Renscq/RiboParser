@@ -4,7 +4,16 @@
 
 Remove adapters, discard very short reads, and prepare clean FASTQ files for read classification and alignment.
 
-## RNA-seq cleaning
+The workflow is divided into two steps:
+
+```text
+Step 1: Clean RNA-seq raw reads
+Step 2: Clean Ribo-seq raw reads
+```
+
+Each step is run inside its own `1.cleandata` directory.
+
+## Step 1: Clean RNA-seq raw reads
 
 ```bash
 mkdir -p ./sce/3.rna-seq/1.cleandata/
@@ -23,7 +32,9 @@ do
 done
 ```
 
-## Ribo-seq cleaning
+## Step 2: Clean Ribo-seq raw reads
+
+Ribo-seq cleaning is similar to RNA-seq cleaning, but the adapter is replaced with the 3' adapter (e.g. poly-A) used in Ribo-seq library construction.
 
 ```bash
 mkdir -p ./sce/4.ribo-seq/1.cleandata/

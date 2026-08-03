@@ -4,7 +4,9 @@ RiboParser is designed for complete RNA-seq and ribosome profiling data analysis
 
 ## What RiboParser does
 
-Common pipeline:
+The complete workflow consists of two parts: a **public pipeline** that can be handled by general bioinformatics tools, and the **RiboParser-specific analysis** described below.
+
+Public pipeline (general tools):
 
 - reference preparation for transcriptome-aware Ribo-seq analysis
 - RNA-seq and Ribo-seq raw data cleaning
@@ -12,7 +14,7 @@ Common pipeline:
 - splice-aware genome alignment
 - transcriptome quantification
 
-RiboParser supports:
+RiboParser-specific analysis:
 
 - Ribo-seq quality control
 - P-site offset inference
@@ -21,7 +23,7 @@ RiboParser supports:
 - periodicity, metaplot, coverage, and correlation analysis
 - gene-level quantification and read-density retrieval
 - codon-level pausing, occupancy, decoding time, selection time, variation, and odds-ratio analysis
-- smORF scanning, filtering, Ribo-seq evidence evaluation, and integration
+- smORF scanning, clustering, Ribo-seq evidence evaluation, and quantification
 - SeRP signal and peak analysis
 - helper utilities for FASTA, FASTQ, bedGraph, Bowtie logs, RSEM tables, and merged Ribo-seq outputs
 

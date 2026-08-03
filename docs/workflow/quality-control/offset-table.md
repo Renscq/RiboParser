@@ -94,7 +94,7 @@ rna_Offset \
 ### Example
 
 ```bash
-for bam in ../01.check/*.bam
+for bam in ../01.qc/*.bam
 do
     prefix_name=$(basename ${bam} .bam)
 

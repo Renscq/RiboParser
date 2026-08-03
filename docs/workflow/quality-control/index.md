@@ -1,4 +1,4 @@
-# 4.5 Quality control overview
+# 4.5 Quality control
 
 The quality-control module checks aligned RNA-seq and Ribo-seq data before downstream gene-level, codon-level, smORF, and SeRP analyses.
 
@@ -20,7 +20,7 @@ merge_dst_list → rpf_Merge
 rpf_Periodicity / rpf_Metaplot / rpf_Coverage / rpf_Percent / rpf_Corr
 ```
 
-## Module summary
+## Step summary
 
 | Section | Main command | Purpose |
 |---|---|---|
@@ -37,7 +37,7 @@ rpf_Periodicity / rpf_Metaplot / rpf_Coverage / rpf_Percent / rpf_Corr
 ## Suggested directory structure
 
 ```bash
-mkdir -p 01.check 02.digestion 03.offset 04.density 05.merge \
+mkdir -p 01.qc 02.digestion 03.offset 04.density 05.merge \
          06.periodicity 07.metaplot 08.coverage 09.correlation
 ```
 

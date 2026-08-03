@@ -58,9 +58,11 @@ nav:
 
   - "2. Installation":
 
-      - "2.1 pip": installation/pip.md
+      - "2 Installation overview": installation/index.md
 
-      - "2.2 conda": installation/conda.md
+      - "2.1 conda / micromamba": installation/conda.md
+
+      - "2.2 pip": installation/pip.md
 
       - "2.3 GitHub": installation/github.md
 

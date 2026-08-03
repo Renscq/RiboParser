@@ -1,4 +1,4 @@
-# 2.2 conda
+# 2.1 conda / micromamba
 
 ## Purpose
 
@@ -11,7 +11,7 @@ conda create -n ribo python=3.12
 conda activate ribo
 ```
 
-or:
+or with micromamba:
 
 ```bash
 micromamba create -n ribo python=3.12
@@ -34,7 +34,7 @@ conda install pigz -c conda-forge
 conda install riboparser -c rensc -c conda-forge -c bioconda
 ```
 
-or:
+or with micromamba:
 
 ```bash
 micromamba install riboparser -c rensc -c conda-forge -c bioconda
