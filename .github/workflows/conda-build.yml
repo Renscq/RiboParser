@@ -41,4 +41,9 @@ jobs:
         env:
           ANACONDA_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
         run: |
+          if [ -z "$ANACONDA_TOKEN" ]; then
+            echo "::error::ANACONDA_TOKEN secret is empty. Please set it in Settings > Secrets."
+            exit 1
+          fi
+          echo "ANACONDA_TOKEN length: ${#ANACONDA_TOKEN}"
           anaconda -t "$ANACONDA_TOKEN" upload --skip-existing dist/conda/noarch/*.conda
