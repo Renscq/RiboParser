@@ -31,13 +31,13 @@ conda install pigz -c conda-forge
 ## Install RiboParser
 
 ```bash
-conda install riboparser -c rensc
+conda install riboparser -c rensc -c conda-forge -c bioconda
 ```
 
 or:
 
 ```bash
-micromamba install riboparser -c rensc
+micromamba install riboparser -c rensc -c conda-forge -c bioconda
 ```
 
 ## Main external tools

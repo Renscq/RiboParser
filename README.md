@@ -24,9 +24,9 @@ The full documentation is available at:
 ## Installation
 
 ```bash
-conda install riboparser -c rensc
+conda install riboparser -c rensc -c conda-forge -c bioconda
 # or
-micromamba install riboparser -c rensc
+micromamba install riboparser -c rensc -c conda-forge -c bioconda
 ```
 
 ```bash
