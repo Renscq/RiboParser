@@ -14,6 +14,37 @@ import pandas as pd
 from collections import OrderedDict
 import argparse
 
+# matplotlib is imported lazily (AGG backend) only when a figure is drawn,
+# keeping the merge workflow usable on headless servers.
+matplotlib = None  # type: ignore[assignment]
+plt = None  # type: ignore[assignment]
+
+_PLOT_STYLE = {
+    "font.family": "sans-serif",
+    "font.sans-serif": ["Arial", "Helvetica", "Liberation Sans", "DejaVu Sans"],
+    "mathtext.fontset": "dejavusans",
+    "text.color": "black",
+    "axes.edgecolor": "black",
+    "axes.linewidth": 0.9,
+    "axes.facecolor": "white",
+    "axes.labelcolor": "black",
+    "axes.labelsize": 12,
+    "axes.titlesize": 14,
+    "xtick.color": "black",
+    "ytick.color": "black",
+    "xtick.labelsize": 11,
+    "ytick.labelsize": 11,
+    "xtick.major.width": 0.9,
+    "ytick.major.width": 0.9,
+    "xtick.direction": "out",
+    "ytick.direction": "out",
+    "xtick.major.size": 3.5,
+    "ytick.major.size": 3.5,
+    "figure.facecolor": "white",
+    "figure.dpi": 120,
+    "savefig.dpi": 300,
+}
+
 
 def merge_digestion_args_parser():
 
@@ -61,7 +92,7 @@ def process_digest_files(digestion_list):
 
     # make the dataframe
     digest_colunms = ['Sample', 'Digest', 'Site', 'A', 'T', 'C', 'G']
-    digestion_df = pd.DataFrame(columns=digest_colunms)
+    digestion_parts = []
 
     # for each gne file
     for motif_file in digestion_list:
@@ -94,8 +125,15 @@ def process_digest_files(digestion_list):
         motif_df['Sample'] = file_prefix
         motif_df = motif_df[digest_colunms]
 
-        # merge the gene digestion file
-        digestion_df = pd.concat([digestion_df, motif_df], axis=0)
+        # collect the current digestion part
+        digestion_parts.append(motif_df)
+
+    # concat all parts at once to avoid the FutureWarning triggered by
+    # concatenating an empty/all-NA dataframe.
+    if digestion_parts:
+        digestion_df = pd.concat(digestion_parts, axis=0, ignore_index=True)
+    else:
+        digestion_df = pd.DataFrame(columns=digest_colunms)
 
     return digestion_df
 
@@ -134,6 +172,250 @@ def output_table(digestion_df, output_file):
     digestion_df.to_csv(output_file + '_reads_digestion.txt', sep='\t', index=False)
 
 
+def _ensure_plotting_backend():
+    """Import matplotlib (AGG backend) on first figure drawing, in place."""
+    global matplotlib, plt
+    if plt is not None:
+        return
+    import matplotlib as _matplotlib
+
+    _matplotlib.use("AGG")
+    import matplotlib.pyplot as _plt
+
+    matplotlib = _matplotlib
+    plt = _plt
+
+
+def _get_logo_base_colors():
+    """Return nucleotide colors used in sequence-logo figures.
+
+    Returns
+    -------
+    dict
+        Mapping from nucleotide base to color.
+    """
+    return {
+        "A": "#4daf4a",
+        "C": "#377eb8",
+        "G": "#ff7f00",
+        "T": "#e41a1c",
+    }
+
+
+def _draw_logo_letter(ax, letter, x_position, y_position, height, color):
+    """Draw one nucleotide letter in a sequence logo.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Target matplotlib axis.
+    letter : str
+        Nucleotide letter.
+    x_position : int
+        Position index on the x-axis.
+    y_position : float
+        Bottom y-position of the letter.
+    height : float
+        Letter height.
+    color : str
+        Letter color.
+
+    Returns
+    -------
+    None
+        The function adds one patch to the axis.
+    """
+    if height <= 0:
+        return
+
+    from matplotlib import transforms
+    from matplotlib.font_manager import FontProperties
+    from matplotlib.patches import PathPatch
+    from matplotlib.textpath import TextPath
+
+    font_property = FontProperties(family="DejaVu Sans", weight="bold")
+    text_path = TextPath((0, 0), letter, size=1, prop=font_property)
+    text_box = text_path.get_extents()
+
+    if text_box.width == 0 or text_box.height == 0:
+        return
+
+    scale_x = 0.85 / text_box.width
+    scale_y = height / text_box.height
+
+    transform = (
+        transforms.Affine2D()
+        .scale(scale_x, scale_y)
+        .translate(x_position - 0.425, y_position)
+    )
+
+    patch = PathPatch(
+        text_path,
+        transform=transform + ax.transData,
+        facecolor=color,
+        edgecolor="none",
+    )
+    ax.add_patch(patch)
+
+
+def _draw_seqlogo_row(ax, sample_name, pwm, position_labels, base_colors, show_xlabel):
+    """Draw one sequence-logo row for a single sample.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Target matplotlib axis.
+    sample_name : str
+        Sample name shown as the row title.
+    pwm : numpy.ndarray
+        Position probability matrix. Rows are positions and columns are
+        A/C/G/T.
+    position_labels : list
+        Relative position labels for every motif position.
+    base_colors : dict
+        Mapping from nucleotide base to color.
+    show_xlabel : bool
+        Whether to show the x-axis label on this row.
+
+    Returns
+    -------
+    None
+        The function draws one row of the merged sequence-logo figure.
+    """
+    motif_bases = ["A", "C", "G", "T"]
+
+    for x_index, row in enumerate(pwm):
+        y_position = 0.0
+
+        # Draw smaller letters first and larger letters later, so the
+        # larger letters are stacked above smaller letters.
+        base_heights = sorted(
+            zip(motif_bases, row),
+            key=lambda item: item[1],
+        )
+
+        for base, height in base_heights:
+            _draw_logo_letter(
+                ax=ax,
+                letter=base,
+                x_position=x_index,
+                y_position=y_position,
+                height=float(height),
+                color=base_colors.get(base, "black"),
+            )
+            y_position += float(height)
+
+    tick_labels = [label for label in position_labels if label % 5 == 0]
+    if not tick_labels:
+        tick_labels = position_labels
+
+    tick_positions = [
+        position_labels.index(tick)
+        for tick in tick_labels
+        if tick in position_labels
+    ]
+
+    ax.set_xlim(-0.5, len(position_labels) - 0.5)
+    ax.set_ylim(0, 1.05)
+
+    ax.set_xticks(tick_positions)
+    ax.set_xticklabels([str(position_labels[pos]) for pos in tick_positions])
+    ax.set_yticks([])
+
+    ax.set_title(sample_name, loc="left", fontsize=11, pad=2)
+
+    if show_xlabel:
+        ax.set_xlabel("Position relative to digestion site")
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+
+def plot_digestion_motif(digestion_df, output_file):
+    """Draw merged sequence logos for all samples.
+
+    One figure is written per read end, containing one sequence-logo row
+    per sample:
+    - ``<output_file>_5end_seqlogo.pdf`` / ``.png``
+    - ``<output_file>_3end_seqlogo.pdf`` / ``.png``
+
+    Parameters
+    ----------
+    digestion_df : pandas.DataFrame
+        Merged digestion dataframe with columns
+        Sample/Digest/Site/A/T/C/G.
+    output_file : str
+        Output prefix.
+
+    Returns
+    -------
+    None
+        The function writes one PDF/PNG per read end.
+    """
+    _ensure_plotting_backend()
+    matplotlib.rcParams.update(_PLOT_STYLE)
+
+    base_colors = _get_logo_base_colors()
+    motif_bases = ["A", "C", "G", "T"]
+
+    digest_configs = [
+        ("End_5p", "5end", "5'-end digestion motif"),
+        ("End_3p", "3end", "3'-end digestion motif"),
+    ]
+
+    # arrange the sample logos in a grid with at most this many columns.
+    max_cols = 4
+
+    for digest_name, suffix, title in digest_configs:
+        end_df = digestion_df[digestion_df["Digest"] == digest_name].copy()
+        sample_names = end_df["Sample"].unique().tolist()
+        sample_count = len(sample_names)
+
+        # skip read ends with no input data (e.g. only 5' files given),
+        # otherwise plt.subplots(0, ...) raises a ValueError.
+        if sample_count == 0:
+            print(
+                f"Warning: no {digest_name} sample found, "
+                f"skip drawing the {suffix} seqlogo."
+            )
+            continue
+
+        # split the samples across several columns to keep the figure compact.
+        n_cols = min(max_cols, sample_count)
+        n_rows = -(-sample_count // n_cols)  # ceil division
+
+        fig, axes = plt.subplots(
+            n_rows,
+            n_cols,
+            figsize=(6 * n_cols, 2.8 * n_rows),
+            dpi=300,
+            squeeze=False,
+        )
+
+        for index, sample in enumerate(sample_names):
+            sample_df = end_df[end_df["Sample"] == sample].sort_values("Site")
+            position_labels = sample_df["Site"].astype(int).tolist()
+            pwm = sample_df[motif_bases].to_numpy()
+
+            _draw_seqlogo_row(
+                ax=axes[index // n_cols][index % n_cols],
+                sample_name=sample,
+                pwm=pwm,
+                position_labels=position_labels,
+                base_colors=base_colors,
+                show_xlabel=(index // n_cols == n_rows - 1),
+            )
+
+        fig.suptitle(title, fontsize=14)
+        fig.tight_layout(rect=[0, 0, 1, 0.97])
+
+        output_file_pdf = output_file + "_" + suffix + "_seqlogo.pdf"
+        output_file_png = output_file + "_" + suffix + "_seqlogo.png"
+        fig.savefig(output_file_pdf, bbox_inches="tight")
+        fig.savefig(output_file_png, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+
+
 def main():
 
     print('Step1: Checking the input Arguments.', flush=True)
@@ -144,6 +426,9 @@ def main():
 
     print('Step3: output the reads digestion table.', flush=True)
     output_table(digestion_df, args.output)
+
+    print('Step4: draw the merged digestion motif logos.', flush=True)
+    plot_digestion_motif(digestion_df, args.output)
 
     print('All done.', flush=True)
 
