@@ -15,6 +15,5 @@ statsmodels
 
 # visualization
 matplotlib
-matplotlib-venn
 seaborn
 seqlogo

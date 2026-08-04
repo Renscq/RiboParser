@@ -10,9 +10,47 @@
 
 
 import os
+import math
+import sys
 import pandas as pd
 from collections import OrderedDict
 import argparse
+import numpy as np
+
+# matplotlib is imported lazily (AGG backend) only when a figure is drawn,
+# keeping the merge workflow usable on headless servers.
+matplotlib = None  # type: ignore[assignment]
+plt = None  # type: ignore[assignment]
+
+_PLOT_STYLE = {
+    'font.family': 'sans-serif',
+    'font.sans-serif': ['Arial', 'Helvetica', 'Liberation Sans', 'DejaVu Sans'],
+    'mathtext.fontset': 'dejavusans',
+    'text.color': 'black',
+    'axes.edgecolor': 'black',
+    'axes.linewidth': 0.9,
+    'axes.facecolor': 'white',
+    'axes.labelcolor': 'black',
+    'axes.labelsize': 12,
+    'axes.titlesize': 14,
+    'xtick.color': 'black',
+    'ytick.color': 'black',
+    'xtick.labelsize': 11,
+    'ytick.labelsize': 11,
+    'xtick.major.width': 0.9,
+    'ytick.major.width': 0.9,
+    'xtick.direction': 'out',
+    'ytick.direction': 'out',
+    'xtick.major.size': 3.5,
+    'ytick.major.size': 3.5,
+    'legend.frameon': True,
+    'legend.edgecolor': '#BBBBBB',
+    'legend.fancybox': False,
+    'legend.fontsize': 11,
+    'figure.facecolor': 'white',
+    'figure.dpi': 120,
+    'savefig.dpi': 300,
+}
 
 
 def merge_saturation_args_parser():
@@ -113,6 +151,157 @@ def output_table(gene_count_df, output_file):
     gene_count_df.to_csv(output_file + '_gene_saturation.txt', sep='\t', index=False)
 
 
+def _ensure_plotting_backend():
+    """Import matplotlib (AGG backend) on first figure drawing, in place."""
+    global matplotlib, plt
+    if plt is not None:
+        return
+    import matplotlib as _matplotlib
+
+    _matplotlib.use('AGG')
+    import matplotlib.pyplot as _plt
+
+    matplotlib = _matplotlib
+    plt = _plt
+
+
+def _sample_line_colors(sample_count):
+    """Sample distinguishable colors from the saturated ends of RdBu.
+
+    The middle (white) part of RdBu is skipped so that every sample
+    keeps a visible color, even when many samples are plotted together.
+
+    Parameters
+    ----------
+    sample_count : int
+        Number of sample lines to color.
+
+    Returns
+    -------
+    numpy.ndarray
+        RGBA colors, shape (sample_count, 4).
+    """
+    base_colors = matplotlib.cm.RdBu(np.linspace(0.0, 1.0, 256))
+    # 0.0-0.35 and 0.65-1.0 of the RdBu scale, excluding the near-white middle
+    # so that every sampled color stays clearly visible on a white background
+    left_side = base_colors[: int(256 * 0.35)]
+    right_side = base_colors[int(256 * 0.65):]
+    merged_colors = np.vstack([left_side, right_side])
+    merged_cmap = matplotlib.colors.ListedColormap(merged_colors)
+    return merged_cmap(np.linspace(0.0, 1.0, max(2, sample_count)))
+
+
+def draw_dot_line_gene_saturation(gene_count_df, output_prefix):
+    """Draw all samples' gene saturation curves in one dot-line figure.
+
+    Parameters
+    ----------
+    gene_count_df : object
+        Merged gene saturation table with Sample, Tercile, Covered, Uncovered columns.
+    output_prefix : object
+        Output prefix.
+
+    Returns
+    -------
+    list
+        Output figure file names (PDF and PNG).
+
+    Workflow
+    --------
+    1. Plot the covered gene number of each sample against reads proportion.
+    2. Color all sample lines with the saturated ends of the RdBu colormap.
+    3. Place the legend below the axes with multiple columns.
+    4. Save the figure as PDF and PNG files.
+    """
+    _ensure_plotting_backend()
+    matplotlib.rcParams.update(_PLOT_STYLE)
+
+    sample_names = gene_count_df['Sample'].unique().tolist()
+    sample_count = len(sample_names)
+
+    # drop the total-gene reference rows (Tercile == 0) kept in the merged table
+    plot_df = gene_count_df.loc[gene_count_df['Tercile'] > 0]
+
+    # legend columns: one row for few samples, at most four rows in total
+    legend_columns = sample_count if sample_count <= 4 else int(math.ceil(sample_count / 4.0))
+    legend_rows = int(math.ceil(sample_count / legend_columns))
+
+    figure_width = 8.0
+    figure_height = 5.0 + legend_rows * 0.35
+
+    fig, ax = plt.subplots(
+        figsize=(figure_width, figure_height),
+        constrained_layout=True,
+    )
+    ax.set_title('Gene saturation', fontsize=15)
+    ax.set_xlabel('Reads proportion (%)', fontsize=13)
+    ax.set_ylabel('Covered genes', fontsize=13)
+
+    # sample distinguishable colors from the saturated ends of RdBu
+    sample_colors = _sample_line_colors(sample_count)
+
+    for color, sample_name in zip(sample_colors, sample_names):
+        sample_df = plot_df.loc[
+            plot_df['Sample'] == sample_name,
+            ['Tercile', 'Covered'],
+        ].sort_values('Tercile')
+        ax.plot(
+            sample_df['Tercile'],
+            sample_df['Covered'],
+            color=color,
+            linewidth=1.6,
+            marker='o',
+            markersize=4.0,
+            label=sample_name,
+        )
+
+    # keep only the reads proportions present in the merged table
+    tercile_values = sorted(plot_df['Tercile'].unique().tolist())
+    ax.set_xticks(tercile_values)
+    ax.tick_params(labelsize=11)
+    # leave 5% headroom at the top so saturated curves stay away from the border
+    max_covered = float(plot_df['Covered'].max())
+    ax.set_ylim(0, max(1.0, max_covered * 1.05))
+
+    # place the legend below the axes with multiple columns
+    ax.legend(
+        loc='upper center',
+        bbox_to_anchor=(0.5, -0.18),
+        ncol=legend_columns,
+        frameon=True,
+        fontsize=11,
+    )
+
+    output_file_pdf = output_prefix + '_gene_saturation_dotline.pdf'
+    output_file_png = output_prefix + '_gene_saturation_dotline.png'
+    fig.savefig(output_file_pdf, bbox_inches='tight')
+    fig.savefig(output_file_png, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+
+    return [output_file_pdf, output_file_png]
+
+
+def output_plot(gene_count_df, output_prefix):
+    """Draw the merged gene saturation figure.
+
+    Parameters
+    ----------
+    gene_count_df : object
+        Merged gene saturation table.
+    output_prefix : object
+        Output prefix.
+
+    Returns
+    -------
+    None
+        The merged gene saturation figure is written to disk.
+    """
+    dot_line_files = draw_dot_line_gene_saturation(gene_count_df, output_prefix)
+
+    for output_file in dot_line_files:
+        print(f'Output file :  {output_file}', flush=True)
+
+
 def main():
 
     print('Step1: Checking the input Arguments.', flush=True)
@@ -124,8 +313,15 @@ def main():
     print('Step3: output the gene saturation table.', flush=True)
     output_table(gene_count_df, args.output)
 
+    print('Step4: draw the gene saturation figure.', flush=True)
+    output_plot(gene_count_df, args.output)
+
     print('All done.', flush=True)
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as error:
+        print(f'Error: {error}', file=sys.stderr, flush=True)
+        sys.exit(1)

@@ -10,11 +10,48 @@
 
 import argparse
 import glob
+import math
 import os
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+
+# matplotlib is imported lazily (AGG backend) only when a figure is drawn,
+# keeping the merge workflow usable on headless servers.
+matplotlib = None  # type: ignore[assignment]
+plt = None  # type: ignore[assignment]
+
+_PLOT_STYLE = {
+    "font.family": "sans-serif",
+    "font.sans-serif": ["Arial", "Helvetica", "Liberation Sans", "DejaVu Sans"],
+    "mathtext.fontset": "dejavusans",
+    "text.color": "black",
+    "axes.edgecolor": "black",
+    "axes.linewidth": 0.9,
+    "axes.facecolor": "white",
+    "axes.labelcolor": "black",
+    "axes.labelsize": 12,
+    "axes.titlesize": 14,
+    "xtick.color": "black",
+    "ytick.color": "black",
+    "xtick.labelsize": 11,
+    "ytick.labelsize": 11,
+    "xtick.major.width": 0.9,
+    "ytick.major.width": 0.9,
+    "xtick.direction": "out",
+    "ytick.direction": "out",
+    "xtick.major.size": 3.5,
+    "ytick.major.size": 3.5,
+    "legend.frameon": True,
+    "legend.edgecolor": "#BBBBBB",
+    "legend.fancybox": False,
+    "legend.fontsize": 11,
+    "figure.facecolor": "white",
+    "figure.dpi": 120,
+    "savefig.dpi": 300,
+}
 
 
 def merge_length_args_parser():
@@ -337,6 +374,239 @@ def output_table(reads_length_df, output_prefix):
     print(f"Output file :  {output_file}", flush=True)
 
 
+def _ensure_plotting_backend():
+    """Import matplotlib (AGG backend) on first figure drawing, in place."""
+    global matplotlib, plt
+    if plt is not None:
+        return
+    import matplotlib as _matplotlib
+
+    _matplotlib.use("AGG")
+    import matplotlib.pyplot as _plt
+
+    matplotlib = _matplotlib
+    plt = _plt
+
+
+def _sample_line_colors(sample_count):
+    """Sample distinguishable colors from the saturated ends of RdBu.
+
+    The middle (white) part of RdBu is skipped so that every sample
+    keeps a visible color, even when many samples are plotted together.
+
+    Parameters
+    ----------
+    sample_count : int
+        Number of sample lines to color.
+
+    Returns
+    -------
+    numpy.ndarray
+        RGBA colors, shape (sample_count, 4).
+    """
+    base_colors = matplotlib.cm.RdBu(np.linspace(0.0, 1.0, 256))
+    # 0.0-0.45 and 0.55-1.0 of the RdBu scale, excluding the near-white middle
+    left_side = base_colors[: int(256 * 0.45)]
+    right_side = base_colors[int(256 * 0.55):]
+    merged_colors = np.vstack([left_side, right_side])
+    merged_cmap = matplotlib.colors.ListedColormap(merged_colors)
+    return merged_cmap(np.linspace(0.0, 1.0, max(2, sample_count)))
+
+
+def draw_dot_line_length_distr(reads_length_df, output_prefix):
+    """Draw all samples' length distributions in one dot-line figure.
+
+    Parameters
+    ----------
+    reads_length_df : pandas.DataFrame
+        Merged length distribution table.
+    output_prefix : str
+        Output prefix.
+
+    Returns
+    -------
+    list
+        Output figure file names (PDF and PNG).
+
+    Workflow
+    --------
+    1. Plot the total ratio of each sample against read length.
+    2. Color all sample lines with the RdBu colormap.
+    3. Save the figure as PDF and PNG files.
+    """
+    _ensure_plotting_backend()
+    matplotlib.rcParams.update(_PLOT_STYLE)
+
+    sample_names = reads_length_df["Sample"].unique().tolist()
+    sample_count = len(sample_names)
+
+    figure_width = 8.0
+    figure_height = max(4.5, sample_count * 0.18 + 2.5)
+    figure_height = min(figure_height, 12.0)
+
+    fig, ax = plt.subplots(
+        figsize=(figure_width, figure_height),
+        constrained_layout=True,
+    )
+    ax.set_title("RPFs length distribution", fontsize=15)
+    ax.set_xlabel("Read length (nt)", fontsize=13)
+    ax.set_ylabel("Proportion (%)", fontsize=13)
+
+    # sample distinguishable colors from the saturated ends of RdBu
+    sample_colors = _sample_line_colors(sample_count)
+
+    for color, sample_name in zip(sample_colors, sample_names):
+        sample_df = reads_length_df.loc[
+            reads_length_df["Sample"] == sample_name,
+            ["Length", "Total_Ratio"],
+        ].sort_values("Length")
+        ax.plot(
+            sample_df["Length"],
+            sample_df["Total_Ratio"],
+            color=color,
+            linewidth=1.6,
+            marker="o",
+            markersize=4.0,
+            label=sample_name,
+        )
+
+    length_min = int(reads_length_df["Length"].min())
+    length_max = int(reads_length_df["Length"].max())
+    tick_step = max(1, int(math.ceil((length_max - length_min) / 10)))
+    ax.set_xticks(range(length_min, length_max + 1, tick_step))
+    ax.tick_params(labelsize=11)
+
+    # place the legend outside the axes, at the middle of the right side
+    legend_columns = 1 if sample_count <= 10 else 2
+    ax.legend(
+        loc="center left",
+        bbox_to_anchor=(1.01, 0.5),
+        ncol=legend_columns,
+        frameon=True,
+        fontsize=11,
+    )
+
+    output_file_pdf = output_prefix + "_length_distribution_dotline.pdf"
+    output_file_png = output_prefix + "_length_distribution_dotline.png"
+    fig.savefig(output_file_pdf, bbox_inches="tight")
+    fig.savefig(output_file_png, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+    return [output_file_pdf, output_file_png]
+
+
+def draw_heatmap_length_distr(reads_length_df, output_prefix):
+    """Draw all samples' length distributions in one heatmap figure.
+
+    Parameters
+    ----------
+    reads_length_df : pandas.DataFrame
+        Merged length distribution table.
+    output_prefix : str
+        Output prefix.
+
+    Returns
+    -------
+    list
+        Output figure file names (PDF and PNG).
+
+    Workflow
+    --------
+    1. Pivot the merged table into a sample-by-length matrix of total ratios.
+    2. Fill missing lengths with zero.
+    3. Plot the matrix with the Blues colormap.
+    4. Save the figure as PDF and PNG files.
+    """
+    _ensure_plotting_backend()
+    matplotlib.rcParams.update(_PLOT_STYLE)
+
+    sample_names = reads_length_df["Sample"].unique().tolist()
+    sample_count = len(sample_names)
+    all_lengths = sorted(reads_length_df["Length"].unique().tolist())
+
+    # pivot into a sample-by-length matrix of total ratios
+    ratio_matrix = (
+        reads_length_df.pivot_table(
+            index="Sample",
+            columns="Length",
+            values="Total_Ratio",
+            aggfunc="mean",
+        )
+        .reindex(index=sample_names)
+        .reindex(columns=all_lengths, fill_value=0.0)
+    )
+    matrix_values = ratio_matrix.to_numpy(dtype=float)
+
+    figure_width = max(8.0, len(all_lengths) * 0.32 + 3.0)
+    figure_width = min(figure_width, 18.0)
+    figure_height = max(4.0, sample_count * 0.32 + 1.8)
+    figure_height = min(figure_height, 16.0)
+
+    # Blues colormap: low values are light, high values are dark blue
+    plot_cmap = matplotlib.colormaps["Blues"]
+
+    fig, ax = plt.subplots(figsize=(figure_width, figure_height))
+    image = ax.imshow(
+        matrix_values,
+        aspect="auto",
+        interpolation="nearest",
+        cmap=plot_cmap,
+    )
+    ax.set_title("RPFs length distribution", fontsize=15)
+    ax.set_xlabel("Read length (nt)", fontsize=13)
+    ax.set_ylabel("Sample", fontsize=13)
+
+    # set x-axis ticks with readable step (no rotation)
+    tick_step = max(1, int(math.ceil(len(all_lengths) / 10)))
+    x_tick_indices = range(0, len(all_lengths), tick_step)
+    x_tick_labels = [all_lengths[index] for index in x_tick_indices]
+    ax.set_xticks(list(x_tick_indices))
+    ax.set_xticklabels(x_tick_labels, rotation=0, ha="center", fontsize=11)
+
+    # set y-axis ticks with sample names
+    if sample_count <= 60:
+        ax.set_yticks(range(sample_count))
+        ax.set_yticklabels(sample_names, fontsize=11)
+    else:
+        y_tick_indices = np.linspace(0, sample_count - 1, 20, dtype=int)
+        ax.set_yticks(y_tick_indices)
+        ax.set_yticklabels([sample_names[index] for index in y_tick_indices], fontsize=10)
+
+    colorbar = fig.colorbar(image, ax=ax, shrink=0.8, pad=0.02)
+    colorbar.set_label("Proportion (%)", fontsize=12)
+    colorbar.ax.tick_params(labelsize=10)
+
+    output_file_pdf = output_prefix + "_length_distribution_heatmap.pdf"
+    output_file_png = output_prefix + "_length_distribution_heatmap.png"
+    fig.savefig(output_file_pdf, bbox_inches="tight")
+    fig.savefig(output_file_png, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+    return [output_file_pdf, output_file_png]
+
+
+def output_plot(reads_length_df, output_prefix):
+    """Draw the merged length distribution figures.
+
+    Parameters
+    ----------
+    reads_length_df : pandas.DataFrame
+        Merged length distribution table.
+    output_prefix : str
+        Output prefix.
+
+    Returns
+    -------
+    None
+        The merged length distribution figures are written to disk.
+    """
+    dot_line_files = draw_dot_line_length_distr(reads_length_df, output_prefix)
+    heatmap_files = draw_heatmap_length_distr(reads_length_df, output_prefix)
+
+    for output_file in dot_line_files + heatmap_files:
+        print(f"Output file :  {output_file}", flush=True)
+
+
 def main():
     """Run the length distribution merging workflow."""
     print("Step1: Checking the input arguments.", flush=True)
@@ -347,6 +617,9 @@ def main():
 
     print("Step3: Output the merged length distribution table.", flush=True)
     output_table(reads_length_df, args.output)
+
+    print("Step4: Draw the length distribution figures.", flush=True)
+    output_plot(reads_length_df, args.output)
 
     print("All done.", flush=True)
 

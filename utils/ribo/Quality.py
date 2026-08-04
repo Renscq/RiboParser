@@ -21,7 +21,28 @@ from multiprocessing import Pool
 import numpy as np
 import pandas as pd
 import pysam
-from PIL import Image, ImageDraw, ImageFont
+
+# matplotlib is imported lazily (see ``_ensure_plotting_backend``) so that the
+# forked scan workers used by ``scan_mrna_reads_fetch`` never inherit
+# matplotlib's C-level state (ft2font/freetype/fontTools) through fork. Loading
+# it too early makes the process pool non-deterministically crash with SIGSEGV
+# on some servers.
+matplotlib = None  # type: ignore[assignment]
+plt = None  # type: ignore[assignment]
+
+
+def _ensure_plotting_backend():
+    """Import matplotlib (AGG backend) on first figure drawing, in place."""
+    global matplotlib, plt
+    if plt is not None:
+        return
+    import matplotlib as _matplotlib
+
+    _matplotlib.use("AGG")
+    import matplotlib.pyplot as _plt
+
+    matplotlib = _matplotlib
+    plt = _plt
 
 
 class Quality(object):
@@ -800,11 +821,11 @@ class Quality(object):
             )
 
         try:
-            with pysam.AlignmentFile(
-                self.sample_file,
-                self.sample_format,
-                **self._alignment_open_kwargs(),
-            ) as bam_in:
+            # Open single-threaded here: this handle lives in the parent before
+            # the process pool is forked, and an active htslib thread pool at
+            # fork time is a known cause of non-deterministic SIGSEGV in the
+            # worker processes.
+            with pysam.AlignmentFile(self.sample_file, self.sample_format) as bam_in:
                 references = set(bam_in.references)
         except Exception as error:
             raise RuntimeError(
@@ -1324,404 +1345,48 @@ class Quality(object):
             return f"{value:.1f}".rstrip("0").rstrip(".")
         return f"{value:.2f}".rstrip("0").rstrip(".")
 
-    @staticmethod
-    def _nice_tick_step(value):
-        """Return a clean 1/2/5/10-based tick step."""
-        value = float(value)
-        if value <= 0 or not math.isfinite(value):
-            return 1.0
-        exponent = math.floor(math.log10(value))
-        fraction = value / (10 ** exponent)
-        if fraction <= 1:
-            nice_fraction = 1
-        elif fraction <= 2:
-            nice_fraction = 2
-        elif fraction <= 5:
-            nice_fraction = 5
-        else:
-            nice_fraction = 10
-        return nice_fraction * (10 ** exponent)
 
-    @staticmethod
-    def _nice_ticks(max_value, target_ticks=4):
-        """Return clean y-axis tick values and a rounded y maximum."""
-        max_value = float(max_value)
-        if max_value <= 0 or not math.isfinite(max_value):
-            return [0.0, 1.0], 1.0
-        step = Quality._nice_tick_step(max_value / max(1, int(target_ticks)))
-        y_max = math.ceil(max_value / step) * step
-        tick_count = int(round(y_max / step))
-        ticks = [i * step for i in range(tick_count + 1)]
-        return ticks, y_max
+    # Shared academic style for the QC figures, kept next to the plotting
+    # code (rather than at the top of the module) so the style parameters
+    # stay with the figures they affect.
+    _QC_PLOT_STYLE = {
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "Helvetica", "Liberation Sans", "DejaVu Sans"],
+        "mathtext.fontset": "dejavusans",
+        "text.color": "black",
+        "axes.edgecolor": "black",
+        "axes.linewidth": 0.9,
+        "axes.facecolor": "white",
+        "axes.labelcolor": "black",
+        "axes.labelsize": 10,
+        "axes.titlesize": 11,
+        "xtick.color": "black",
+        "ytick.color": "black",
+        "xtick.labelsize": 9,
+        "ytick.labelsize": 9,
+        "xtick.major.width": 0.9,
+        "ytick.major.width": 0.9,
+        "xtick.direction": "out",
+        "ytick.direction": "out",
+        "xtick.major.size": 3.5,
+        "ytick.major.size": 3.5,
+        "legend.frameon": True,
+        "legend.edgecolor": "#BBBBBB",
+        "legend.fancybox": False,
+        "legend.fontsize": 9,
+        "figure.facecolor": "white",
+        "figure.dpi": 120,
+        "savefig.dpi": 300,
+    }
 
-    @staticmethod
-    def _nice_max(value):
-        """Return a rounded upper plotting limit."""
-        value = float(value)
-        if value <= 0 or not math.isfinite(value):
-            return 1.0
-        exponent = math.floor(math.log10(value))
-        fraction = value / (10 ** exponent)
-        if fraction <= 1:
-            nice_fraction = 1
-        elif fraction <= 2:
-            nice_fraction = 2
-        elif fraction <= 5:
-            nice_fraction = 5
-        else:
-            nice_fraction = 10
-        return nice_fraction * (10 ** exponent)
-
-    @staticmethod
-    def _linear_map(value, src_min, src_max, dst_min, dst_max):
-        """Map a numeric value from one interval to another interval."""
-        if src_max == src_min:
-            return (dst_min + dst_max) / 2.0
-        return dst_min + (float(value) - src_min) * (dst_max - dst_min) / (src_max - src_min)
-
-    @staticmethod
-    def _pdf_escape(text):
-        """Escape text for raw PDF content streams."""
-        return str(text).replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-
-    class _VectorCanvas(object):
-        """Small pure-Python vector PDF canvas used as a stable plotting backend.
-
-        The plot style follows the original QC figures, but the PDF is written
-        directly to avoid matplotlib/fontTools backend crashes observed on some
-        server environments. No auxiliary vector image files are generated.
-        """
-
-        _NAMED_COLORS = {
-            "black": (0.0, 0.0, 0.0),
-            "white": (1.0, 1.0, 1.0),
-            "none": None,
-            "gray": (0.5, 0.5, 0.5),
-            "grey": (0.5, 0.5, 0.5),
-        }
-
-        def __init__(self, width, height):
-            self.width = float(width)
-            self.height = float(height)
-            self.pdf_cmds = []
-            self.ops = []
-            self.rect(0, 0, self.width, self.height, fill="white", stroke="none", line_width=0)
-
-        @classmethod
-        def _rgb(cls, color):
-            if color is None:
-                return None
-            color = str(color).strip()
-            lower = color.lower()
-            if lower in cls._NAMED_COLORS:
-                return cls._NAMED_COLORS[lower]
-            if color.startswith("#") and len(color) == 7:
-                try:
-                    return (
-                        int(color[1:3], 16) / 255.0,
-                        int(color[3:5], 16) / 255.0,
-                        int(color[5:7], 16) / 255.0,
-                    )
-                except ValueError:
-                    return (0.0, 0.0, 0.0)
-            return (0.0, 0.0, 0.0)
-
-        @classmethod
-        def _stroke_cmd(cls, color):
-            rgb = cls._rgb(color)
-            if rgb is None:
-                return ""
-            return f"{rgb[0]:.4f} {rgb[1]:.4f} {rgb[2]:.4f} RG"
-
-        @classmethod
-        def _fill_cmd(cls, color):
-            rgb = cls._rgb(color)
-            if rgb is None:
-                return ""
-            return f"{rgb[0]:.4f} {rgb[1]:.4f} {rgb[2]:.4f} rg"
-
-        def line(self, x1, y1, x2, y2, width=0.8, color="#333333"):
-            if color in (None, "none") or width <= 0:
-                return
-            x1, y1, x2, y2 = map(float, [x1, y1, x2, y2])
-            self.ops.append(("line", x1, y1, x2, y2, float(width), color))
-            self.pdf_cmds.append(
-                f"{width:.3f} w {self._stroke_cmd(color)} {x1:.3f} {y1:.3f} m {x2:.3f} {y2:.3f} l S"
-            )
-
-        def polyline(self, points, width=0.9, color="#1F77B4"):
-            points = [(float(x), float(y)) for x, y in points]
-            if len(points) < 2:
-                return
-            self.ops.append(("polyline", points, float(width), color))
-            pdf_parts = [
-                f"{width:.3f} w {self._stroke_cmd(color)} {points[0][0]:.3f} {points[0][1]:.3f} m"
-            ]
-            pdf_parts.extend(f"{x:.3f} {y:.3f} l" for x, y in points[1:])
-            pdf_parts.append("S")
-            self.pdf_cmds.append(" ".join(pdf_parts))
-
-        def rect(self, x, y, width, height, fill="none", stroke="#333333", line_width=0.8):
-            x, y, width, height = map(float, [x, y, width, height])
-            if height < 0:
-                y += height
-                height = abs(height)
-            self.ops.append(("rect", x, y, width, height, fill, stroke, float(line_width)))
-            cmds = []
-            if fill not in (None, "none"):
-                cmds.append(
-                    f"q {self._fill_cmd(fill)} {x:.3f} {y:.3f} {width:.3f} {height:.3f} re f Q"
-                )
-            if stroke not in (None, "none") and line_width > 0:
-                cmds.append(
-                    f"{line_width:.3f} w {self._stroke_cmd(stroke)} {x:.3f} {y:.3f} {width:.3f} {height:.3f} re S"
-                )
-            if cmds:
-                self.pdf_cmds.append(" ".join(cmds))
-
-        def circle(self, x, y, radius=2.0, fill="#1F77B4", stroke="none", line_width=0.4):
-            x, y, radius = float(x), float(y), float(radius)
-            self.ops.append(("circle", x, y, float(radius), fill, stroke, float(line_width)))
-            c = 0.5522847498 * radius
-            path = (
-                f"{x + radius:.3f} {y:.3f} m "
-                f"{x + radius:.3f} {y + c:.3f} {x + c:.3f} {y + radius:.3f} {x:.3f} {y + radius:.3f} c "
-                f"{x - c:.3f} {y + radius:.3f} {x - radius:.3f} {y + c:.3f} {x - radius:.3f} {y:.3f} c "
-                f"{x - radius:.3f} {y - c:.3f} {x - c:.3f} {y - radius:.3f} {x:.3f} {y - radius:.3f} c "
-                f"{x + c:.3f} {y - radius:.3f} {x + radius:.3f} {y - c:.3f} {x + radius:.3f} {y:.3f} c"
-            )
-            cmds = []
-            if fill not in (None, "none"):
-                cmds.append(f"q {self._fill_cmd(fill)} {path} f Q")
-            if stroke not in (None, "none") and line_width > 0:
-                cmds.append(f"{line_width:.3f} w {self._stroke_cmd(stroke)} {path} S")
-            if cmds:
-                self.pdf_cmds.append(" ".join(cmds))
-
-        def text(self, x, y, text, size=8, anchor="middle", rotate=0, color="#222222"):
-            x, y, size = float(x), float(y), float(size)
-            text = str(text)
-            self.ops.append(("text", x, y, text, float(size), anchor, float(rotate), color))
-            escaped_pdf = Quality._pdf_escape(text)
-            if anchor == "middle":
-                tx = -0.25 * size * len(text)
-            elif anchor == "end":
-                tx = -0.5 * size * len(text)
-            else:
-                tx = 0
-            angle = math.radians(float(rotate))
-            cos_a = math.cos(angle)
-            sin_a = math.sin(angle)
-            self.pdf_cmds.append(
-                "q "
-                f"{self._fill_cmd(color)} "
-                f"{cos_a:.6f} {sin_a:.6f} {-sin_a:.6f} {cos_a:.6f} {x:.3f} {y:.3f} cm "
-                f"BT /F1 {size:.3f} Tf {tx:.3f} 0 Td ({escaped_pdf}) Tj ET Q"
-            )
-
-        def save_pdf(self, pdf_file):
-            content = "\n".join(self.pdf_cmds).encode("latin-1", "replace")
-            objects = []
-            objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
-            objects.append(b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>")
-            page = (
-                f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {self.width:.3f} {self.height:.3f}] "
-                "/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"
-            ).encode("latin-1")
-            objects.append(page)
-            objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
-            stream = b"<< /Length " + str(len(content)).encode("ascii") + b" >>\nstream\n" + content + b"\nendstream"
-            objects.append(stream)
-
-            with open(pdf_file, "wb") as out:
-                out.write(b"%PDF-1.4\n")
-                offsets = [0]
-                for idx, obj in enumerate(objects, start=1):
-                    offsets.append(out.tell())
-                    out.write(f"{idx} 0 obj\n".encode("ascii"))
-                    out.write(obj)
-                    out.write(b"\nendobj\n")
-                xref_pos = out.tell()
-                out.write(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
-                out.write(b"0000000000 65535 f \n")
-                for offset in offsets[1:]:
-                    out.write(f"{offset:010d} 00000 n \n".encode("ascii"))
-                out.write(
-                    f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF\n".encode("ascii")
-                )
-
-        @classmethod
-        def _png_rgb(cls, color):
-            """Convert a PDF-style color value to an RGB tuple for PNG output."""
-            rgb = cls._rgb(color)
-            if rgb is None:
-                return None
-            return tuple(int(round(max(0.0, min(1.0, channel)) * 255)) for channel in rgb)
-
-        @staticmethod
-        def _load_font(size_px):
-            """Load a readable TrueType font for PNG rendering."""
-            size_px = max(8, int(round(size_px)))
-            candidates = [
-                "DejaVuSans.ttf",
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-                "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
-                "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
-            ]
-            for candidate in candidates:
-                try:
-                    return ImageFont.truetype(candidate, size_px)
-                except Exception:
-                    continue
-            return ImageFont.load_default()
-
-        def save_png(self, png_file, scale=2):
-            """Rasterize the recorded vector drawing commands to PNG."""
-            scale = max(1, int(scale))
-            width_px = int(round(self.width * scale))
-            height_px = int(round(self.height * scale))
-            image = Image.new("RGB", (width_px, height_px), (255, 255, 255))
-            draw = ImageDraw.Draw(image)
-
-            def px(value):
-                return float(value) * scale
-
-            def py(value):
-                return float(self.height - float(value)) * scale
-
-            for op in self.ops:
-                kind = op[0]
-
-                if kind == "line":
-                    _, x1, y1, x2, y2, line_width, color = op
-                    color_rgb = self._png_rgb(color)
-                    if color_rgb is not None:
-                        draw.line(
-                            [(px(x1), py(y1)), (px(x2), py(y2))],
-                            fill=color_rgb,
-                            width=max(1, int(round(line_width * scale))),
-                        )
-
-                elif kind == "polyline":
-                    _, points, line_width, color = op
-                    color_rgb = self._png_rgb(color)
-                    if color_rgb is not None and len(points) >= 2:
-                        draw.line(
-                            [(px(x), py(y)) for x, y in points],
-                            fill=color_rgb,
-                            width=max(1, int(round(line_width * scale))),
-                            joint="curve",
-                        )
-
-                elif kind == "rect":
-                    _, x, y, width, height, fill, stroke, line_width = op
-                    fill_rgb = self._png_rgb(fill) if fill not in (None, "none") else None
-                    stroke_rgb = self._png_rgb(stroke) if stroke not in (None, "none") else None
-                    xy = [px(x), py(y + height), px(x + width), py(y)]
-                    draw.rectangle(
-                        xy,
-                        fill=fill_rgb,
-                        outline=stroke_rgb,
-                        width=max(1, int(round(line_width * scale))) if stroke_rgb else 1,
-                    )
-
-                elif kind == "circle":
-                    _, x, y, radius, fill, stroke, line_width = op
-                    fill_rgb = self._png_rgb(fill) if fill not in (None, "none") else None
-                    stroke_rgb = self._png_rgb(stroke) if stroke not in (None, "none") else None
-                    xy = [px(x - radius), py(y + radius), px(x + radius), py(y - radius)]
-                    draw.ellipse(
-                        xy,
-                        fill=fill_rgb,
-                        outline=stroke_rgb,
-                        width=max(1, int(round(line_width * scale))) if stroke_rgb else 1,
-                    )
-
-                elif kind == "text":
-                    _, x, y, text, size, anchor, rotate, color = op
-                    font = self._load_font(size * scale)
-                    color_rgb = self._png_rgb(color) or (0, 0, 0)
-                    text = str(text)
-                    bbox = font.getbbox(text)
-                    text_width = bbox[2] - bbox[0]
-                    text_height = bbox[3] - bbox[1]
-                    padding = max(4, int(round(3 * scale)))
-                    text_image = Image.new(
-                        "RGBA",
-                        (text_width + padding * 2, text_height + padding * 2),
-                        (255, 255, 255, 0),
-                    )
-                    text_draw = ImageDraw.Draw(text_image)
-                    text_draw.text(
-                        (padding - bbox[0], padding - bbox[1]),
-                        text,
-                        fill=color_rgb + (255,),
-                        font=font,
-                    )
-                    if abs(float(rotate)) > 1e-6:
-                        text_image = text_image.rotate(
-                            -float(rotate),
-                            expand=True,
-                            resample=Image.Resampling.BICUBIC,
-                        )
-
-                    anchor_x = px(x)
-                    anchor_y = py(y)
-                    if anchor == "middle":
-                        paste_x = int(round(anchor_x - text_image.width / 2))
-                    elif anchor == "end":
-                        paste_x = int(round(anchor_x - text_image.width))
-                    else:
-                        paste_x = int(round(anchor_x))
-                    paste_y = int(round(anchor_y - text_image.height / 2))
-                    image.paste(text_image, (paste_x, paste_y), text_image)
-
-            image.save(png_file, format="PNG")
-
-    def _draw_panel_axes(self, canvas, left, bottom, width, height, title, xlabel, ylabel, x_ticks, x_labels, y_max):
-        """Draw a clean XY axis panel with full numeric y-axis labels."""
-        y_ticks, y_max = self._nice_ticks(y_max, target_ticks=4)
-        for value in y_ticks:
-            y = self._linear_map(value, 0, y_max, bottom, bottom + height)
-            if value > 0:
-                canvas.line(left, y, left + width, y, width=0.25, color="#D9D9D9")
-            canvas.line(left - 3, y, left, y, width=0.6, color="#333333")
-            canvas.text(left - 9, y - 2, self._format_axis_value(value), size=13, anchor="end", color="#222222")
-
-        canvas.line(left, bottom, left + width, bottom, width=0.8, color="#333333")
-        canvas.line(left, bottom, left, bottom + height, width=0.8, color="#333333")
-        canvas.text(left + width / 2, bottom + height + 22, title, size=14, anchor="middle")
-        canvas.text(left + width / 2, bottom - 46, xlabel, size=14, anchor="middle")
-        canvas.text(left - 70, bottom + height / 2, ylabel, size=14, anchor="middle", rotate=90)
-
-        for x, label in zip(x_ticks, x_labels):
-            canvas.line(x, bottom, x, bottom - 3, width=0.6, color="#333333")
-            canvas.text(x, bottom - 20, label, size=13, anchor="middle", rotate=90 if len(str(label)) > 2 else 0)
-
-        return y_max
-
-    def _save_vector_canvas(self, canvas, pdf_file, png_file=None):
-        """Save one vector canvas as PDF and optional PNG."""
-        canvas.save_pdf(pdf_file)
-        if png_file:
-            canvas.save_png(png_file, scale=2)
-
-    def _draw_horizontal_dashed_reference(self, canvas, left, right, y, color="#666666", line_width=0.8, dash=6.0, gap=4.0):
-        """Draw a horizontal dashed reference line on the vector canvas."""
-        left = float(left)
-        right = float(right)
-        y = float(y)
-        dash = max(1.0, float(dash))
-        gap = max(1.0, float(gap))
-        x = left
-        while x < right:
-            x2 = min(x + dash, right)
-            canvas.line(x, y, x2, y, width=line_width, color=color)
-            x += dash + gap
+    # Blue-orange contrast palette shared by the QC figures.
+    _QC_BLUE = "#2166AC"
+    _QC_BLUE_LIGHT = "#4393C3"
+    _QC_ORANGE = "#E08214"
+    _QC_ORANGE_DARK = "#B84507"
 
     def draw_the_length_distr(self, sorted_length):
-        """Draw plus/minus RPF length distribution as vector PDF and PNG."""
+        """Draw plus/minus RPF length distribution as PDF and PNG."""
         out_pdf = self.output_prefix + "_length_distribution.pdf"
         out_png = self.output_prefix + "_length_distribution.png"
 
@@ -1737,40 +1402,58 @@ class Quality(object):
         plus_values = length_df["Plus"].to_numpy(dtype=float)
         minus_values = length_df["Minus"].to_numpy(dtype=float)
 
-        canvas = self._VectorCanvas(660, 560)
-        canvas.text(330, 535, "RPFs length distribution", size=17, anchor="middle")
-
-        panels = [
-            ("Plus strand", plus_values, 315, "#1F77B4"),
-            ("Minus strand", minus_values, 95, "#D62728"),
-        ]
         x_min, x_max = float(self.mono[0]), float(self.mono[1])
-        visible_mask = (x_values >= x_min) & (x_values <= x_max)
-        visible_x = x_values[visible_mask] if np.any(visible_mask) else x_values
-        tick_step = max(1, int(math.ceil(len(visible_x) / 18)))
-        tick_values = visible_x[::tick_step]
+        mask = (x_values >= x_min) & (x_values <= x_max)
+        if not np.any(mask):
+            mask = np.ones_like(x_values, dtype=bool)
+        x = x_values[mask]
+        tick_step = max(1, int(math.ceil(len(x) / 10)))
+        tick_values = x[::tick_step].astype(int)
 
-        for title, y_values, bottom, line_color in panels:
-            left, width, height = 95, 470, 160
-            y_max = self._nice_max(np.nanmax(y_values) if len(y_values) else 1)
-            x_ticks = [self._linear_map(x, x_min, x_max, left, left + width) for x in tick_values]
-            x_labels = [str(int(x)) for x in tick_values]
-            y_max = self._draw_panel_axes(
-                canvas, left, bottom, width, height, title,
-                "RPFs length (nt)", "RPFs number", x_ticks, x_labels, y_max,
+        _ensure_plotting_backend()
+        matplotlib.rcParams.update(self._QC_PLOT_STYLE)
+        fig, axes = plt.subplots(
+            nrows=1, ncols=2, figsize=(7.4, 3.5), sharey=True, constrained_layout=True
+        )
+        fig.suptitle("RPFs length distribution", fontsize=13)
+        series = [
+            (axes[0], "Plus strand", plus_values[mask], self._QC_BLUE),
+            (axes[1], "Minus strand", minus_values[mask], self._QC_ORANGE),
+        ]
+        # The two panels share one y-axis, so the limit must be computed from
+        # both strands together; otherwise the last panel's limit overwrites
+        # the other and clips its peak outside the axes.
+        y_axis_max = max(
+            1.0,
+            float(np.max(plus_values[mask])),
+            float(np.max(minus_values[mask])),
+        )
+        for ax, title, y, color in series:
+            ax.plot(x, y, color=color, linewidth=1.4, marker="o", markersize=3.0)
+            ax.fill_between(x, 0, y, color=color, alpha=0.06, linewidth=0)
+            ax.set_title(title, fontsize=11, pad=6)
+            ax.set_xlabel("Read length (nt)", fontsize=10)
+            ax.set_ylabel("Number of RPFs", fontsize=10)
+            ax.set_xlim(x_min, x_max)
+            ax.set_ylim(0, y_axis_max * 1.18)
+            ax.set_xticks(tick_values)
+
+            # mark the most abundant read length
+            peak_idx = int(np.argmax(y))
+            peak_x = float(x[peak_idx])
+            ax.axvline(peak_x, color="#888888", linestyle="--", linewidth=0.9)
+            ax.annotate(
+                f"{peak_x:.0f} nt",
+                xy=(peak_x, float(y[peak_idx])),
+                xytext=(0, 10),
+                textcoords="offset points",
+                ha="center",
+                fontsize=9,
             )
-            points = []
-            for x, y in zip(x_values, y_values):
-                if x < x_min or x > x_max:
-                    continue
-                px = self._linear_map(x, x_min, x_max, left, left + width)
-                py = self._linear_map(y, 0, y_max, bottom, bottom + height)
-                points.append((px, py))
-            canvas.polyline(points, width=1.4, color=line_color)
-            for px, py in points:
-                canvas.circle(px, py, radius=1.8, fill=line_color)
 
-        self._save_vector_canvas(canvas, out_pdf, out_png)
+        fig.savefig(out_pdf, bbox_inches="tight", pad_inches=0.06)
+        fig.savefig(out_png, dpi=300, bbox_inches="tight", pad_inches=0.06)
+        plt.close(fig)
 
     def write_length_distr(self):
         """Write and plot plus/minus read-length distribution."""
@@ -1922,7 +1605,7 @@ class Quality(object):
         return self.rpf_saturation()
 
     def draw_gene_saturation(self):
-        """Draw gene-level saturation curves as vector PDF and PNG."""
+        """Draw gene-level saturation curves as PDF and PNG."""
         out_pdf = self.output_prefix + "_gene_saturation.pdf"
         out_png = self.output_prefix + "_gene_saturation.png"
         out_gene = self.output_prefix + "_gene_saturation.txt"
@@ -1933,155 +1616,45 @@ class Quality(object):
         gene_df = gene_df[["Part", "Count"]]
         gene_df.to_csv(out_gene, sep="\t", index=False)
 
-        canvas = self._VectorCanvas(780, 400)
-        canvas.text(390, 372, "Gene saturation", size=17, anchor="middle")
-        panels = [
-            ("covered gene saturation", self.saturation, 85, "gene number", "#4C78A8"),
-            ("uncovered gene saturation", [total_gene_num - i for i in self.saturation], 410, "gene number", "#F58518"),
+        _ensure_plotting_backend()
+        matplotlib.rcParams.update(self._QC_PLOT_STYLE)
+        fig, axes = plt.subplots(
+            nrows=1, ncols=2, figsize=(7.6, 3.5), constrained_layout=True
+        )
+        fig.suptitle("Gene saturation", fontsize=13)
+        x_positions = np.arange(len(self.saturation))
+        covered = np.asarray(self.saturation, dtype=float)
+        uncovered = total_gene_num - covered
+        series = [
+            (axes[0], "Covered genes", covered, self._QC_BLUE),
+            (axes[1], "Uncovered genes", uncovered, self._QC_ORANGE),
         ]
-
-        for title, values, left, ylabel, plot_color in panels:
-            bottom, width, height = 82, 245, 205
-            y_max = self._nice_max(max(max(values) if values else 1, total_gene_num))
-            x_min, x_max = 5.0, 95.0
-            x_positions = [self._linear_map(x, x_min, x_max, left, left + width) for x in self.x_ticks]
-            y_max = self._draw_panel_axes(
-                canvas, left, bottom, width, height, title,
-                "reads proportion (%)", ylabel,
-                x_positions, [str(i) for i in self.x_ticks], y_max,
+        for ax, title, y, color in series:
+            ax.axhline(total_gene_num, color="#888888", linestyle="--", linewidth=0.9)
+            ax.plot(x_positions, y, color=color, linewidth=1.5, marker="o", markersize=3.6)
+            ax.fill_between(x_positions, 0, y, color=color, alpha=0.05, linewidth=0)
+            ax.text(
+                0.98,
+                0.96,
+                f"Total genes: {int(total_gene_num):,}",
+                transform=ax.transAxes,
+                fontsize=8.5,
+                color="black",
+                ha="right",
+                va="top",
             )
+            ax.set_title(title, fontsize=11, pad=6)
+            ax.set_xlabel("Reads proportion (%)", fontsize=10)
+            ax.set_ylabel("Gene number", fontsize=10)
+            ax.set_xticks(x_positions, [str(i) for i in self.x_ticks])
+            ax.set_ylim(bottom=0)
 
-            ref_y = self._linear_map(total_gene_num, 0, y_max, bottom, bottom + height)
-            self._draw_horizontal_dashed_reference(
-                canvas,
-                left,
-                left + width,
-                ref_y,
-                color="#7F7F7F",
-                line_width=0.8,
-                dash=6.0,
-                gap=4.0,
-            )
-            canvas.text(
-                left + width - 2,
-                min(bottom + height + 10, ref_y + 8),
-                f"Total genes: {int(total_gene_num)}",
-                size=11,
-                anchor="end",
-                color="#555555",
-            )
-
-            bar_width = max(4.0, width / 42.0)
-            points = []
-            for x, value in zip(x_positions, values):
-                y = self._linear_map(value, 0, y_max, bottom, bottom + height)
-                canvas.rect(x - bar_width / 2, bottom, bar_width, y - bottom, fill=plot_color, stroke=plot_color, line_width=0.4)
-                points.append((x, y))
-            canvas.polyline(points, width=1.2, color="#333333")
-            for x, y in points:
-                canvas.circle(x, y, radius=1.6, fill="#333333")
-
-        self._save_vector_canvas(canvas, out_pdf, out_png)
-
-    @staticmethod
-    def _boxplot_stats(values):
-        """Return boxplot statistics for a numeric vector."""
-        arr = np.asarray(values, dtype=float)
-        arr = arr[np.isfinite(arr)]
-        if arr.size == 0:
-            return None
-        q1, median, q3 = np.percentile(arr, [25, 50, 75])
-        iqr = q3 - q1
-        low_bound = q1 - 1.5 * iqr
-        high_bound = q3 + 1.5 * iqr
-        lower_values = arr[arr >= low_bound]
-        upper_values = arr[arr <= high_bound]
-        whisker_low = float(np.min(lower_values)) if lower_values.size else float(np.min(arr))
-        whisker_high = float(np.max(upper_values)) if upper_values.size else float(np.max(arr))
-        outliers = arr[(arr < whisker_low) | (arr > whisker_high)]
-        if outliers.size > 120:
-            outliers = np.sort(outliers)[::max(1, int(outliers.size / 120))]
-        return {
-            "q1": float(q1),
-            "median": float(median),
-            "q3": float(q3),
-            "whisker_low": whisker_low,
-            "whisker_high": whisker_high,
-            "outliers": outliers.astype(float),
-        }
-
-    def _draw_boxplot_panel(self, canvas, data_frame, left, bottom, width, height, title):
-        """Draw one reads-saturation boxplot panel with readable count-scale labels."""
-        canvas.text(left + width / 2, bottom + height + 24, title, size=14, anchor="middle")
-        canvas.text(left + width / 2, bottom - 48, "reads proportion (%)", size=13, anchor="middle")
-        canvas.text(left - 74, bottom + height / 2, "Reads count", size=13, anchor="middle", rotate=90)
-
-        if data_frame.empty:
-            canvas.line(left, bottom, left + width, bottom, width=0.8, color="#333333")
-            canvas.line(left, bottom, left, bottom + height, width=0.8, color="#333333")
-            canvas.text(left + width / 2, bottom + height / 2, "No data", size=13, anchor="middle")
-            return
-
-        stats_by_col = []
-        all_values = []
-        for col in data_frame.columns[:9]:
-            values = pd.to_numeric(data_frame[col], errors="coerce").dropna().to_numpy(dtype=float)
-            values = np.maximum(values, 0.0)
-            logged = np.log10(values + 1.0)
-            stats = self._boxplot_stats(logged)
-            stats_by_col.append(stats)
-            if values.size:
-                all_values.extend(values[np.isfinite(values)].tolist())
-
-        max_count = max(all_values) if all_values else 1.0
-        max_log = max(1.0, math.ceil(math.log10(max_count + 1.0)))
-
-        y_tick_counts = [0]
-        power = 0
-        while 10 ** power <= max_count:
-            y_tick_counts.append(10 ** power)
-            power += 1
-        y_tick_counts = sorted(set(y_tick_counts))
-
-        for count_value in y_tick_counts:
-            y = self._linear_map(math.log10(count_value + 1.0), 0, max_log, bottom, bottom + height)
-            if count_value > 0:
-                canvas.line(left, y, left + width, y, width=0.25, color="#D9D9D9")
-            canvas.line(left - 3, y, left, y, width=0.6, color="#333333")
-            canvas.text(left - 9, y - 2, self._format_axis_value(count_value), size=10, anchor="end")
-
-        canvas.line(left, bottom, left + width, bottom, width=0.8, color="#333333")
-        canvas.line(left, bottom, left, bottom + height, width=0.8, color="#333333")
-
-        n = len(stats_by_col)
-        box_width = max(5.0, width / (n * 2.8))
-        for idx, stats in enumerate(stats_by_col):
-            x = left + (idx + 0.5) * width / n
-            tick_label = str(self.x_ticks[idx]) if idx < len(self.x_ticks) else str(idx + 1)
-            canvas.line(x, bottom, x, bottom - 3, width=0.5, color="#333333")
-            canvas.text(x, bottom - 20, tick_label, size=10, anchor="middle", rotate=90)
-            if stats is None:
-                continue
-
-            def map_y(value):
-                return self._linear_map(value, 0, max_log, bottom, bottom + height)
-
-            y_q1 = map_y(stats["q1"])
-            y_med = map_y(stats["median"])
-            y_q3 = map_y(stats["q3"])
-            y_low = map_y(stats["whisker_low"])
-            y_high = map_y(stats["whisker_high"])
-            canvas.line(x, y_low, x, y_q1, width=0.6, color="#333333")
-            canvas.line(x, y_q3, x, y_high, width=0.6, color="#333333")
-            canvas.line(x - box_width / 3, y_low, x + box_width / 3, y_low, width=0.6, color="#333333")
-            canvas.line(x - box_width / 3, y_high, x + box_width / 3, y_high, width=0.6, color="#333333")
-            canvas.rect(x - box_width / 2, y_q1, box_width, max(0.5, y_q3 - y_q1), fill="#DDEAF7", stroke="#1F77B4", line_width=0.6)
-            canvas.line(x - box_width / 2, y_med, x + box_width / 2, y_med, width=0.8, color="#D62728")
-            for outlier in stats["outliers"]:
-                canvas.circle(x, map_y(outlier), radius=0.75, fill="#555555")
+        fig.savefig(out_pdf, bbox_inches="tight", pad_inches=0.06)
+        fig.savefig(out_png, dpi=300, bbox_inches="tight", pad_inches=0.06)
+        plt.close(fig)
 
     def draw_rpf_saturation(self):
-        """Draw read-count saturation boxplots by expression quartile as vector PDF and PNG."""
+        """Draw read-count saturation boxplots by expression quartile as PDF and PNG."""
         out_pdf = self.output_prefix + "_reads_saturation.pdf"
         out_png = self.output_prefix + "_reads_saturation.png"
         out_rpf = self.output_prefix + "_reads_saturation.txt"
@@ -2110,23 +1683,80 @@ class Quality(object):
         ]
         mrna_75_100 = mrna_df[quantile_list.iloc[2] <= mrna_df["mean"]]
 
-        canvas = self._VectorCanvas(1320, 450)
-        canvas.text(660, 418, "Reads saturation", size=17, anchor="middle")
+        _ensure_plotting_backend()
+        matplotlib.rcParams.update(self._QC_PLOT_STYLE)
+        fig, axes = plt.subplots(
+            nrows=1, ncols=4, figsize=(11.8, 3.3), sharey=True, constrained_layout=True
+        )
+        fig.suptitle("Reads saturation", fontsize=13)
+        x_positions = np.arange(len(self.x_ticks))
         groups = [
             (mrna_0_25, "0-25%"),
             (mrna_25_50, "25-50%"),
             (mrna_50_75, "50-75%"),
             (mrna_75_100, "75-100%"),
         ]
-        for idx, (group_df, title) in enumerate(groups):
-            self._draw_boxplot_panel(
-                canvas,
-                group_df.iloc[:, 0:9],
-                left=90 + idx * 305,
-                bottom=92,
-                width=220,
-                height=250,
-                title=title,
+
+        # One box per reads proportion, split by expression-quartile group.
+        logged_groups = []
+        max_count = 1.0
+        max_log = 1.0
+        for group_df, _ in groups:
+            matrix = group_df.iloc[:, 0:9].to_numpy(dtype=float)
+            cols = []
+            for col_idx in range(matrix.shape[1]):
+                col_values = matrix[:, col_idx]
+                col_values = np.maximum(col_values[np.isfinite(col_values)], 0.0)
+                if col_values.size == 0:
+                    continue
+                cols.append(np.log10(col_values + 1.0))
+                max_count = max(max_count, float(col_values.max()))
+                max_log = max(max_log, float(np.log10(col_values.max() + 1.0)))
+            logged_groups.append(cols)
+
+        # Shared log10(count + 1) y-axis so all four panels are comparable.
+        tick_counts = [0] + [10 ** p for p in range(0, int(math.ceil(math.log10(max_count))) + 1)]
+        y_ticks_log = [math.log10(c + 1.0) for c in tick_counts]
+        y_tick_labels = [self._format_axis_value(c) for c in tick_counts]
+
+        box_colors = [self._QC_BLUE, self._QC_BLUE_LIGHT, self._QC_ORANGE, self._QC_ORANGE_DARK]
+        for idx, (logged, title) in enumerate(zip(logged_groups, [title for _, title in groups])):
+            ax = axes[idx]
+            ax.set_title(title, fontsize=11, pad=6)
+            ax.set_xlabel("Reads proportion (%)", fontsize=10)
+            if idx == 0:
+                ax.set_ylabel("Reads count", fontsize=10)
+            ax.set_xticks(x_positions)
+            ax.set_xticklabels([str(i) for i in self.x_ticks])
+            ax.set_yticks(y_ticks_log)
+            ax.set_yticklabels(y_tick_labels)
+            ax.set_ylim(0, max_log * 1.05)
+            if not logged:
+                ax.text(0.5, 0.5, "No data", transform=ax.transAxes, ha="center", fontsize=10)
+                continue
+            color = box_colors[idx]
+            ax.boxplot(
+                logged,
+                positions=x_positions[: len(logged)],
+                widths=0.55,
+                patch_artist=True,
+                medianprops=dict(color="black", linewidth=1.1),
+                whiskerprops=dict(color=color, linewidth=0.9),
+                capprops=dict(color=color, linewidth=0.9),
+                boxprops=dict(
+                    facecolor=matplotlib.colors.to_rgba(color, alpha=0.10),
+                    edgecolor=color,
+                    linewidth=0.9,
+                ),
+                flierprops=dict(
+                    marker="o",
+                    markersize=1.6,
+                    markerfacecolor="#666666",
+                    markeredgecolor="none",
+                    alpha=0.5,
+                ),
             )
 
-        self._save_vector_canvas(canvas, out_pdf, out_png)
+        fig.savefig(out_pdf, bbox_inches="tight", pad_inches=0.06)
+        fig.savefig(out_png, dpi=300, bbox_inches="tight", pad_inches=0.06)
+        plt.close(fig)

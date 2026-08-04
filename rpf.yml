@@ -52,7 +52,6 @@ dependencies:
     - lxml==6.1.1
     - markdown-it-py==4.2.0
     - matplotlib==3.10.9
-    - matplotlib-venn==1.1.2
     - mdurl==0.1.2
     - more-itertools==11.1.0
     - nh3==0.3.5

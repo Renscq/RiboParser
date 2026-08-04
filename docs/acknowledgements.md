@@ -25,7 +25,6 @@ RiboParser depends on and interoperates with widely used open-source tools, incl
 - pysam
 - joblib
 - matplotlib
-- matplotlib-venn
 - seaborn
 
 ## Example dataset

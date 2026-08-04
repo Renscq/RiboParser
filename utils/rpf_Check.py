@@ -13,8 +13,13 @@
 from __future__ import annotations
 
 import argparse
+import multiprocessing as mp
+import os
+import queue
+import sys
 from argparse import Namespace
 from collections.abc import Sequence
+from pathlib import Path
 
 
 from utils.ribo.Quality import Quality
@@ -179,6 +184,91 @@ def _parse_args(argv: Sequence[str] | None = None) -> Namespace:
     return args
 
 
+def _run_saturation_isolated(rpf_quality: Quality, attempts: int = 2) -> None:
+    """Run saturation analysis and plotting inside a forked child process.
+
+    The saturation matrix can be large (one column per transcript), so the
+    result is collected with ``Queue.get(timeout=...)`` *while* the child is
+    still alive instead of ``process.join()`` first. Calling ``join()`` before
+    draining the queue would let the child's feeder thread block on a full
+    OS pipe (default 64 KB), and the child would hang forever in its
+    ``join_thread`` at interpreter shutdown -- the classic
+    Queue-fills-before-join deadlock.
+    """
+    ctx = mp.get_context("fork")
+    last_error: str | None = None
+
+    for attempt in range(1, attempts + 1):
+        result_queue = ctx.Queue()
+
+        def _child() -> None:
+            try:
+                # The forked child inherits the parent's matplotlib state; reset
+                # it before drawing to minimize the chance of C-level crashes.
+                import gc
+
+                import matplotlib.pyplot as plt
+
+                plt.close("all")
+                gc.collect()
+                rpf_quality.rpf_saturation()
+                rpf_quality.draw_gene_saturation()
+                rpf_quality.draw_rpf_saturation()
+                result_queue.put(
+                    (
+                        list(rpf_quality.saturation),
+                        rpf_quality.saturation_matrix,
+                        None,
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001 - reported to the parent
+                result_queue.put((None, None, repr(exc)))
+
+        process = ctx.Process(target=_child)
+        process.start()
+
+        # Drain the queue while the child runs; this prevents the pipe from
+        # filling up and deadlocking the child's feeder thread at shutdown.
+        result_item: tuple | None = None
+        while process.is_alive():
+            try:
+                result_item = result_queue.get(timeout=1.0)
+                break
+            except queue.Empty:
+                continue
+
+        process.join()
+
+        # If the child exited before we observed the queue (e.g. it finished
+        # too fast between the is_alive() check and the join), drain leftovers.
+        if result_item is None and not result_queue.empty():
+            result_item = result_queue.get()
+
+        if process.exitcode == 0 and result_item is not None:
+            saturation, matrix, error = result_item
+            if error is not None:
+                last_error = error
+                print(
+                    f"  warning: saturation step failed (attempt {attempt}), retrying...",
+                    flush=True,
+                )
+                continue
+            rpf_quality.saturation = saturation
+            rpf_quality.saturation_matrix = matrix
+            return
+
+        last_error = f"saturation subprocess crashed with exit code {process.exitcode}"
+        print(
+            f"  warning: saturation subprocess crashed (attempt {attempt}), retrying...",
+            flush=True,
+        )
+
+    raise RuntimeError(
+        "RPFs saturation analysis failed repeatedly. "
+        f"Last error: {last_error}"
+    )
+
+
 def _run_check_pipeline(args: Namespace) -> None:
     """Run the optimized rpf_Check workflow."""
     rpf_quality = Quality(args)
@@ -207,9 +297,7 @@ def _run_check_pipeline(args: Namespace) -> None:
 
     if args.saturation:
         step_print(6, "Check the RPFs saturation.")
-        rpf_quality.rpf_saturation()
-        rpf_quality.draw_gene_saturation()
-        rpf_quality.draw_rpf_saturation()
+        _run_saturation_isolated(rpf_quality)
         rpf_quality.write_summary()
     else:
         step_print(6, "Do not check the RPFs saturation.")
@@ -227,6 +315,10 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     complete_print()
     now_time()
+
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)
 
 
 if __name__ == "__main__":

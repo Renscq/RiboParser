@@ -1,4 +1,4 @@
-{% set version = os.environ.get("PACKAGE_VERSION", "0.3.5") %}
+{% set version = os.environ.get("PACKAGE_VERSION", "0.3.6") %}
 {% set sha256 = os.environ.get("PACKAGE_SHA256", "71b42325e7c3e919973679abfb93d0657539325f273e6289772ef87e04a99769") %}
 
 package:
@@ -33,7 +33,6 @@ requirements:
     - pysam >=0.23
     - joblib >=1.3
     - matplotlib-base >=3.8
-    - matplotlib-venn >=1.1
     - seaborn >=0.13
 
 test:
