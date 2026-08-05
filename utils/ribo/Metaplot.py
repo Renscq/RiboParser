@@ -1114,7 +1114,7 @@ class Metaplot(object):
         ax.set_xticks([position_to_index[value] for value in tick_values])
         ax.set_xticklabels([str(value) for value in tick_values], rotation=0, ha="center", fontsize=8)
 
-    def _plot_heatmap_panel(self, ax, matrix: pd.DataFrame, title: str, tick_step: int):
+    def _plot_heatmap_panel(self, ax, matrix: pd.DataFrame, title: str, region: str, tick_step: int):
         """Draw one heatmap panel."""
         image = ax.imshow(
             matrix.to_numpy(dtype=float),
@@ -1123,7 +1123,7 @@ class Metaplot(object):
             cmap=HEATMAP_CMAP,
         )
         ax.set_title(title, fontsize=11)
-        ax.set_xlabel("Relative position (nt)")
+        ax.set_xlabel("Position from {region} (nt)".format(region=region))
 
         if len(matrix.index) <= 60:
             ax.set_yticks(range(len(matrix.index)))
@@ -1161,8 +1161,8 @@ class Metaplot(object):
             [int(value) for value in tts_matrix.columns.tolist()],
             max_ticks=9,
         )
-        image1 = self._plot_heatmap_panel(axes[0], tis_matrix, "TIS metaplot", tick_step=tick_step)
-        image2 = self._plot_heatmap_panel(axes[1], tts_matrix, "TTS metaplot", tick_step=tick_step)
+        image1 = self._plot_heatmap_panel(axes[0], tis_matrix, "TIS metaplot", "start codon", tick_step=tick_step)
+        image2 = self._plot_heatmap_panel(axes[1], tts_matrix, "TTS metaplot", "stop codon", tick_step=tick_step)
         axes[0].set_ylabel("Sample")
         axes[1].set_ylabel("")
 
