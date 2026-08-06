@@ -230,6 +230,18 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     output_group.add_argument(
+        "--rankplot-ncol",
+        dest="rankplot_ncol",
+        required=False,
+        type=int,
+        default=1,
+        help=(
+            "Number of sample panels per row in the codon rank plot. Every codon is "
+            "labeled on the x-axis (rotated 90 degrees), so 1 gives one wide panel "
+            "per row and 2 gives two narrower panels per row. Default: %(default)s."
+        ),
+    )
+    output_group.add_argument(
         "--all",
         dest="all",
         action="store_true",
@@ -264,6 +276,8 @@ def _validate_args(args: Namespace) -> None:
         raise ValueError("--outlier-window must be >= 1.")
     if args.outlier_local_fold <= 1:
         raise ValueError("--outlier-local-fold must be > 1.")
+    if args.rankplot_ncol < 1:
+        raise ValueError("--rankplot-ncol must be >= 1.")
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> Namespace:

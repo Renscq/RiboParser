@@ -64,6 +64,7 @@ class _GeneProfile:
     codons: np.ndarray
     regions: np.ndarray
     density: np.ndarray
+    frame_density: np.ndarray | None = None
 
 
 @dataclass(slots=True)
@@ -106,7 +107,13 @@ class MetaCodon:
         self.scale = bool(args.scale)
         self.unique = bool(args.unique)
         self.smooth = args.smooth
+        self.unit = str(getattr(args, "unit", "codon"))
         self.fig = bool(args.fig)
+
+        # Frame-resolution mode: when the x-axis uses nucleotides and all
+        # three frames are kept, each codon is expanded into three nucleotide
+        # positions (frame 0/1/2) so that tri-nucleotide periodicity is visible.
+        self.nt_expand = self.unit == "nucleotide" and self.frame == "all"
 
         # Imported data.
         self.rpf_data: RPFs.RPFData | None = None
@@ -131,6 +138,33 @@ class MetaCodon:
     # ------------------------------------------------------------------
     # Input and validation
     # ------------------------------------------------------------------
+    @staticmethod
+    def _frame_columns(sample_name: Sequence[str]) -> list[str]:
+        """Return the per-frame column names of all samples (f0, f1, f2)."""
+        return [
+            f"{sample}_f{frame}"
+            for sample in sample_name
+            for frame in range(3)
+        ]
+
+    @staticmethod
+    def _shift_frame_table(
+        table: pd.DataFrame,
+        sample_name: Sequence[str],
+        shift_num: int,
+    ) -> pd.DataFrame:
+        """Shift each per-frame column independently (codon-level A-site shift)."""
+        if shift_num == 0:
+            return table
+        frame_columns = MetaCodon._frame_columns(sample_name)
+        table.loc[:, frame_columns] = (
+            table.groupby("name", sort=False)[frame_columns]
+            .shift(shift_num)
+            .fillna(0)
+            .values
+        )
+        return table
+
     @staticmethod
     def _normalize_codon(value: Any) -> str:
         """Return an uppercase DNA codon or codon motif."""
@@ -257,40 +291,56 @@ class MetaCodon:
         )
         return high_rpf
 
-    def _normalize_to_rpm(self, table: pd.DataFrame) -> None:
+    def _normalize_to_rpm(
+        self,
+        table: pd.DataFrame,
+        sample_columns: Sequence[str] | None = None,
+    ) -> None:
         """Convert sample density columns to RPM in place."""
         if not self.norm:
             return
         if self.total_rpf_num is None:
             raise ValueError("Total RPF counts are unavailable for RPM normalization.")
 
-        for sample in self.sample_name:
+        sample_columns = (
+            list(sample_columns) if sample_columns is not None else self.sample_name
+        )
+        for sample, column in zip(self.sample_name, sample_columns):
             total = float(self.total_rpf_num.get(sample, 0.0))
             if total > 0:
-                table.loc[:, sample] *= RPM_SCALE / total
+                table[column] = table[column].astype("float64") * (
+                    RPM_SCALE / total
+                )
             else:
-                table.loc[:, sample] = 0.0
+                table[column] = 0.0
                 print(
                     f"Warning: sample {sample} has zero total RPF count; "
                     "its RPM density was set to zero.",
                     flush=True,
                 )
 
-    def _normalize_by_gene_mean(self, table: pd.DataFrame) -> None:
+    def _normalize_by_gene_mean(
+        self,
+        table: pd.DataFrame,
+        sample_columns: Sequence[str] | None = None,
+    ) -> None:
         """Normalize each position by transcript-specific mean CDS density."""
         if not self.scale:
             return
 
+        sample_columns = (
+            list(sample_columns) if sample_columns is not None else self.sample_name
+        )
         cds_mask = table["region"].astype(str).str.lower().eq("cds")
         gene_mean = (
-            table.loc[cds_mask, ["name"] + self.sample_name]
-            .groupby("name", sort=False)[self.sample_name]
+            table.loc[cds_mask, ["name"] + sample_columns]
+            .groupby("name", sort=False)[sample_columns]
             .mean()
         )
 
         gene_names = table["name"].astype(str).to_numpy()
         denominator_values = gene_mean.reindex(gene_names).to_numpy(dtype=float)
-        values = table.loc[:, self.sample_name].to_numpy(dtype=float)
+        values = table.loc[:, sample_columns].to_numpy(dtype=float)
 
         normalized = np.zeros_like(values, dtype=float)
         valid = np.isfinite(denominator_values) & (denominator_values > 0)
@@ -300,60 +350,123 @@ class MetaCodon:
             out=normalized,
             where=valid,
         )
-        table.loc[:, self.sample_name] = normalized
+        # Cast target columns to float first so that assigning the float
+        # array does not trigger an incompatible-dtype warning.
+        table[sample_columns] = table[sample_columns].astype("float64")
+        table[sample_columns] = normalized
 
-    def _build_gene_profiles(self, table: pd.DataFrame) -> None:
-        """Convert the retained table into compact transcript-local arrays."""
+    def _build_gene_profiles(
+        self,
+        table: pd.DataFrame,
+        frame_table: pd.DataFrame | None = None,
+    ) -> None:
+        """Convert the retained table into compact transcript-local arrays.
+
+        The whole table is pre-sorted/deduped and converted to numeric once,
+        outside the per-transcript loop, so that large tables are not
+        repeatedly scanned inside the loop.
+        """
         profiles: list[_GeneProfile] = []
+        frame_columns = self._frame_columns(self.sample_name)
 
-        for gene_name, gene_table in table.groupby("name", sort=False):
-            gene_table = (
-                gene_table.sort_values(
-                    ["from_tis", "now_nt"],
-                    kind="stable",
-                )
-                .drop_duplicates(subset=["from_tis"], keep="first")
-                .reset_index(drop=True)
+        for column in self.sample_name:
+            table[column] = pd.to_numeric(table[column], errors="coerce")
+        table["from_tis"] = pd.to_numeric(
+            table["from_tis"], errors="coerce"
+        )
+        if frame_table is not None:
+            frame_table["from_tis"] = pd.to_numeric(
+                frame_table["from_tis"], errors="coerce"
             )
+            for column in frame_columns:
+                frame_table[column] = pd.to_numeric(
+                    frame_table[column], errors="coerce"
+                )
 
-            coordinates = pd.to_numeric(
-                gene_table["from_tis"],
-                errors="coerce",
-            ).to_numpy(dtype=float)
-            valid_coordinate = np.isfinite(coordinates)
+        # One global sort + dedup is equivalent to the previous per-gene
+        # sort_values(["from_tis", "now_nt"]) + drop_duplicates("from_tis").
+        sort_columns = ["name", "from_tis", "now_nt"]
+        table = table.sort_values(sort_columns, kind="stable")
+        table = table.drop_duplicates(
+            subset=["name", "from_tis"], keep="first"
+        )
+
+        coordinates = table["from_tis"].to_numpy(dtype=float)
+        valid_coordinate = np.isfinite(coordinates)
+        if not valid_coordinate.all():
+            table = table.iloc[valid_coordinate]
+
+        if frame_table is not None:
+            frame_table = frame_table.sort_values(sort_columns, kind="stable")
+            frame_table = frame_table.drop_duplicates(
+                subset=["name", "from_tis"], keep="first"
+            )
             if not valid_coordinate.all():
-                gene_table = gene_table.loc[valid_coordinate, :].reset_index(
-                    drop=True
+                frame_table = frame_table.iloc[valid_coordinate]
+            if len(frame_table) != len(table) or not np.array_equal(
+                frame_table["name"].to_numpy(), table["name"].to_numpy()
+            ) or not np.array_equal(
+                frame_table["from_tis"].to_numpy(),
+                table["from_tis"].to_numpy(),
+            ):
+                raise ValueError(
+                    "Frame-resolution rows do not match merged rows "
+                    f"({len(frame_table)} vs {len(table)})."
                 )
-                coordinates = coordinates[valid_coordinate]
 
-            if gene_table.empty:
-                continue
+        table[self.sample_name] = table[self.sample_name].fillna(0.0)
+        if frame_table is not None:
+            frame_table[frame_columns] = frame_table[frame_columns].fillna(0.0)
 
-            density = (
-                gene_table.loc[:, self.sample_name]
-                .apply(pd.to_numeric, errors="coerce")
-                .fillna(0.0)
-                .to_numpy(dtype=float)
+        # Convert the whole tables to numpy once and slice per transcript,
+        # avoiding thousands of pandas groupby/get_group/column-index calls.
+        names = table["name"].to_numpy()
+        density_all = table.loc[:, self.sample_name].to_numpy(dtype=float)
+        coords_all = table["from_tis"].to_numpy(dtype=float)
+        codons_all = (
+            table["codon"]
+            .astype(str)
+            .str.upper()
+            .str.replace("U", "T", regex=False)
+            .to_numpy(dtype="U3")
+        )
+        regions_all = (
+            table["region"].astype(str).str.lower().to_numpy(dtype="U4")
+        )
+        frame_values_all = None
+        if frame_table is not None:
+            frame_values_all = frame_table.loc[:, frame_columns].to_numpy(
+                dtype=float
             )
+
+        # Consecutive rows sharing the same name form one transcript block.
+        boundaries = np.flatnonzero(
+            np.concatenate(([True], names[1:] != names[:-1]))
+        )
+        block_ends = np.append(boundaries[1:], len(names))
+
+        for start, end in zip(boundaries, block_ends):
+            gene_name = names[start]
+            block_length = end - start
+
+            frame_density = None
+            if frame_values_all is not None:
+                frame_density = frame_values_all[start:end, :].reshape(
+                    block_length,
+                    self.sample_num,
+                    3,
+                )
+
             profiles.append(
                 _GeneProfile(
                     name=str(gene_name),
-                    coordinates=coordinates.astype(np.int64, copy=False),
-                    codons=(
-                        gene_table["codon"]
-                        .astype(str)
-                        .str.upper()
-                        .str.replace("U", "T", regex=False)
-                        .to_numpy(dtype="U3")
+                    coordinates=coords_all[start:end].astype(
+                        np.int64, copy=False
                     ),
-                    regions=(
-                        gene_table["region"]
-                        .astype(str)
-                        .str.lower()
-                        .to_numpy(dtype="U4")
-                    ),
-                    density=density,
+                    codons=codons_all[start:end],
+                    regions=regions_all[start:end],
+                    density=density_all[start:end, :],
+                    frame_density=frame_density,
                 )
             )
 
@@ -386,7 +499,7 @@ class MetaCodon:
         self._validate_imported_table(merged_rpf)
 
         for sample in self.sample_name:
-            merged_rpf.loc[:, sample] = pd.to_numeric(
+            merged_rpf[sample] = pd.to_numeric(
                 merged_rpf[sample],
                 errors="coerce",
             ).fillna(0.0)
@@ -394,7 +507,41 @@ class MetaCodon:
         high_rpf = self._select_high_expression_transcripts(merged_rpf)
         self._normalize_to_rpm(high_rpf)
         self._normalize_by_gene_mean(high_rpf)
-        self._build_gene_profiles(high_rpf)
+
+        # Build the frame-resolution table (f0/f1/f2 kept separately) so that
+        # nucleotide-level meta-codon profiles retain tri-nucleotide periodicity.
+        frame_table: pd.DataFrame | None = None
+        if self.nt_expand:
+            frame_table = RPFs.get_frame_rpf(
+                raw_rpf=self.rpf_data.raw_rpf,
+                sample_name=self.sample_name,
+                frame="all",
+                merge_frame=False,
+            )
+            frame_table = self._shift_frame_table(
+                frame_table,
+                self.sample_name,
+                RPFs.set_codon_shift("A"),
+            )
+            frame_table = frame_table.loc[
+                frame_table["name"].isin(self.high_gene),
+                BASE_COLUMNS + self._frame_columns(self.sample_name),
+            ].copy()
+            for column in self._frame_columns(self.sample_name):
+                frame_table[column] = pd.to_numeric(
+                    frame_table[column],
+                    errors="coerce",
+                ).fillna(0.0)
+            self._normalize_to_rpm(
+                frame_table,
+                sample_columns=self._frame_columns(self.sample_name),
+            )
+            self._normalize_by_gene_mean(
+                frame_table,
+                sample_columns=self._frame_columns(self.sample_name),
+            )
+
+        self._build_gene_profiles(high_rpf, frame_table)
 
         # Keep a compact public reference without duplicating the large table.
         self.high_rpf = None
@@ -645,10 +792,16 @@ class MetaCodon:
             dtype=int,
         )
 
-        density_sum = np.zeros(
-            (relative_positions.size, self.sample_num),
-            dtype=float,
-        )
+        if self.nt_expand:
+            density_sum = np.zeros(
+                (relative_positions.size, self.sample_num, 3),
+                dtype=float,
+            )
+        else:
+            density_sum = np.zeros(
+                (relative_positions.size, self.sample_num),
+                dtype=float,
+            )
         raw_site_count = 0
         retained_site_count = 0
         sequence_rows: list[dict[Any, Any]] = []
@@ -678,7 +831,10 @@ class MetaCodon:
             retained_site_count += len(retained_occurrences)
 
             for start_coordinate, window_indices in retained_occurrences:
-                density_sum += profile.density[window_indices, :]
+                if self.nt_expand:
+                    density_sum += profile.frame_density[window_indices, :, :]
+                else:
+                    density_sum += profile.density[window_indices, :]
                 sequence_rows.append(
                     self._sequence_row(
                         profile=profile,
@@ -692,22 +848,46 @@ class MetaCodon:
             return None
 
         density_values = density_sum / float(retained_site_count)
+        if self.nt_expand:
+            # Smooth each frame column independently so that the
+            # tri-nucleotide periodicity is not blurred.
+            density_values = density_values.reshape(
+                relative_positions.size,
+                -1,
+            )
         density_values = self._smooth_profile(density_values)
 
-        density_table = pd.DataFrame(
-            density_values,
-            index=relative_positions,
-            columns=self.sample_name,
-        )
-        density_table.index.name = "Codon"
-
-        if self.frame == "all":
-            nucleotide_position = relative_positions * 3
+        if self.nt_expand:
+            nt_positions = (
+                relative_positions[:, None] * 3 + np.arange(3)[None, :]
+            ).ravel()
+            density_table = pd.DataFrame(
+                density_values.reshape(-1, self.sample_num),
+                index=nt_positions,
+                columns=self.sample_name,
+            )
+            density_table.index.name = "Codon"
+            density_table.insert(
+                0,
+                "Frame",
+                np.tile(np.arange(3), relative_positions.size),
+            )
+            density_table.insert(0, "Nucleotide", nt_positions)
         else:
-            nucleotide_position = relative_positions * 3 + int(self.frame)
+            density_table = pd.DataFrame(
+                density_values,
+                index=relative_positions,
+                columns=self.sample_name,
+            )
+            density_table.index.name = "Codon"
 
-        density_table.insert(0, "Frame", self.frame)
-        density_table.insert(0, "Nucleotide", nucleotide_position)
+            if self.frame == "all":
+                nucleotide_position = relative_positions * 3
+            else:
+                nucleotide_position = relative_positions * 3 + int(self.frame)
+
+            density_table.insert(0, "Frame", self.frame)
+            density_table.insert(0, "Nucleotide", nucleotide_position)
 
         sequence_table = pd.DataFrame.from_records(sequence_rows)
         sequence_columns: list[Any] = [
@@ -848,7 +1028,9 @@ class MetaCodon:
     def _plot_ticks(
         minimum: int,
         maximum: int,
-        motif_length: int,
+        motif_start: int,
+        motif_end: int,
+        unit: str = "codon",
     ) -> list[int]:
         """Return readable integer ticks including the target motif."""
         span = maximum - minimum
@@ -856,9 +1038,12 @@ class MetaCodon:
             ticks = list(range(minimum, maximum + 1))
         else:
             step = max(1, int(np.ceil(span / 8)))
+            if unit == "nucleotide":
+                # Keep ticks on codon boundaries when the axis uses nt.
+                step = int(np.ceil(step / 3.0)) * 3
             ticks = list(range(minimum, maximum + 1, step))
 
-        ticks.extend([0, motif_length - 1, minimum, maximum])
+        ticks.extend([motif_start, motif_end, minimum, maximum])
         return sorted(
             {
                 int(value)
@@ -877,11 +1062,23 @@ class MetaCodon:
 
     def draw_meta_codon(self) -> None:
         """Draw polished line profiles for all retained target motifs."""
+        nt_mode = self.unit == "nucleotide"
+        frame_offset = 0 if self.frame == "all" else int(self.frame)
+
         for codon, message in self.density_df.items():
             raw_site_count, retained_site_count, density_table = message
             motif_length = len(codon) // 3
 
-            x_values = density_table.index.to_numpy(dtype=int)
+            if nt_mode:
+                x_values = density_table["Nucleotide"].to_numpy(dtype=int)
+                motif_start = frame_offset
+                motif_end = frame_offset + motif_length * 3 - 1
+                x_label = "Relative nucleotide position (nt)"
+            else:
+                x_values = density_table.index.to_numpy(dtype=int)
+                motif_start = 0
+                motif_end = motif_length - 1
+                x_label = "Relative codon position"
             sample_table = density_table.loc[:, self.sample_name]
 
             figure_width = max(7.0, min(12.0, 6.5 + self.sample_num * 0.15))
@@ -899,20 +1096,20 @@ class MetaCodon:
                 )
 
             ax.axvspan(
-                -0.5,
-                motif_length - 0.5,
+                motif_start - 0.5,
+                motif_end + 0.5,
                 alpha=0.08,
                 linewidth=0,
             )
             ax.axvline(
-                0,
+                motif_start,
                 linewidth=0.8,
                 linestyle="--",
                 alpha=0.65,
             )
             if motif_length > 1:
                 ax.axvline(
-                    motif_length - 1,
+                    motif_end,
                     linewidth=0.8,
                     linestyle=":",
                     alpha=0.65,
@@ -923,11 +1120,13 @@ class MetaCodon:
                 self._plot_ticks(
                     minimum=int(x_values.min()),
                     maximum=int(x_values.max()),
-                    motif_length=motif_length,
+                    motif_start=motif_start,
+                    motif_end=motif_end,
+                    unit=self.unit,
                 )
             )
             ax.tick_params(axis="x", labelrotation=0)
-            ax.set_xlabel("Relative codon position")
+            ax.set_xlabel(x_label)
             ax.set_ylabel(self._density_ylabel())
             ax.set_title(
                 "{codon} | raw sites={raw:,}, retained sites={retained:,}".format(

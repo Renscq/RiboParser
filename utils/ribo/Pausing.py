@@ -41,6 +41,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+# Use Arial (with common fallbacks when it is unavailable on the system) for
+# every figure produced by this module.
+matplotlib.rcParams.update(
+    {
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "Helvetica", "Liberation Sans", "DejaVu Sans"],
+        "mathtext.fontset": "dejavusans",
+    }
+)
+
 
 BASE_COLUMNS = ["name", "now_nt", "from_tis", "from_tts", "region", "codon"]
 RPM_SCALE = 1_000_000.0
@@ -81,6 +91,7 @@ class Pausing(object):
         # Scaling and plotting.
         self.scale = args.scale
         self.plot_transform = args.plot_transform
+        self.rankplot_ncol = max(1, int(getattr(args, "rankplot_ncol", 1)))
 
         # Outlier filtering.
         self.remove_outlier = args.remove_outlier
@@ -857,7 +868,7 @@ class Pausing(object):
         self.output_files["codon_heatmap_png"] = out_png
 
     def draw_codon_rank_plot(self) -> None:
-        """Draw compact sample-wise codon rank profiles using valid pausing scores."""
+        """Draw sample-wise codon rank profiles with codons on the x-axis."""
         matrix = self._codon_matrix("valid", relative=False)
         long_df = matrix.reset_index().melt(
             id_vars="Codon", var_name="Sample", value_name="PausingScore"
@@ -866,39 +877,56 @@ class Pausing(object):
             self.codon_pausing[["Codon", "Abbr"]], on="Codon", how="left"
         )
 
-        ncols = min(3, max(1, self.sample_num))
+        ncols = max(1, int(self.rankplot_ncol))
+        ncols = min(ncols, max(1, self.sample_num))
         nrows = int(np.ceil(self.sample_num / ncols))
+        n_codons = int(len(matrix.index))
+        tick_fontsize = 14 if ncols == 1 else 12
+        label_width = 3 * 0.42 * tick_fontsize / 72.0 + 0.01
+        panel_width = max(5.5, 2.0 + n_codons * label_width)
+        panel_height = 3.8
         fig, axes = plt.subplots(
             nrows,
             ncols,
-            figsize=(5.2 * ncols, 4.0 * nrows),
+            figsize=(panel_width * ncols, panel_height * nrows),
             squeeze=False,
         )
 
         for ax, sample in zip(axes.ravel(), self.sample_name):
             data = long_df.loc[long_df["Sample"] == sample, :].dropna()
             data = data.sort_values("PausingScore", ascending=True).reset_index(drop=True)
+            x = np.arange(len(data))
             ax.scatter(
-                np.arange(len(data)),
+                x,
                 data["PausingScore"],
                 s=15,
                 alpha=0.8,
                 edgecolors="none",
+                label="_nolegend_",
             )
             top = data.tail(min(6, len(data)))
-            for idx, row in top.iterrows():
-                ax.text(
-                    idx,
-                    row["PausingScore"],
-                    f"{row['Codon']}[{row['Abbr']}]",
-                    fontsize=7,
-                    rotation=35,
-                    ha="left",
-                    va="bottom",
-                )
-            ax.set_title(sample, fontsize=10)
-            ax.set_xlabel("Codon rank")
-            ax.set_ylabel("Absolute valid pausing score")
+            ax.scatter(
+                top.index.to_numpy(),
+                top["PausingScore"],
+                s=24,
+                alpha=0.95,
+                color="#c0392b",
+                edgecolors="none",
+                zorder=3,
+                label="Top 6 paused codons",
+            )
+            ax.set_xticks(x)
+            ax.set_xticklabels(
+                data["Codon"] + "[" + data["Abbr"].astype(str) + "]",
+                rotation=90,
+                ha="center",
+                fontsize=tick_fontsize,
+            )
+            ax.tick_params(labelsize=tick_fontsize)
+            ax.set_xlim(-0.5, len(data) - 0.5)
+            ax.set_title(sample, fontsize=14)
+            ax.set_xlabel("Codon [amino acid]", fontsize=14)
+            ax.set_ylabel("Absolute valid pausing score", fontsize=14)
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
             ax.grid(axis="y", linewidth=0.4, alpha=0.25)
@@ -906,9 +934,20 @@ class Pausing(object):
         for ax in axes.ravel()[self.sample_num :]:
             ax.set_axis_off()
 
+        handles, labels = axes.ravel()[0].get_legend_handles_labels()
+        if handles:
+            fig.legend(
+                handles,
+                labels,
+                frameon=False,
+                loc="upper center",
+                ncol=len(handles),
+                fontsize=12,
+            )
+
         out_pdf = self.output + "_codon_pausing_rankplot.pdf"
         out_png = self.output + "_codon_pausing_rankplot.png"
-        fig.tight_layout()
+        fig.tight_layout(rect=(0, 0, 1, 0.98))
         fig.savefig(out_pdf, bbox_inches="tight")
         fig.savefig(out_png, dpi=300, bbox_inches="tight")
         plt.close(fig)
@@ -958,6 +997,7 @@ class Pausing(object):
                             ("exclude_stop", True),
                             ("individual", self.individual),
                             ("plot_transform", self.plot_transform),
+                            ("rankplot_ncol", self.rankplot_ncol),
                             ("remove_outlier", self.remove_outlier),
                             ("outlier_iqr", self.outlier_iqr),
                             ("outlier_window", self.outlier_window),

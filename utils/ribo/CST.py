@@ -41,6 +41,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+# Use Arial (with common fallbacks when it is unavailable on the system) for
+# every figure produced by this module.
+matplotlib.rcParams.update(
+    {
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "Helvetica", "Liberation Sans", "DejaVu Sans"],
+        "mathtext.fontset": "dejavusans",
+    }
+)
+
 
 BASE_COLUMNS = ["name", "now_nt", "from_tis", "from_tts", "region", "codon"]
 STOP_CODONS = {"TAA", "TAG", "TGA"}
@@ -75,6 +85,7 @@ class CodonSelectiveTime(object):
         self.plot_transform = args.plot_transform
         self.thread = max(1, int(args.thread))
         self.output_all = args.all
+        self.rankplot_ncol = max(1, int(getattr(args, "rankplot_ncol", 1)))
 
         self.remove_outlier = args.remove_outlier
         self.outlier_iqr = args.outlier_iqr
@@ -640,6 +651,7 @@ class CodonSelectiveTime(object):
                         ("tolerance", self.tolerance),
                         ("scale", self.scale),
                         ("thread", self.thread),
+                        ("rankplot_ncol", self.rankplot_ncol),
                         ("remove_outlier", self.remove_outlier),
                         ("outlier_iqr", self.outlier_iqr),
                         ("outlier_window", self.outlier_window),
@@ -679,46 +691,75 @@ class CodonSelectiveTime(object):
             return np.log10(clipped + 1.0)
         raise ValueError(f"Unsupported plot transform: {self.plot_transform}")
 
+    def _metric_matrix(self, metric: str) -> pd.DataFrame:
+        """Return a codon-by-sample matrix for one CST metric."""
+        matrix = self.cst.pivot_table(
+            index="Codon", columns="Sample", values=metric, aggfunc="first"
+        )
+        sample_order = [pair[0] for pair in self.sample_pairs]
+        return matrix.reindex(index=self.codon_order, columns=sample_order)
+
     @staticmethod
-    def _adaptive_corr_limits(corr: pd.DataFrame) -> tuple[float, float]:
-        """Return an adaptive correlation color range."""
-        values = corr.to_numpy(dtype=float)
-        mask = ~np.eye(values.shape[0], dtype=bool)
-        off_diag = values[mask]
-        off_diag = off_diag[np.isfinite(off_diag)]
-        if off_diag.size == 0:
+    def _adaptive_correlation_limits(values: np.ndarray) -> tuple[float, float]:
+        """Return a focused color range for highly correlated samples."""
+        values = np.asarray(values, dtype=float)
+        offdiag = values[~np.eye(values.shape[0], dtype=bool)] if values.ndim == 2 else values
+        offdiag = offdiag[np.isfinite(offdiag)]
+        if offdiag.size == 0:
             return -1.0, 1.0
-        low, high = np.percentile(off_diag, [2, 98])
-        spread = max(float(high - low), 0.01)
-        vmin = max(-1.0, float(low - spread * 0.15))
-        return min(vmin, 0.99), 1.0
+        low = float(np.quantile(offdiag, 0.02))
+        high = float(np.quantile(offdiag, 0.98))
+        span = max(high - low, 0.02)
+        return max(-1.0, low - span * 0.15), 1.0
 
     def draw_cst_corr(self) -> None:
-        """Draw sample correlation heatmap from final absolute CST values."""
-        matrix = self.cst.pivot(index="Codon", columns="Sample", values="AbsoluteCST")
-        corr = matrix.corr(method="pearson")
+        """Draw sample correlation based on absolute CST values."""
+        matrix = self._metric_matrix("AbsoluteCST")
+        corr = matrix.corr(method="pearson", min_periods=3)
         corr_file = self.output + "_cst_corr.txt"
         corr.to_csv(corr_file, sep="\t")
         self.output_files["correlation_table"] = corr_file
 
-        vmin, vmax = self._adaptive_corr_limits(corr)
-        fig_size = max(5.2, 0.5 * len(corr.columns) + 3.0)
-        fig, ax = plt.subplots(figsize=(fig_size, fig_size), dpi=300)
-        image = ax.imshow(corr.to_numpy(dtype=float), cmap=PLOT_CMAP, vmin=vmin, vmax=vmax)
-        ax.set_xticks(range(len(corr.columns)))
+        values = corr.to_numpy(dtype=float)
+        vmin, vmax = self._adaptive_correlation_limits(values)
+        sample_count = max(1, corr.shape[0])
+        size = max(5.5, sample_count * 0.48 + 3.0)
+        fig, ax = plt.subplots(figsize=(size, size))
+        image = ax.imshow(
+            values,
+            aspect="equal",
+            interpolation="nearest",
+            cmap=PLOT_CMAP,
+            vmin=vmin,
+            vmax=vmax,
+        )
+        ax.set_xticks(range(sample_count))
+        ax.set_yticks(range(sample_count))
         ax.set_xticklabels(corr.columns, rotation=45, ha="right", fontsize=8)
-        ax.set_yticks(range(len(corr.index)))
         ax.set_yticklabels(corr.index, fontsize=8)
         ax.set_title("Codon selection time correlation")
+        ax.tick_params(length=0)
 
-        if len(corr.columns) <= HEATMAP_ANNOTATION_MAX_SAMPLES:
-            for row in range(len(corr.index)):
-                for col in range(len(corr.columns)):
-                    value = corr.iat[row, col]
-                    if np.isfinite(value):
-                        ax.text(col, row, f"{value:.3f}", ha="center", va="center", fontsize=7)
+        if sample_count <= HEATMAP_ANNOTATION_MAX_SAMPLES:
+            color_span = max(vmax - vmin, np.finfo(float).eps)
+            for row_idx in range(values.shape[0]):
+                for col_idx in range(values.shape[1]):
+                    value = values[row_idx, col_idx]
+                    if not np.isfinite(value):
+                        continue
+                    color_fraction = (value - vmin) / color_span
+                    text_color = "white" if color_fraction < 0.18 or color_fraction > 0.82 else "#222222"
+                    ax.text(
+                        col_idx,
+                        row_idx,
+                        f"{value:.2f}",
+                        ha="center",
+                        va="center",
+                        fontsize=7,
+                        color=text_color,
+                    )
 
-        cbar = fig.colorbar(image, ax=ax, shrink=0.78)
+        cbar = fig.colorbar(image, ax=ax, shrink=0.78, pad=0.03)
         cbar.set_label(f"Pearson correlation ({vmin:.2f} to {vmax:.2f})")
         fig.tight_layout()
 
@@ -731,20 +772,20 @@ class CodonSelectiveTime(object):
         self.output_files["correlation_png"] = out_png
 
     def draw_cst_heat(self) -> None:
-        """Draw final absolute and relative CST heatmaps."""
-        absolute = self.cst.pivot(index="Codon", columns="Sample", values="AbsoluteCST")
-        relative = self.cst.pivot(index="Codon", columns="Sample", values="RelativeCST")
-        absolute = absolute.reindex(index=self.codon_order)
-        relative = relative.reindex(index=self.codon_order)
+        """Draw absolute and relative CST heatmaps."""
+        absolute = self._metric_matrix("AbsoluteCST")
+        relative = self._metric_matrix("RelativeCST")
         absolute_plot = self._transform_values(absolute)
 
-        labels = [
-            f"{codon} [{self.codon_annotation.loc[codon, 'Abbr']}]"
-            for codon in self.codon_order
-        ]
-        height = min(max(8.0, len(self.codon_order) * 0.24), 18.0)
-        width = max(11.0, len(self.sample_pairs) * 0.7 + 8.0)
-        fig, axes = plt.subplots(1, 2, figsize=(width, height), gridspec_kw={"wspace": 0.25})
+        sample_count = max(1, len(self.sample_pairs))
+        figure_height = max(9.0, len(absolute_plot) * 0.22)
+        figure_width = max(10.0, sample_count * 0.55 + 7.5)
+        fig, axes = plt.subplots(
+            1,
+            2,
+            figsize=(figure_width, figure_height),
+            gridspec_kw={"wspace": 0.28},
+        )
 
         for ax, matrix, title in (
             (axes[0], absolute_plot, "Absolute CST"),
@@ -753,31 +794,57 @@ class CodonSelectiveTime(object):
             values = matrix.to_numpy(dtype=float)
             finite = values[np.isfinite(values)]
             if self.scale == "zscore" and title.startswith("Relative"):
-                bound = float(np.nanpercentile(np.abs(finite), 98)) if finite.size else 1.0
-                vmin, vmax = -max(bound, 1e-9), max(bound, 1e-9)
+                bound = float(np.quantile(np.abs(finite), 0.98)) if finite.size else 1.0
+                bound = bound if bound > 0 else 1.0
+                vmin, vmax = -bound, bound
             else:
-                vmax = float(np.nanpercentile(finite, 98)) if finite.size else 1.0
+                vmax = float(np.quantile(finite, 0.98)) if finite.size else 1.0
+                vmax = vmax if vmax > 0 else 1.0
                 vmin = 0.0
-                if vmax <= vmin:
-                    vmax = vmin + 1.0
-            image = ax.imshow(values, aspect="auto", interpolation="nearest", cmap=PLOT_CMAP, vmin=vmin, vmax=vmax)
-            ax.set_title(title)
-            ax.set_xticks(range(len(matrix.columns)))
+            image = ax.imshow(
+                values,
+                aspect="auto",
+                interpolation="nearest",
+                cmap=PLOT_CMAP,
+                vmin=vmin,
+                vmax=vmax,
+            )
+            ax.set_title(title, fontsize=11)
+            ax.set_xlabel("Sample")
+            ax.set_xticks(range(matrix.shape[1]))
             ax.set_xticklabels(matrix.columns, rotation=45, ha="right", fontsize=8)
-            ax.set_yticks(range(len(labels)))
+            labels = [f"{codon} [{self.codon_annotation.loc[codon, 'Abbr']}]" for codon in matrix.index]
+            ax.set_yticks(range(matrix.shape[0]))
             ax.set_yticklabels(labels, fontsize=7)
-            if len(matrix.columns) <= HEATMAP_ANNOTATION_MAX_SAMPLES:
-                midpoint = (vmin + vmax) / 2.0
-                for row in range(values.shape[0]):
-                    for col in range(values.shape[1]):
-                        value = values[row, col]
-                        if np.isfinite(value):
-                            color = "white" if value > midpoint else "black"
-                            ax.text(col, row, f"{value:.2f}", ha="center", va="center", fontsize=5.5, color=color)
-            cbar = fig.colorbar(image, ax=ax, shrink=0.60, pad=0.02)
+            ax.tick_params(length=0)
+
+            # Add numeric CST values only when the sample count is small enough
+            # to keep the heatmap readable.
+            if sample_count <= HEATMAP_ANNOTATION_MAX_SAMPLES:
+                color_span = max(vmax - vmin, np.finfo(float).eps)
+                for row_idx in range(values.shape[0]):
+                    for col_idx in range(values.shape[1]):
+                        value = values[row_idx, col_idx]
+                        if not np.isfinite(value):
+                            continue
+                        color_fraction = (value - vmin) / color_span
+                        text_color = "white" if color_fraction < 0.18 or color_fraction > 0.82 else "#222222"
+                        ax.text(
+                            col_idx,
+                            row_idx,
+                            f"{value:.2f}",
+                            ha="center",
+                            va="center",
+                            fontsize=5.5,
+                            color=text_color,
+                        )
+
+            cbar = fig.colorbar(image, ax=ax, shrink=0.55, pad=0.02)
             cbar.set_label(title)
 
-        fig.tight_layout()
+        axes[0].set_ylabel("Codon [amino acid]")
+        axes[1].set_ylabel("")
+
         out_pdf = self.output + "_cst_heatmap.pdf"
         out_png = self.output + "_cst_heatmap.png"
         fig.savefig(out_pdf, bbox_inches="tight")
@@ -787,28 +854,94 @@ class CodonSelectiveTime(object):
         self.output_files["heatmap_png"] = out_png
 
     def draw_cst_rank(self) -> None:
-        """Draw per-sample final CST rank plots."""
-        samples = [pair[0] for pair in self.sample_pairs]
-        height = max(3.2, 2.7 * len(samples))
-        fig, axes = plt.subplots(len(samples), 1, figsize=(10.5, height), squeeze=False)
+        """Draw sample-wise CST rank profiles with codons on the x-axis."""
+        matrix = self._metric_matrix("AbsoluteCST")
+        long_df = matrix.reset_index().melt(
+            id_vars="Codon", var_name="Sample", value_name="CST"
+        )
+        long_df = long_df.merge(
+            self.codon_annotation.reset_index().rename(columns={"codon": "Codon"}),
+            on="Codon",
+            how="left",
+        )
 
-        for ax, sample in zip(axes[:, 0], samples):
-            data = self.cst.loc[self.cst["Sample"] == sample, ["Codon", "AbsoluteCST"]].dropna()
-            data = data.sort_values("AbsoluteCST", ascending=True).reset_index(drop=True)
-            ax.plot(np.arange(len(data)), data["AbsoluteCST"], linewidth=1.2)
-            ax.scatter(np.arange(len(data)), data["AbsoluteCST"], s=12)
-            for idx in data.tail(5).index:
-                ax.text(idx, data.at[idx, "AbsoluteCST"], data.at[idx, "Codon"], fontsize=7, ha="left", va="bottom")
-            ax.set_title(sample, fontsize=10)
-            ax.set_xlabel("Codon rank")
-            ax.set_ylabel("Absolute CST")
-            ax.grid(axis="y", linewidth=0.4, alpha=0.25)
+        # Each x-axis tick is one codon labeled as "Codon[AminoAcid]", so the
+        # panel width must be large enough to host all rotated labels side by
+        # side. `rankplot_ncol` controls how many panels are placed per row
+        # (e.g. 1 wide panel per row, or 2 narrower panels for a more compact
+        # layout). The label-width factor is kept small so that larger tick
+        # fonts do not inflate the panel width too much.
+        ncols = max(1, int(self.rankplot_ncol))
+        ncols = min(ncols, max(1, matrix.shape[1]))
+        nrows = int(np.ceil(matrix.shape[1] / ncols))
+        n_codons = int(len(matrix.index))
+        tick_fontsize = 14 if ncols == 1 else 12
+        label_width = 3 * 0.42 * tick_fontsize / 72.0 + 0.01
+        panel_width = max(5.5, 2.0 + n_codons * label_width)
+        panel_height = 3.8
+        fig, axes = plt.subplots(
+            nrows,
+            ncols,
+            figsize=(panel_width * ncols, panel_height * nrows),
+            squeeze=False,
+        )
+
+        for ax, sample in zip(axes.ravel(), matrix.columns):
+            data = long_df.loc[long_df["Sample"] == sample, :].dropna()
+            data = data.sort_values("CST", ascending=True).reset_index(drop=True)
+            x = np.arange(len(data))
+            ax.scatter(
+                x,
+                data["CST"],
+                s=15,
+                alpha=0.8,
+                edgecolors="none",
+                label="_nolegend_",
+            )
+            top = data.tail(min(6, len(data)))
+            ax.scatter(
+                top.index.to_numpy(),
+                top["CST"],
+                s=24,
+                alpha=0.95,
+                color="#c0392b",
+                edgecolors="none",
+                zorder=3,
+                label="Top 6 selected codons",
+            )
+            ax.set_xticks(x)
+            ax.set_xticklabels(
+                data["Codon"] + "[" + data["Abbr"].astype(str) + "]",
+                rotation=90,
+                ha="center",
+                fontsize=tick_fontsize,
+            )
+            ax.tick_params(labelsize=tick_fontsize)
+            ax.set_xlim(-0.5, len(data) - 0.5)
+            ax.set_title(sample, fontsize=14)
+            ax.set_xlabel("Codon [amino acid]", fontsize=13)
+            ax.set_ylabel("Absolute CST", fontsize=13)
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
+            ax.grid(axis="y", linewidth=0.4, alpha=0.25)
 
-        fig.tight_layout()
+        for ax in axes.ravel()[matrix.shape[1] :]:
+            ax.set_axis_off()
+
+        handles, labels = axes.ravel()[0].get_legend_handles_labels()
+        if handles:
+            fig.legend(
+                handles,
+                labels,
+                frameon=False,
+                loc="upper center",
+                ncol=len(handles),
+                fontsize=12,
+            )
+
         out_pdf = self.output + "_cst_rankplot.pdf"
         out_png = self.output + "_cst_rankplot.png"
+        fig.tight_layout(rect=(0, 0, 1, 0.98))
         fig.savefig(out_pdf, bbox_inches="tight")
         fig.savefig(out_png, dpi=300, bbox_inches="tight")
         plt.close(fig)

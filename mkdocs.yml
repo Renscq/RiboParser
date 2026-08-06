@@ -105,8 +105,9 @@ nav:
           - "4.7.3 Codon decoding time": workflow/codon-level/codon-decoding-time.md
           - "4.7.4 Codon selection time": workflow/codon-level/codon-selection-time.md
           - "4.7.5 Coefficient of Variation": workflow/codon-level/coefficient-of-variation.md
-          - "4.7.6 Meta-codon analysis": workflow/codon-level/meta-codon-analysis.md
-          - "4.7.7 Codon odds ratio": workflow/codon-level/codon-odds-ratio.md
+          - "4.7.6 Cumulative of CoV": workflow/codon-level/cumulative-of-cov.md
+          - "4.7.7 Meta-codon analysis": workflow/codon-level/meta-codon-analysis.md
+          - "4.7.8 Codon odds ratio": workflow/codon-level/codon-odds-ratio.md
 
       - "4.8 smORF analysis":
           - "4.8 smORF overview": workflow/smorf/index.md

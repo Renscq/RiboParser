@@ -1,4 +1,4 @@
-# 4.7.6 Meta-codon analysis
+# 4.7.7 Meta-codon analysis
 
 ## Function
 
@@ -21,7 +21,7 @@
 | `-c` | No | One-column codon or codon-motif list in TXT format. RNA `U` is converted to DNA `T`. If omitted, all codons are used. |
 | `-o` | Yes | Output prefix. |
 | `-f` | No | Reading frame used for meta-codon analysis. Choices in the parser are `0`, `1`, `2`; the script default is `all`. |
-| `-a` | No | Number of upstream and downstream codons to retrieve around each target codon or motif. Default: `20`. |
+| `-a` | No | Number of upstream and downstream codons to retrieve around each target codon or motif. Default: `10`. |
 | `-m` | No | Retain transcripts with more than this minimum number of RPFs. Default: `50`. |
 | `--tis` | No | Number of codons after the translation initiation site to discard. Default: `0`. |
 | `--tts` | No | Number of codons before the translation termination site to discard. Default: `0`. |
@@ -31,6 +31,7 @@
 | `--smooth` | No | Smooth density values using a Savitzky-Golay filter. Format: `window,order`, for example `3,1`. Disabled by default. |
 | `--thread` | No | Number of threads. Default: `1`. The current implementation loops over codons sequentially. |
 | `--fig` | No | Draw meta-codon line plots. Disabled by default. |
+| `--unit` | No | X-axis position unit, either `codon` or `nucleotide` (nt). Default: `codon`. With `--frame all`, `nucleotide` expands the density to one value per nt so that tri-nucleotide periodicity is visible in both the density table and the figure. |
 
 ## Output files
 

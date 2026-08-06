@@ -734,8 +734,21 @@ def read_rpf_file(rpf_file: str) -> pl.DataFrame:
     return read_txt_rpf_file(rpf_file)
 
 
-def get_frame_rpf(raw_rpf: pl.DataFrame, sample_name: Sequence[str], frame: str) -> pd.DataFrame:
+def get_frame_rpf(
+    raw_rpf: pl.DataFrame,
+    sample_name: Sequence[str],
+    frame: str,
+    merge_frame: bool = True,
+) -> pd.DataFrame:
     """Merge all frame density or retrieve one frame as a Pandas table.
+
+    Parameters
+    ----------
+    merge_frame : bool, default True
+        Only used when ``frame == "all"``. When ``False``, the three
+        per-frame columns (``{sample}_f0/f1/f2``) are kept instead of being
+        summed into a single column per sample, which preserves the
+        frame-resolution (nucleotide) information.
 
     Notes
     -----
@@ -768,9 +781,14 @@ def get_frame_rpf(raw_rpf: pl.DataFrame, sample_name: Sequence[str], frame: str)
                         columns=", ".join(missing_frame),
                     )
                 )
-            select_exprs.append(
-                pl.sum_horizontal([pl.col(f0), pl.col(f1), pl.col(f2)]).alias(now_sp)
-            )
+            if merge_frame:
+                select_exprs.append(
+                    pl.sum_horizontal([pl.col(f0), pl.col(f1), pl.col(f2)]).alias(now_sp)
+                )
+            else:
+                select_exprs.append(pl.col(f0))
+                select_exprs.append(pl.col(f1))
+                select_exprs.append(pl.col(f2))
     elif frame in {"0", "1", "2"}:
         for now_sp in sample_name:
             print("Import the density file {file_name}.".format(file_name=now_sp), flush=True)

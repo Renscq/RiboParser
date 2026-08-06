@@ -75,6 +75,7 @@ class CodonDecodingTime(object):
         self.tts = args.tts
         self.scale = args.scale
         self.plot_transform = args.plot_transform
+        self.rankplot_ncol = max(1, int(getattr(args, "rankplot_ncol", 1)))
         self.thread = max(1, int(args.thread))
         self.output_all = args.all
 
@@ -536,32 +537,56 @@ class CodonDecodingTime(object):
         corr.to_csv(out_txt, sep="\t")
         self.output_files["correlation_table"] = out_txt
 
-        vmin, vmax = self._adaptive_correlation_limits(corr.to_numpy(dtype=float))
+        values = corr.to_numpy(dtype=float)
+        vmin, vmax = self._adaptive_correlation_limits(values)
         sample_count = max(1, corr.shape[0])
-        fig_size = min(max(5.5, sample_count * 0.48 + 2.5), 18.0)
-        fig, ax = plt.subplots(figsize=(fig_size, fig_size), dpi=300)
-        image = ax.imshow(corr.to_numpy(dtype=float), cmap=PLOT_CMAP, vmin=vmin, vmax=vmax)
+        size = max(5.5, sample_count * 0.48 + 3.0)
+        fig, ax = plt.subplots(figsize=(size, size))
+        image = ax.imshow(
+            values,
+            aspect="equal",
+            interpolation="nearest",
+            cmap=PLOT_CMAP,
+            vmin=vmin,
+            vmax=vmax,
+        )
         ax.set_xticks(range(sample_count))
         ax.set_yticks(range(sample_count))
         ax.set_xticklabels(corr.columns, rotation=45, ha="right", fontsize=8)
         ax.set_yticklabels(corr.index, fontsize=8)
         ax.set_title("Codon decoding time correlation")
+        ax.tick_params(length=0)
+
         if sample_count <= HEATMAP_ANNOTATION_MAX_SAMPLES:
-            midpoint = (vmin + vmax) / 2.0
-            for i in range(sample_count):
-                for j in range(sample_count):
-                    value = corr.iat[i, j]
-                    if pd.notna(value):
-                        ax.text(j, i, f"{value:.3f}", ha="center", va="center",
-                                fontsize=7, color="white" if value < midpoint else "black")
-        cbar = fig.colorbar(image, ax=ax, shrink=0.78)
-        cbar.set_label(f"Pearson correlation ({vmin:.2f} to 1.00)")
+            color_span = max(vmax - vmin, np.finfo(float).eps)
+            for row_idx in range(values.shape[0]):
+                for col_idx in range(values.shape[1]):
+                    value = values[row_idx, col_idx]
+                    if not np.isfinite(value):
+                        continue
+                    color_fraction = (value - vmin) / color_span
+                    text_color = "white" if color_fraction < 0.18 or color_fraction > 0.82 else "#222222"
+                    ax.text(
+                        col_idx,
+                        row_idx,
+                        f"{value:.2f}",
+                        ha="center",
+                        va="center",
+                        fontsize=7,
+                        color=text_color,
+                    )
+
+        cbar = fig.colorbar(image, ax=ax, shrink=0.78, pad=0.03)
+        cbar.set_label(f"Pearson correlation ({vmin:.2f} to {vmax:.2f})")
         fig.tight_layout()
-        for suffix, dpi in (("pdf", None), ("png", 300)):
-            path = f"{self.output}_cdt_corrplot.{suffix}"
-            fig.savefig(path, dpi=dpi, bbox_inches="tight")
-            self.output_files[f"correlation_{suffix}"] = path
+
+        out_pdf = self.output + "_cdt_corrplot.pdf"
+        out_png = self.output + "_cdt_corrplot.png"
+        fig.savefig(out_pdf, bbox_inches="tight")
+        fig.savefig(out_png, dpi=300, bbox_inches="tight")
         plt.close(fig)
+        self.output_files["correlation_pdf"] = out_pdf
+        self.output_files["correlation_png"] = out_png
 
     def _transform_plot_values(self, matrix: pd.DataFrame) -> pd.DataFrame:
         """Transform plotted values without modifying output tables."""
@@ -586,71 +611,169 @@ class CodonDecodingTime(object):
         normalized_plot = self._transform_plot_values(normalized)
 
         sample_count = max(1, len(self.sample_pairs))
-        fig_width = min(max(10.5, sample_count * 0.65 + 7.0), 24.0)
-        fig, axes = plt.subplots(1, 2, figsize=(fig_width, 15.0), dpi=300,
-                                 gridspec_kw={"wspace": 0.18})
-        annotate = sample_count <= HEATMAP_ANNOTATION_MAX_SAMPLES
+        figure_height = max(9.0, len(absolute_plot) * 0.22)
+        figure_width = max(10.0, sample_count * 0.55 + 7.5)
+        fig, axes = plt.subplots(
+            1,
+            2,
+            figsize=(figure_width, figure_height),
+            gridspec_kw={"wspace": 0.28},
+        )
 
         for ax, matrix, title in (
             (axes[0], absolute_plot, "Absolute CDT"),
             (axes[1], normalized_plot, "RNA-normalized CDT"),
         ):
-            finite = matrix.to_numpy(dtype=float)
-            finite = finite[np.isfinite(finite)]
+            values = matrix.to_numpy(dtype=float)
+            finite = values[np.isfinite(values)]
             vmax = float(np.quantile(finite, 0.98)) if finite.size else 1.0
             vmax = vmax if vmax > 0 else 1.0
-            image = ax.imshow(matrix.to_numpy(dtype=float), aspect="auto", interpolation="nearest",
-                              cmap=PLOT_CMAP, vmin=0, vmax=vmax)
-            ax.set_title(title)
+            image = ax.imshow(
+                values,
+                aspect="auto",
+                interpolation="nearest",
+                cmap=PLOT_CMAP,
+                vmin=0,
+                vmax=vmax,
+            )
+            ax.set_title(title, fontsize=11)
+            ax.set_xlabel("Sample")
             ax.set_xticks(range(matrix.shape[1]))
             ax.set_xticklabels(matrix.columns, rotation=45, ha="right", fontsize=8)
             labels = [f"{codon} [{self.codon_annotation.loc[codon, 'Abbr']}]" for codon in matrix.index]
             ax.set_yticks(range(matrix.shape[0]))
-            ax.set_yticklabels(labels if ax is axes[0] else [], fontsize=7)
-            if annotate:
-                midpoint = vmax / 2.0
-                for i in range(matrix.shape[0]):
-                    for j in range(matrix.shape[1]):
-                        value = matrix.iat[i, j]
-                        if pd.notna(value):
-                            ax.text(j, i, f"{value:.2f}", ha="center", va="center", fontsize=5.5,
-                                    color="white" if value < midpoint else "black")
+            ax.set_yticklabels(labels, fontsize=7)
+            ax.tick_params(length=0)
+
+            # Add numeric CDT values only when the sample count is small enough
+            # to keep the heatmap readable.
+            if sample_count <= HEATMAP_ANNOTATION_MAX_SAMPLES:
+                color_span = max(vmax - 0.0, np.finfo(float).eps)
+                for row_idx in range(values.shape[0]):
+                    for col_idx in range(values.shape[1]):
+                        value = values[row_idx, col_idx]
+                        if not np.isfinite(value):
+                            continue
+                        color_fraction = (value - 0.0) / color_span
+                        text_color = "white" if color_fraction < 0.18 or color_fraction > 0.82 else "#222222"
+                        ax.text(
+                            col_idx,
+                            row_idx,
+                            f"{value:.2f}",
+                            ha="center",
+                            va="center",
+                            fontsize=5.5,
+                            color=text_color,
+                        )
+
             cbar = fig.colorbar(image, ax=ax, shrink=0.55, pad=0.02)
             cbar.set_label(title)
 
-        for suffix, dpi in (("pdf", None), ("png", 300)):
-            path = f"{self.output}_cdt_heatmap.{suffix}"
-            fig.savefig(path, dpi=dpi, bbox_inches="tight")
-            self.output_files[f"heatmap_{suffix}"] = path
+        axes[0].set_ylabel("Codon [amino acid]")
+        axes[1].set_ylabel("")
+
+        out_pdf = self.output + "_cdt_heatmap.pdf"
+        out_png = self.output + "_cdt_heatmap.png"
+        fig.savefig(out_pdf, bbox_inches="tight")
+        fig.savefig(out_png, dpi=300, bbox_inches="tight")
         plt.close(fig)
+        self.output_files["heatmap_pdf"] = out_pdf
+        self.output_files["heatmap_png"] = out_png
 
     def draw_cdt_rank(self) -> None:
-        """Draw ranked RNA-normalized CDT profiles for all samples."""
+        """Draw sample-wise CDT rank profiles with codons on the x-axis."""
         matrix = self._metric_matrix("NormalizedCDT")
-        sample_count = max(1, matrix.shape[1])
-        fig, axes = plt.subplots(sample_count, 1, figsize=(11, max(3.2, sample_count * 2.8)),
-                                 dpi=300, squeeze=False)
-        for row, sample in enumerate(matrix.columns):
-            ax = axes[row, 0]
-            values = matrix[sample].dropna().sort_values(ascending=False)
-            labels = [f"{codon}[{self.codon_annotation.loc[codon, 'Abbr']}]" for codon in values.index]
-            x = np.arange(len(values))
-            ax.plot(x, values.to_numpy(dtype=float), marker="o", markersize=3, linewidth=1.0)
-            for idx in range(min(5, len(values))):
-                ax.text(idx, values.iloc[idx], labels[idx], fontsize=7, ha="left", va="bottom")
-            ax.set_title(sample, fontsize=10)
-            ax.set_ylabel("Normalized CDT")
-            ax.grid(axis="y", linewidth=0.4, alpha=0.25)
+        long_df = matrix.reset_index().melt(
+            id_vars="codon", var_name="Sample", value_name="CDT"
+        )
+        long_df = long_df.merge(
+            self.codon_annotation.reset_index().rename(columns={"index": "codon"}),
+            on="codon",
+            how="left",
+        )
+
+        # Each x-axis tick is one codon labeled as "Codon[AminoAcid]", so the
+        # panel width must be large enough to host all rotated labels side by
+        # side. `rankplot_ncol` controls how many panels are placed per row
+        # (e.g. 1 wide panel per row, or 2 narrower panels for a more compact
+        # layout). The label-width factor is kept small so that larger tick
+        # fonts do not inflate the panel width too much.
+        ncols = max(1, int(self.rankplot_ncol))
+        ncols = min(ncols, max(1, matrix.shape[1]))
+        nrows = int(np.ceil(matrix.shape[1] / ncols))
+        n_codons = int(len(matrix.index))
+        tick_fontsize = 14 if ncols == 1 else 12
+        label_width = 3 * 0.42 * tick_fontsize / 72.0 + 0.01
+        panel_width = max(5.5, 2.0 + n_codons * label_width)
+        panel_height = 3.8
+        fig, axes = plt.subplots(
+            nrows,
+            ncols,
+            figsize=(panel_width * ncols, panel_height * nrows),
+            squeeze=False,
+        )
+
+        for ax, sample in zip(axes.ravel(), matrix.columns):
+            data = long_df.loc[long_df["Sample"] == sample, :].dropna()
+            data = data.sort_values("CDT", ascending=True).reset_index(drop=True)
+            x = np.arange(len(data))
+            ax.scatter(
+                x,
+                data["CDT"],
+                s=15,
+                alpha=0.8,
+                edgecolors="none",
+                label="_nolegend_",
+            )
+            top = data.tail(min(6, len(data)))
+            ax.scatter(
+                top.index.to_numpy(),
+                top["CDT"],
+                s=24,
+                alpha=0.95,
+                color="#c0392b",
+                edgecolors="none",
+                zorder=3,
+                label="Top 6 decoded codons",
+            )
+            ax.set_xticks(x)
+            ax.set_xticklabels(
+                data["codon"] + "[" + data["Abbr"].astype(str) + "]",
+                rotation=90,
+                ha="center",
+                fontsize=tick_fontsize,
+            )
+            ax.tick_params(labelsize=tick_fontsize)
+            ax.set_xlim(-0.5, len(data) - 0.5)
+            ax.set_title(sample, fontsize=14)
+            ax.set_xlabel("Codon [amino acid]", fontsize=13)
+            ax.set_ylabel("RNA-normalized CDT", fontsize=13)
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
-            if row == sample_count - 1:
-                ax.set_xlabel("Codon rank")
-        fig.tight_layout()
-        for suffix, dpi in (("pdf", None), ("png", 300)):
-            path = f"{self.output}_cdt_rankplot.{suffix}"
-            fig.savefig(path, dpi=dpi, bbox_inches="tight")
-            self.output_files[f"rankplot_{suffix}"] = path
+            ax.grid(axis="y", linewidth=0.4, alpha=0.25)
+
+        for ax in axes.ravel()[matrix.shape[1] :]:
+            ax.set_axis_off()
+
+        handles, labels = axes.ravel()[0].get_legend_handles_labels()
+        if handles:
+            fig.legend(
+                handles,
+                labels,
+                frameon=False,
+                loc="upper center",
+                ncol=len(handles),
+                fontsize=12,
+            )
+
+        out_pdf = self.output + "_cdt_rankplot.pdf"
+        out_png = self.output + "_cdt_rankplot.png"
+        fig.tight_layout(rect=(0, 0, 1, 0.98))
+        fig.savefig(out_pdf, bbox_inches="tight")
+        fig.savefig(out_png, dpi=300, bbox_inches="tight")
         plt.close(fig)
+        self.output_files["rankplot_pdf"] = out_pdf
+        self.output_files["rankplot_png"] = out_png
 
     # ------------------------------------------------------------------
     # Summary and workflow
@@ -677,6 +800,7 @@ class CodonDecodingTime(object):
                     ("min_rpf", self.rpf_num), ("min_rna", self.rna_num),
                     ("tis", self.tis), ("tts", self.tts),
                     ("scale", self.scale), ("plot_transform", self.plot_transform),
+                    ("rankplot_ncol", self.rankplot_ncol),
                     ("thread", self.thread), ("remove_outlier", self.remove_outlier),
                     ("outlier_iqr", self.outlier_iqr),
                     ("outlier_window", self.outlier_window),

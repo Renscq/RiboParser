@@ -32,9 +32,10 @@ RNA_merged.txt
 | 4.7.2 | `rpf_Occupancy` | Calculate absolute and relative codon occupancy. |
 | 4.7.3 | `rpf_CDT` | Estimate codon decoding time by combining Ribo-seq and RNA-seq density. |
 | 4.7.4 | `rpf_CST` | Estimate codon selection time using iterative Ribo-seq/RNA-seq codon-level calculations. |
-| 4.7.5 | `rpf_CoV`, `rpf_Cumulative_CoV` | Quantify coefficient of variation across CDS regions or cumulative CDS positions. |
-| 4.7.6 | `rpf_Meta_Codon` | Extract and plot local RPF density around selected codons or codon motifs. |
-| 4.7.7 | `rpf_Odd_Ratio` | Compare codon-associated RPF enrichment between control and treatment samples. |
+| 4.7.5 | `rpf_CoV` | Quantify coefficient of variation across CDS regions. |
+| 4.7.6 | `rpf_Cumulative_CoV` | Quantify cumulative coefficient of variation along the CDS. |
+| 4.7.7 | `rpf_Meta_Codon` | Extract and plot local RPF density around selected codons or codon motifs. |
+| 4.7.8 | `rpf_Odd_Ratio` | Compare codon-associated RPF enrichment between control and treatment samples. |
 
 ## Recommended order
 

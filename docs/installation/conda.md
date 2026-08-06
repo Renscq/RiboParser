@@ -18,27 +18,22 @@ micromamba create -n ribo python=3.12
 micromamba activate ribo
 ```
 
-## Install external dependencies
+## Install external dependencies with conda / micromamba
 
 ```bash
-conda install bowtie samtools cutadapt star bedtools subread rsem gffread sra-tools \
+micromamba install bowtie samtools cutadapt star bedtools subread rsem gffread sra-tools \
   ucsc-genepredtogtf ucsc-gtftogenepred ucsc-gff3togenepred ucsc-bedgraphtobigwig ucsc-bedsort \
   -c bioconda
 
-conda install pigz -c conda-forge
+micromamba install pigz -c conda-forge
 ```
 
-## Install RiboParser
+## Install RiboParser with conda / micromamba
 
 ```bash
-conda install riboparser -c rensc -c conda-forge -c bioconda
+micromamba install riboparser -c rensc
 ```
 
-or with micromamba:
-
-```bash
-micromamba install riboparser -c rensc -c conda-forge -c bioconda
-```
 
 ## Main external tools
 

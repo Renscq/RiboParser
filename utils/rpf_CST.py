@@ -138,6 +138,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Transform absolute CST values for plotting only. Default: %(default)s.",
     )
     output.add_argument(
+        "--rankplot-ncol",
+        dest="rankplot_ncol", type=int, default=1,
+        help=(
+            "Number of panels per row in the rank plot. Set to 2 for a more "
+            "compact two-column layout. Default: %(default)s."
+        ),
+    )
+    output.add_argument(
         "--all", action="store_true", default=False,
         help="Output detailed gene-level CST metrics. Default: %(default)s.",
     )
@@ -161,6 +169,8 @@ def _validate_args(args: Namespace) -> None:
         raise ValueError("--tolerance must be > 0.")
     if args.thread < 1:
         raise ValueError("--thread must be >= 1.")
+    if args.rankplot_ncol < 1:
+        raise ValueError("--rankplot-ncol must be >= 1.")
     if args.outlier_iqr <= 0:
         raise ValueError("--outlier-iqr must be > 0.")
     if args.outlier_window < 1:

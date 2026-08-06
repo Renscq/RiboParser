@@ -83,7 +83,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "-a",
         "--around",
         dest="around",
-        default=20,
+        default=10,
         type=int,
         help="Number of codons retained around the target codon (default: %(default)s).",
     )
@@ -141,6 +141,15 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         type=str,
         help="Optional smoothing method.",
+    )
+    plotting_group.add_argument(
+        "--unit",
+        dest="unit",
+        choices=["codon", "nucleotide"],
+        default="codon",
+        type=str,
+        help="X-axis position unit used for plotting, either codon or "
+        "nucleotide (nt) (default: %(default)s).",
     )
 
     plotting_group.add_argument(

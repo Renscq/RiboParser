@@ -39,6 +39,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+# Use Arial (with common fallbacks when it is unavailable on the system) for
+# every figure produced by this module.
+matplotlib.rcParams.update(
+    {
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "Helvetica", "Liberation Sans", "DejaVu Sans"],
+        "mathtext.fontset": "dejavusans",
+    }
+)
+
 
 BASE_COLUMNS = ["name", "now_nt", "from_tis", "from_tts", "region", "codon"]
 RPM_SCALE = 1_000_000.0
@@ -74,6 +84,7 @@ class Occupancy(object):
         # Scaling and plotting.
         self.scale = args.scale
         self.plot_transform = args.plot_transform
+        self.rankplot_ncol = max(1, int(getattr(args, "rankplot_ncol", 1)))
 
         # Outlier filtering.
         self.remove_outlier = args.remove_outlier
@@ -594,7 +605,7 @@ class Occupancy(object):
             vmax=vmax,
         )
         title = "Relative codon occupancy" if relative else "Absolute codon occupancy"
-        ax.set_title(title, fontsize=12)
+        ax.set_title(title, fontsize=11)
         ax.set_xlabel("Sample")
         ax.set_ylabel("Codon")
         ax.set_xticks(range(self.sample_num))
@@ -698,6 +709,12 @@ class Occupancy(object):
                 for col_idx in range(values.shape[1]):
                     value = values[row_idx, col_idx]
                     if np.isfinite(value):
+                        color_fraction = (value - vmin) / (vmax - vmin)
+                        color = (
+                            "white"
+                            if color_fraction < 0.18 or color_fraction > 0.82
+                            else "#222222"
+                        )
                         ax.text(
                             col_idx,
                             row_idx,
@@ -705,7 +722,7 @@ class Occupancy(object):
                             ha="center",
                             va="center",
                             fontsize=7,
-                            color="white" if abs(value) > 0.65 else "#222222",
+                            color=color,
                         )
 
         cbar = fig.colorbar(image, ax=ax, shrink=0.78, pad=0.03)
@@ -721,47 +738,86 @@ class Occupancy(object):
         self.output_files["occupancy_corrplot_png"] = png
 
     def draw_occupancy_rankplot(self) -> None:
-        """Draw sample-wise codon occupancy ranks as a complementary figure."""
+        """Draw sample-wise codon occupancy ranks with codons on the x-axis."""
         matrix = self._occupancy_matrix(relative=False)
-        ncols = min(3, max(1, self.sample_num))
+        long_df = matrix.reset_index().melt(
+            id_vars="Codon", var_name="Sample", value_name="OccupancyScore"
+        )
+        long_df = long_df.merge(
+            self.codon_occupancy_table[["Codon", "Abbr"]], on="Codon", how="left"
+        )
+
+        ncols = max(1, int(self.rankplot_ncol))
+        ncols = min(ncols, max(1, self.sample_num))
         nrows = int(np.ceil(self.sample_num / ncols))
+        n_codons = int(len(matrix.index))
+        tick_fontsize = 14 if ncols == 1 else 12
+        label_width = 3 * 0.42 * tick_fontsize / 72.0 + 0.01
+        panel_width = max(5.5, 2.0 + n_codons * label_width)
+        panel_height = 3.8
         fig, axes = plt.subplots(
             nrows,
             ncols,
-            figsize=(5.0 * ncols, 3.6 * nrows),
+            figsize=(panel_width * ncols, panel_height * nrows),
             squeeze=False,
         )
 
-        annotation = self.codon_occupancy_table.set_index("Codon")
-        for index, sample in enumerate(self.sample_name):
-            ax = axes.flat[index]
-            series = matrix[sample].dropna().sort_values(ascending=False)
-            x = np.arange(len(series))
-            ax.plot(x, series.to_numpy(dtype=float), linewidth=1.2, marker="o", markersize=2.5)
-            ax.set_title(sample, fontsize=10)
-            ax.set_xlabel("Codon rank")
-            ax.set_ylabel("Absolute occupancy")
-            ax.grid(axis="y", linewidth=0.4, alpha=0.25)
+        for ax, sample in zip(axes.ravel(), self.sample_name):
+            data = long_df.loc[long_df["Sample"] == sample, :].dropna()
+            data = data.sort_values("OccupancyScore", ascending=True).reset_index(drop=True)
+            x = np.arange(len(data))
+            ax.scatter(
+                x,
+                data["OccupancyScore"],
+                s=15,
+                alpha=0.8,
+                edgecolors="none",
+                label="_nolegend_",
+            )
+            top = data.tail(min(6, len(data)))
+            ax.scatter(
+                top.index.to_numpy(),
+                top["OccupancyScore"],
+                s=24,
+                alpha=0.95,
+                color="#c0392b",
+                edgecolors="none",
+                zorder=3,
+                label="Top 6 occupied codons",
+            )
+            ax.set_xticks(x)
+            ax.set_xticklabels(
+                data["Codon"] + "[" + data["Abbr"].astype(str) + "]",
+                rotation=90,
+                ha="center",
+                fontsize=tick_fontsize,
+            )
+            ax.tick_params(labelsize=tick_fontsize)
+            ax.set_xlim(-0.5, len(data) - 0.5)
+            ax.set_title(sample, fontsize=14)
+            ax.set_xlabel("Codon [amino acid]", fontsize=14)
+            ax.set_ylabel("Absolute occupancy", fontsize=14)
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
+            ax.grid(axis="y", linewidth=0.4, alpha=0.25)
 
-            for rank, (codon, value) in enumerate(series.head(5).items()):
-                abbr = annotation.loc[codon, "Abbr"]
-                ax.annotate(
-                    f"{codon}[{abbr}]",
-                    (rank, value),
-                    xytext=(3, 4),
-                    textcoords="offset points",
-                    fontsize=7,
-                )
+        for ax in axes.ravel()[self.sample_num :]:
+            ax.set_axis_off()
 
-        for index in range(self.sample_num, nrows * ncols):
-            axes.flat[index].set_axis_off()
+        handles, labels = axes.ravel()[0].get_legend_handles_labels()
+        if handles:
+            fig.legend(
+                handles,
+                labels,
+                frameon=False,
+                loc="upper center",
+                ncol=len(handles),
+                fontsize=12,
+            )
 
-        fig.suptitle("Codon occupancy ranking", fontsize=12)
-        fig.tight_layout()
         pdf = self.output + "_occupancy_rankplot.pdf"
         png = self.output + "_occupancy_rankplot.png"
+        fig.tight_layout(rect=(0, 0, 1, 0.98))
         fig.savefig(pdf, bbox_inches="tight")
         fig.savefig(png, dpi=300, bbox_inches="tight")
         plt.close(fig)
@@ -806,6 +862,7 @@ class Occupancy(object):
                             ("thread", self.thread),
                             ("scale", self.scale),
                             ("plot_transform", self.plot_transform),
+                            ("rankplot_ncol", self.rankplot_ncol),
                             ("exclude_stop", True),
                             ("remove_outlier", self.remove_outlier),
                             ("outlier_iqr", self.outlier_iqr),

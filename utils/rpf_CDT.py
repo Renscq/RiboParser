@@ -132,6 +132,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Transform absolute CDT values for plotting only. Default: %(default)s.",
     )
     output.add_argument(
+        "--rankplot-ncol",
+        dest="rankplot_ncol",
+        required=False,
+        type=int,
+        default=1,
+        help=(
+            "Number of sample panels per row in the codon rank plot. Set to 2 "
+            "for a more compact two-column layout when many samples exist; "
+            "the tick labels are shrunk accordingly. Default: %(default)s."
+        ),
+    )
+    output.add_argument(
         "--all", action="store_true", default=False,
         help="Output detailed position-level and gene-codon CDT tables. Default: %(default)s.",
     )
@@ -153,6 +165,8 @@ def _validate_args(args: Namespace) -> None:
         raise ValueError("--thread must be >= 1.")
     if args.outlier_iqr <= 0:
         raise ValueError("--outlier-iqr must be > 0.")
+    if args.rankplot_ncol < 1:
+        raise ValueError("--rankplot-ncol must be >= 1.")
     if args.outlier_window < 1:
         raise ValueError("--outlier-window must be >= 1.")
     if args.outlier_local_fold <= 1:
