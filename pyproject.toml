@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "RiboParser"
-version = "0.3.10"
+version = "0.3.11"
 authors = [{ name = "Ren Shuchao", email = "rensc0718@163.com" }]
 description = "A pipeline for ribosome profiling data analysis"
 readme = "README.md"
@@ -59,6 +59,7 @@ rpf_Cumulative_CoV = "utils.rpf_Cumulative_CoV:main"
 rpf_CDT = "utils.rpf_CDT:main"
 rpf_CST = "utils.rpf_CST:main"
 rpf_Odd_Ratio = "utils.rpf_Odd_Ratio:main"
+rpf_PSplot = "utils.rpf_PSplot:main"
 rpf_Meta_Codon = "utils.rpf_Meta_Codon:main"
 
 # Ribo-utils

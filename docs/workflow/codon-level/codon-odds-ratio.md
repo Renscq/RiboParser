@@ -114,6 +114,7 @@ All output files are written to the current working directory with the given pre
 | Output                                        | Description                                                                                          |
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `<prefix>_codon_odd_ratio.txt`                | Site-level table of the significant codon positions after the selected p-value/FDR filtering.        |
+| `<prefix>_codon_local_pause.txt`              | Site-level table of the detected local pause sites; used as the input of `rpf_PSplot` (see [4.7.9 Pause site plot](pause-site-plot.md)). |
 | `<prefix>_sum_codon_odd_ratio.txt`            | Codon-level summary table with counts, proportions, and relative values.                             |
 | `<prefix>_odd_lineplot.pdf` / `.png`          | Two-panel line plot of the significant codon counts and proportions.                                 |
 | `<prefix>_odd_scatter.pdf` / `.png`           | Two-panel scatter plot of the control-vs-treatment counts and proportions.                           |
@@ -177,6 +178,7 @@ The left panel plots the treatment number against the control number of signific
 - Use `--fdr bhfdr` for Benjamini-Hochberg FDR filtering or `--fdr pvalue` for raw p-value filtering.
 - The command generates line and scatter plots. An internal barplot function exists but is not called by the command-line workflow.
 - Interpret the odds-ratio results together with pausing, occupancy, and read-depth information.
+- To visualize the detected local pause sites on the raw RPF profiles, use `rpf_PSplot` (see [4.7.9 Pause site plot](pause-site-plot.md)); its input is the `<prefix>_codon_local_pause.txt` table produced by this command.
 
 ## Merge related results
 

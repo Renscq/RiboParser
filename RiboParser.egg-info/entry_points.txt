@@ -62,6 +62,7 @@ rpf_Occupancy = utils.rpf_Occupancy:main
 rpf_Odd_Ratio = utils.rpf_Odd_Ratio:main
 rpf_Offset = utils.rpf_Offset:main
 rpf_Offset_RSBM = utils.rpf_Offset_RSBM:main
+rpf_PSplot = utils.rpf_PSplot:main
 rpf_Pausing = utils.rpf_Pausing:main
 rpf_Percent = utils.rpf_Percent:main
 rpf_Periodicity = utils.rpf_Periodicity:main

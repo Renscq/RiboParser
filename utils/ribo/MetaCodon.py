@@ -109,6 +109,7 @@ class MetaCodon:
         self.smooth = args.smooth
         self.unit = str(getattr(args, "unit", "codon"))
         self.fig = bool(args.fig)
+        self.ylim_scale = float(getattr(args, "ylim_scale", 1.5))
 
         # Frame-resolution mode: when the x-axis uses nucleotides and all
         # three frames are kept, each codon is expanded into three nucleotide
@@ -146,6 +147,32 @@ class MetaCodon:
             for sample in sample_name
             for frame in range(3)
         ]
+
+    @staticmethod
+    def _sample_from_frame_column(column: str) -> str:
+        """Strip the per-frame suffix (f0/f1/f2) to recover the sample name."""
+        for suffix in ("_f0", "_f1", "_f2"):
+            if column.endswith(suffix):
+                return column[: -len(suffix)]
+        return column
+
+    @staticmethod
+    def _group_frame_columns(
+        sample_columns: Sequence[str],
+    ) -> dict[str, list[str]] | None:
+        """Group per-frame columns by sample, or return ``None`` for plain columns."""
+        groups: dict[str, list[str]] = {}
+        for column in sample_columns:
+            sample = MetaCodon._sample_from_frame_column(column)
+            if sample == column:
+                return None
+            groups.setdefault(sample, []).append(column)
+        # Require each sample to have exactly the f0/f1/f2 triplet.
+        for sample, columns in groups.items():
+            expected = [f"{sample}_f0", f"{sample}_f1", f"{sample}_f2"]
+            if sorted(columns) != sorted(expected):
+                return None
+        return groups
 
     @staticmethod
     def _shift_frame_table(
@@ -305,7 +332,11 @@ class MetaCodon:
         sample_columns = (
             list(sample_columns) if sample_columns is not None else self.sample_name
         )
-        for sample, column in zip(self.sample_name, sample_columns):
+        for column in sample_columns:
+            # Frame-level columns ({sample}_f0/f1/f2) must use the total RPF
+            # count of their own sample. Zipping against ``self.sample_name``
+            # would misalign columns and leave most frame columns unscaled.
+            sample = self._sample_from_frame_column(column)
             total = float(self.total_rpf_num.get(sample, 0.0))
             if total > 0:
                 table[column] = table[column].astype("float64") * (
@@ -332,13 +363,51 @@ class MetaCodon:
             list(sample_columns) if sample_columns is not None else self.sample_name
         )
         cds_mask = table["region"].astype(str).str.lower().eq("cds")
+        gene_names = table["name"].astype(str).to_numpy()
+
+        frame_groups = self._group_frame_columns(sample_columns)
+        if frame_groups is not None:
+            # Frame-level columns: the f0/f1/f2 columns of one sample share a
+            # single denominator, the gene's mean CDS total density. Dividing
+            # each frame by its own mean would erase the tri-nucleotide
+            # periodicity by rescaling every frame to the same level.
+            total_columns: list[str] = []
+            for sample, frame_columns in frame_groups.items():
+                total_column = f"__total_{sample}"
+                total_columns.append(total_column)
+                table[total_column] = table[frame_columns].sum(axis=1)
+            gene_mean = (
+                table.loc[cds_mask, ["name"] + total_columns]
+                .groupby("name", sort=False)[total_columns]
+                .mean()
+            )
+            denominator_values = gene_mean.reindex(gene_names).to_numpy(
+                dtype=float
+            )
+            for index, (sample, frame_columns) in enumerate(
+                frame_groups.items()
+            ):
+                values = table.loc[:, frame_columns].to_numpy(dtype=float)
+                normalized = np.zeros_like(values, dtype=float)
+                denom = denominator_values[:, index]
+                valid = np.isfinite(denom) & (denom > 0)
+                np.divide(
+                    values,
+                    denom[:, None],
+                    out=normalized,
+                    where=valid[:, None],
+                )
+                table[frame_columns] = table[frame_columns].astype("float64")
+                table[frame_columns] = normalized
+            table.drop(columns=total_columns, inplace=True)
+            return
+
         gene_mean = (
             table.loc[cds_mask, ["name"] + sample_columns]
             .groupby("name", sort=False)[sample_columns]
             .mean()
         )
 
-        gene_names = table["name"].astype(str).to_numpy()
         denominator_values = gene_mean.reindex(gene_names).to_numpy(dtype=float)
         values = table.loc[:, sample_columns].to_numpy(dtype=float)
 
@@ -861,8 +930,19 @@ class MetaCodon:
             nt_positions = (
                 relative_positions[:, None] * 3 + np.arange(3)[None, :]
             ).ravel()
+            # ``density_values`` has shape (codons, samples * 3): each
+            # codon row stores its three frames per sample contiguously.
+            # Reshape so that the table rows become (codon, frame) pairs
+            # in nt order, otherwise frames leak across rows and the
+            # target codon's A-site peak shifts one nt off-centre.
             density_table = pd.DataFrame(
-                density_values.reshape(-1, self.sample_num),
+                density_values.reshape(
+                    relative_positions.size,
+                    self.sample_num,
+                    3,
+                )
+                .transpose(0, 2, 1)
+                .reshape(-1, self.sample_num),
                 index=nt_positions,
                 columns=self.sample_name,
             )
@@ -1060,6 +1140,24 @@ class MetaCodon:
             return "Mean RPM density"
         return "Mean RPF density"
 
+    @staticmethod
+    def _nice_ylim_top(data_max: float, compression: float = 1.5) -> float:
+        """Return a rounded-up y-axis upper bound that compresses the profile.
+
+        The data maximum is multiplied by ``compression`` and then rounded
+        upward to a clean value (1/2/2.5/5/10 x 10^k), so every figure gets
+        a dynamic, data-driven upper limit instead of a fixed number.
+        """
+        if data_max <= 0 or not np.isfinite(data_max):
+            return 1.0
+        ymax = data_max * max(1.0, float(compression))
+        magnitude = 10.0 ** np.floor(np.log10(ymax))
+        normalized = ymax / magnitude
+        for nice in (1.0, 2.0, 2.5, 5.0, 10.0):
+            if normalized <= nice:
+                return nice * magnitude
+        return 10.0 * magnitude
+
     def draw_meta_codon(self) -> None:
         """Draw polished line profiles for all retained target motifs."""
         nt_mode = self.unit == "nucleotide"
@@ -1142,7 +1240,17 @@ class MetaCodon:
             values = sample_table.to_numpy(dtype=float)
             finite_values = values[np.isfinite(values)]
             if finite_values.size and np.nanmin(finite_values) >= 0:
-                ax.set_ylim(bottom=0)
+                # Compress the vertical range: derive the upper limit from
+                # the data maximum instead of letting matplotlib fit the
+                # peak tightly, which would exaggerate the tri-nucleotide
+                # periodicity. The limit is rounded up to a clean tick value.
+                ax.set_ylim(
+                    bottom=0,
+                    top=self._nice_ylim_top(
+                        float(np.nanmax(finite_values)),
+                        self.ylim_scale,
+                    ),
+                )
 
             if self.sample_num > 0:
                 ax.legend(

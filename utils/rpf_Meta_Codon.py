@@ -159,6 +159,16 @@ def _build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Draw meta-codon figures (default: %(default)s).",
     )
+    plotting_group.add_argument(
+        "--ylim-scale",
+        dest="ylim_scale",
+        default=1.5,
+        type=float,
+        help="Compression factor for the y-axis upper limit of meta-codon "
+        "plots. The limit is computed as the data maximum times this factor "
+        "and rounded up to a clean tick value, flattening the vertical "
+        "range while staying data-driven (default: %(default)s).",
+    )
 
     runtime_group = parser.add_argument_group("Runtime arguments")
     runtime_group.add_argument(

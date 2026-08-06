@@ -85,6 +85,7 @@ utils/rpf_Occupancy.py
 utils/rpf_Odd_Ratio.py
 utils/rpf_Offset.py
 utils/rpf_Offset_RSBM.py
+utils/rpf_PSplot.py
 utils/rpf_Pausing.py
 utils/rpf_Percent.py
 utils/rpf_Periodicity.py
@@ -122,6 +123,7 @@ utils/ribo/Occupancy.py
 utils/ribo/Odd_Ratio.py
 utils/ribo/Offset.py
 utils/ribo/Offset_RSBM.py
+utils/ribo/PSplot.py
 utils/ribo/Pausing.py
 utils/ribo/Percentage.py
 utils/ribo/Periodicity.py
