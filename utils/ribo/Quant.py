@@ -59,9 +59,9 @@ REGION_OUTPUT_NAMES = {
 }
 REGION_COLORS = OrderedDict(
     [
-        ("5utr", "#66C2A5"),
-        ("cds", "#FC8D62"),
-        ("3utr", "#8DA0CB"),
+        ("5utr", "#E64B35"),
+        ("cds", "#4DBBD5"),
+        ("3utr", "#00A087"),
     ]
 )
 RPM_SCALE = 1_000_000.0
@@ -649,7 +649,11 @@ class Quant(object):
         self.output_files["region_proportion_table"] = out_txt
 
     def draw_rpf_cdfplot(self) -> None:
-        """Draw empirical CDF curves of log2 CDS RPM values for detected genes."""
+        """Draw empirical CDF curves of log2 CDS RPM values for detected genes.
+
+        Each sample's CDF is computed from the genes with RPM > 0 in that
+        sample only, so log2 transformation never produces -inf.
+        """
         cds_rpm = self._cds_rpm_for_plots()
         if cds_rpm is None:
             print("Skip eCDF plot because CDS quantification is not available.", flush=True)
@@ -663,23 +667,23 @@ class Quant(object):
             print("Skip eCDF plot because all CDS RPM values are zero.", flush=True)
             return
 
-        cds_log = self._safe_log2(detected)
         figure_width = max(5.4, min(7.0, len(self.sample_name) * 0.18 + 3.8))
         fig, ax = plt.subplots(figsize=(figure_width, 7))
         cmap = plt.get_cmap("tab20")
 
         for idx, sample in enumerate(self.sample_name):
-            if sample not in cds_log.columns:
+            if sample not in detected.columns:
                 continue
-            values = np.sort(cds_log[sample].dropna().to_numpy(dtype=float))
-            if values.size == 0:
+            sample_values = detected[sample].dropna().to_numpy(dtype=float)
+            sample_values = sample_values[sample_values > 0.0]
+            if sample_values.size == 0:
                 continue
+            values = np.sort(np.log2(sample_values))
             y = np.arange(1, values.size + 1, dtype=float) / float(values.size)
             ax.step(values, y, where="post", label=sample, linewidth=1.35, color=cmap(idx % 20), alpha=0.95)
 
-        ax.set_xlabel("log2(CDS RPM + 1)")
+        ax.set_xlabel("log2(CDS RPM)")
         ax.set_ylabel("Empirical cumulative fraction")
-        ax.set_xlim(left=0)
         ax.set_ylim(0, 1.01)
         ax.grid(color="#E5E5E5", linewidth=0.6)
         ax.set_axisbelow(True)
@@ -688,7 +692,14 @@ class Quant(object):
         ax.spines["left"].set_color("#BBBBBB")
         ax.spines["bottom"].set_color("#BBBBBB")
         if len(self.sample_name) <= 24:
-            legend_cols = min(4, max(1, int(np.ceil(len(self.sample_name) / 6))))
+            if len(self.sample_name) == 1:
+                legend_cols = 1
+            elif len(self.sample_name) <= 6:
+                legend_cols = 2
+            elif len(self.sample_name) < 13:
+                legend_cols = 3
+            else:
+                legend_cols = 4
             ax.legend(
                 frameon=False,
                 fontsize=7.5,
@@ -708,6 +719,67 @@ class Quant(object):
 
         self.output_files["cdf_pdf"] = out_pdf
         self.output_files["cdf_png"] = out_png
+
+    @staticmethod
+    def _place_non_overlapping_labels(
+        fig: plt.Figure,
+        ax: plt.Axes,
+        anchors: list[tuple[float, float]],
+        labels: list[str],
+        fontsize: float = 7.5,
+        max_iter: int = 80,
+        step_px: float = 2.0,
+        max_offset_px: float = 70.0,
+    ) -> None:
+        """Place text labels next to scatter anchors and push overlaps apart.
+
+        Positions are adjusted in display (pixel) coordinates and mapped back
+        to data coordinates so the layout is independent of figure size. Each
+        label is kept within ``max_offset_px`` pixels of its anchor point.
+        """
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        inv = ax.transData.inverted()
+        texts: list[Any] = []
+        anchor_win: list[tuple[float, float]] = []
+        for (x, y), label in zip(anchors, labels):
+            texts.append(ax.text(x, y, "  " + str(label), fontsize=fontsize, va="center", zorder=4))
+            anchor_win.append(tuple(ax.transData.transform((float(x), float(y)))))
+
+        for _ in range(max_iter):
+            moved = False
+            for i in range(len(texts)):
+                for j in range(i + 1, len(texts)):
+                    bbox_i = texts[i].get_window_extent(renderer=renderer)
+                    bbox_j = texts[j].get_window_extent(renderer=renderer)
+                    if not bbox_i.overlaps(bbox_j):
+                        continue
+                    center_x_i = (bbox_i.x0 + bbox_i.x1) / 2.0
+                    center_y_i = (bbox_i.y0 + bbox_i.y1) / 2.0
+                    center_x_j = (bbox_j.x0 + bbox_j.x1) / 2.0
+                    center_y_j = (bbox_j.y0 + bbox_j.y1) / 2.0
+                    delta_x = center_x_j - center_x_i
+                    delta_y = center_y_j - center_y_i
+                    distance = float(np.hypot(delta_x, delta_y))
+                    if distance < 1e-6:
+                        delta_x, delta_y = step_px, step_px
+                        distance = float(np.hypot(delta_x, delta_y))
+                    unit_x = delta_x / distance
+                    unit_y = delta_y / distance
+                    for index, sign in ((i, -1.0), (j, 1.0)):
+                        current = texts[index].get_position()
+                        win = ax.transData.transform(current)
+                        new_win_x = win[0] + sign * unit_x * step_px
+                        new_win_y = win[1] + sign * unit_y * step_px
+                        offset = float(np.hypot(new_win_x - anchor_win[index][0], new_win_y - anchor_win[index][1]))
+                        if offset > max_offset_px:
+                            ratio = max_offset_px / offset
+                            new_win_x = anchor_win[index][0] + (new_win_x - anchor_win[index][0]) * ratio
+                            new_win_y = anchor_win[index][1] + (new_win_y - anchor_win[index][1]) * ratio
+                        texts[index].set_position(inv.transform((new_win_x, new_win_y)))
+                    moved = True
+            if not moved:
+                break
 
     @staticmethod
     def _calculate_pca_by_svd(matrix: pd.DataFrame, n_components: int = 2) -> tuple[pd.DataFrame, np.ndarray]:
@@ -773,6 +845,8 @@ class Quant(object):
         figure_width = max(5.0, min(6.2, self.sample_num * 0.12 + 4.0))
         fig, ax = plt.subplots(figsize=(figure_width, 5.5))
         cmap = plt.get_cmap("tab20")
+        anchor_points: list[tuple[float, float]] = []
+        sample_labels: list[str] = []
         for idx, sample in enumerate(pca_df.index):
             ax.scatter(
                 pca_df.loc[sample, "PC1"],
@@ -784,15 +858,8 @@ class Quant(object):
                 label=sample,
                 zorder=3,
             )
-            if self.sample_num <= 20:
-                ax.text(
-                    pca_df.loc[sample, "PC1"],
-                    pca_df.loc[sample, "PC2"],
-                    "  " + str(sample),
-                    fontsize=7.5,
-                    va="center",
-                    zorder=4,
-                )
+            anchor_points.append((float(pca_df.loc[sample, "PC1"]), float(pca_df.loc[sample, "PC2"])))
+            sample_labels.append(str(sample))
 
         ax.axhline(0, color="#D0D0D0", linewidth=0.7, zorder=0)
         ax.axvline(0, color="#D0D0D0", linewidth=0.7, zorder=0)
@@ -805,6 +872,8 @@ class Quant(object):
         ax.spines["left"].set_color("#BBBBBB")
         ax.spines["bottom"].set_color("#BBBBBB")
         fig.subplots_adjust(bottom=0.14, left=0.14, right=0.96, top=0.93)
+        if self.sample_num <= 20:
+            self._place_non_overlapping_labels(fig, ax, anchor_points, sample_labels, fontsize=7.5)
         fig.savefig(out_pdf, bbox_inches="tight")
         fig.savefig(out_png, dpi=300, bbox_inches="tight")
         plt.close(fig)

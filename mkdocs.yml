@@ -95,9 +95,8 @@ nav:
       - "4.6 Gene-level analysis":
           - "4.6 Gene-level overview": workflow/gene-level/index.md
           - "4.6.1 Gene quantification": workflow/gene-level/quantification.md
-          - "4.6.2 Gene coverage": workflow/gene-level/coverage.md
-          - "4.6.3 Gene correlation": workflow/gene-level/correlation.md
-          - "4.6.4 Gene density retrieval": workflow/gene-level/retrieve.md
+          - "4.6.2 Frameshift detection": workflow/gene-level/shift.md
+          - "4.6.3 Gene density plot": workflow/gene-level/geneplot.md
 
       - "4.7 Codon-level analysis":
           - "4.7 Codon-level overview": workflow/codon-level/index.md
@@ -127,9 +126,7 @@ nav:
 
       - "5.2 RPF density utilities":
           - "5.2.1 rpf retrieve": workflow/others/retrieve.md
-          - "5.2.2 rpf geneplot": workflow/others/geneplot.md
-          - "5.2.3 rpf shuffle": workflow/others/shuffle.md
-          - "5.2.4 rpf shift": workflow/others/shift.md
+          - "5.2.2 rpf shuffle": workflow/others/shuffle.md
 
       - "5.3 Signal track utilities":
           - "5.3.1 rpf Bam2bw": workflow/others/Bam2bw.md
