@@ -113,9 +113,9 @@ nav:
       - "4.8 smORF analysis":
           - "4.8 smORF overview": workflow/smorf/index.md
           - "4.8.1 smORF scanner": workflow/smorf/scanner.md
-          - "4.8.2 smORF filter": workflow/smorf/filter.md
+          - "4.8.2 smORF cluster": workflow/smorf/cluster.md
           - "4.8.3 smORF evidence": workflow/smorf/evidence.md
-          - "4.8.4 smORF integrate": workflow/smorf/integrate.md
+          - "4.8.4 smORF quantification": workflow/smorf/quant.md
 
       - "4.9 SeRP analysis":
           - "4.9 SeRP overview": workflow/serp/index.md
