@@ -122,6 +122,8 @@ ATGACTGCAATTTTAGAGAGACGCGAGAGCGAAAGCCTATGGGGTCGCTTCTGTAACTGG
 ### Use the common scanning setup on a large genome
 
 ```bash
+cd ./sce/5.smorf/01.scanner
+
 smorf_scanner \
   --genome ~/gmx/genome/GCF_000004515.6_Glycine_max_v4.0_genomic.fna \
   --annotation ~/gmx/norm/gmx4.genepred \

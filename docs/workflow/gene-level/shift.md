@@ -52,6 +52,8 @@ The input is the merged frame-resolved density file produced by `rpf_Merge` (see
 ### 1.2 Example
 
 ```bash
+cd ./sce/4.ribo-seq/20.frame_shift/
+
 rpf_Shift \
     -r ../05.merge/sce1_rpf_merged.jsonl.gz \
     -o sce \

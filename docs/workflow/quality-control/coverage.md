@@ -43,6 +43,8 @@ Normalize transcripts into bins and generate metagene coverage profiles from a m
 ### 1.2 Example
 
 ```bash
+cd ./sce/4.ribo-seq/08.coverage/
+
 rpf_Coverage \
     -t /path/to/norm/sce.genepred \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \

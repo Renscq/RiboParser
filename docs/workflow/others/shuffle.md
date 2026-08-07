@@ -35,6 +35,8 @@ The output keeps the standard RiboParser merged-density layout so it can be reus
 Shuffle all transcripts with the default seed:
 
 ```bash
+cd ./4.ribo-seq/21.shuffle/
+
 rpf_Shuffle \
   -r RIBO_merged.txt \
   -o RIBO
@@ -43,6 +45,8 @@ rpf_Shuffle \
 Shuffle selected transcripts only:
 
 ```bash
+cd ./4.ribo-seq/20.shuffle/
+
 rpf_Shuffle \
   -r RIBO_merged.txt \
   -l target_gene_ids.txt \
@@ -53,6 +57,8 @@ rpf_Shuffle \
 Shuffle each sample independently:
 
 ```bash
+cd ./4.ribo-seq/20.shuffle/
+
 rpf_Shuffle \
   -r RIBO_merged.txt \
   -l gene.norm.txt \

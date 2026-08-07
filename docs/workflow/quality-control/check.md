@@ -42,6 +42,8 @@ Step 3: Merge gene/read saturation
 ### 1.2 Example
 
 ```bash
+cd ./sce/4.ribo-seq/01.qc/
+
 for bam in ../../3.star/*Aligned.toTranscriptome.out.bam
 do
     prefix_name=$(basename ${bam} Aligned.toTranscriptome.out.bam)

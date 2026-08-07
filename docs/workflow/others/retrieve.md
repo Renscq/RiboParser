@@ -55,6 +55,8 @@ If `-n` is enabled, the output values are RPM-normalized. If `-f` is enabled, th
 Retrieve transcripts with at least 50 RPF counts:
 
 ```bash
+cd ./4.ribo-seq/22.retrieve/
+
 rpf_Retrieve \
   -r RIBO_merged.txt \
   -m 50 \
@@ -83,6 +85,7 @@ rpf_Retrieve \
 Convert the retrieved table to a longer frame-aware format:
 
 ```bash
+
 rpf_Retrieve \
   -r RIBO_merged.txt \
   -m 0 \

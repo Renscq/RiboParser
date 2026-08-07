@@ -77,6 +77,8 @@ YHL034C-t26_1
 ```
 
 ```bash
+cd ./sce/4.ribo-seq/16.cumulative_of_cov
+
 rpf_Cumulative_CoV \
     -r ../05.merge/sce1_rpf_merged.jsonl.gz \
     -l gene.list \

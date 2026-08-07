@@ -37,6 +37,8 @@ Step 4: Merge offset tables
 ### 1.2 Example
 
 ```bash
+cd ./sce/4.ribo-seq/03.offset/
+
 rna_Offset \
     -m 25 \
     -M 150 \

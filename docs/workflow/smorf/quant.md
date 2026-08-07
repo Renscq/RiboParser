@@ -84,6 +84,8 @@ The matrix contains 11 metadata columns followed by one column per sample (in de
 ### Quantify all-frame density across samples
 
 ```bash
+cd ./sce/5.smorf/04.quant
+
 smorf_quant \
   -g gmx4.smorf.reliable_smorf.genepred \
   -l ribo.bedgraph.list \

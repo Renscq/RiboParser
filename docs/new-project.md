@@ -1,4 +1,4 @@
-# 3 Quick start
+# 3 New project
 
 ## Project layout
 
@@ -57,13 +57,16 @@ To standardize project analysis, the following directory structure is recommende
 │       ├── 13.codon_decoding_time
 │       ├── 14.codon_selection_time
 │       ├── 15.coefficient_of_variation
-│       ├── 16.meta_codon
-│       ├── 17.odd_ratio
-│       ├── 18.shuffle
-│       ├── 19.retrieve
-│       └── 20.frame_shift
+│       ├── 16.cumulative_of_cov
+│       ├── 17.meta_codon
+│       ├── 18.odd_ratio
+│       ├── 19.pause_site_plot
+│       ├── 20.frame_shift
+│       ├── 21.shuffle
+│       ├── 22.retrieve
+│       └── 23.geneplot
 ├── 5.smorf
-│   ├── 01.scan
+│   ├── 01.scanner
 │   ├── 02.cluster
 │   ├── 03.evidence
 │   └── 04.quant

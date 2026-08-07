@@ -66,7 +66,7 @@ nav:
 
       - "2.3 GitHub": installation/github.md
 
-  - "3. Quick start": quick-start.md
+  - "3. New project": new-project.md
 
   - "4. Workflow":
 
@@ -78,7 +78,10 @@ nav:
 
       - "4.3 Raw data cleaning": workflow/raw-data-cleaning.md
 
-      - "4.4 Alignment and quantification": workflow/alignment-and-quantification.md
+      - "4.4 Alignment and quantification":
+          - "4.4 Alignment and quantification overview": workflow/alignment-and-quantification/index.md
+          - "4.4.1 RNA-seq": workflow/alignment-and-quantification/rna-seq.md
+          - "4.4.2 Ribo-seq": workflow/alignment-and-quantification/ribo-seq.md
 
       - "4.5 Quality control":
           - "4.5 Quality control overview": workflow/quality-control/index.md

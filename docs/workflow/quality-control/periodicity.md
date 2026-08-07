@@ -29,6 +29,8 @@ Calculate the frame-specific RPF distribution from a merged density file.
 ### 1.2 Example
 
 ```bash
+cd ./sce/4.ribo-seq/06.periodicity/
+
 rpf_Periodicity \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \
     -m 30 \

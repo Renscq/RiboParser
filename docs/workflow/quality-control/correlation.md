@@ -33,6 +33,8 @@ Calculate sample correlation matrices from a merged density file.
 ### 1.2 Example
 
 ```bash
+cd ./sce/4.ribo-seq/09.correlation/
+
 rpf_Corr \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \
     --region cds \

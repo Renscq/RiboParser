@@ -37,7 +37,7 @@ RNA_merged.txt
 | 4.7.7 | `rpf_Meta_Codon` | Extract and plot local RPF density around selected codons or codon motifs. |
 | 4.7.8 | `rpf_Odd_Ratio` | Compare codon-associated RPF enrichment between control and treatment samples. |
 | 4.7.9 | `rpf_PSplot` | Visualize the detected local pause sites on the raw RPF profiles. |
-
+s
 ## Recommended order
 
 A typical codon-level analysis can be organized as follows:

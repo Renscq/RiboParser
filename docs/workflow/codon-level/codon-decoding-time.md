@@ -62,6 +62,8 @@ The inputs are the merged density files produced by `rpf_Merge` (see [4.5.5 Merg
 ### 1.2 Example
 
 ```bash
+cd ./sce/4.ribo-seq/13.codon_decoding_time/
+
 rpf_CDT \
     --rpf ../05.merge/sce_rpf_merged.jsonl.gz \
     --rna ../../rna/05.merge/sce_rna_merged.jsonl.gz \

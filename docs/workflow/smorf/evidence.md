@@ -189,6 +189,8 @@ A reliable smORF requires a reliable family with a supported or prior-compatible
 ## Examples
 
 ```bash
+cd ./sce/5.smorf/03.evidence
+
 smorf_evidence \
   -i ../02.smorf_cluster/gmx4.reliable.family.message.txt \
   -M ../02.smorf_cluster/gmx4.reliable.family.members.txt \

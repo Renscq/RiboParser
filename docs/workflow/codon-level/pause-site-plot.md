@@ -83,6 +83,8 @@ YBR217W
 Draw the pasuing-site plots for the four genes in `gene.list`:
 
 ```bash
+cd ./sce/4.ribo-seq/19.pause_site_plot/
+
 rpf_PSplot \
     -i ../codon_odd_ratio/sce_codon_local_pause.txt \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \

@@ -52,6 +52,8 @@ The RPF density input is the same compact file as in the other `rpf_*` analyses 
 ### 1.2 Example
 
 ```bash
+cd ./sce/4.ribo-seq/17.meta_codon/
+
 rpf_Meta_Codon \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \
     -o sce \

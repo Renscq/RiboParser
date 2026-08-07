@@ -31,6 +31,8 @@ Quantify transcript-level RPF density from a merged density file and generate no
 ### 1.2 Example
 
 ```bash
+cd ./sce/04.ribo-seq/10.quantification/
+
 rpf_Quant \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \
     --tis 0 \

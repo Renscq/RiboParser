@@ -38,6 +38,8 @@ Calculate metaplot profiles around TIS/TTS from a merged density file.
 ### 1.2 Example
 
 ```bash
+cd ./sce/4.ribo-seq/07.metaplot/
+
 rpf_Metaplot \
     -t /path/to/norm/sce.genepred \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \

@@ -94,6 +94,8 @@ The input is the frame-resolved RPF density file produced by `rpf_Merge` (see [4
 ### 1.2 Example
 
 ```bash
+cd ./sce/4.ribo-seq/18.odd_ratio/
+
 rpf_Odd_Ratio \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \
     -c SRR1944912,SRR1944913,SRR1944914 \

@@ -41,6 +41,8 @@ Both commands write a gzip-compressed compact JSONL by default, which carries a 
 ### 1.2 Example
 
 ```bash
+cd ./sce/4.ribo-seq/04.density/
+
 for bam in ../01.qc/*.bam
 do
     prefix_name=$(basename ${bam} .bam)

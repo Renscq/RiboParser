@@ -71,6 +71,8 @@ The input is a density file produced by `rpf_Merge` (see [4.5.5 Merge density](.
 ### 1.2 Example
 
 ```bash
+cd ./sce/4.ribo-seq/15.coefficient_of_variation/
+
 rpf_CoV \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \
     -f 0 \

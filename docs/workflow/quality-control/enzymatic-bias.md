@@ -41,6 +41,8 @@ Step 2: Merge digestion results
 ### 1.2 Example
 
 ```bash
+cd ./sce/4.ribo-seq/02.digestion/
+
 for bam in ../01.qc/*.bam
 do
     prefix_name=$(basename ${bam} .bam)
@@ -95,6 +97,7 @@ The sequence logos show the nucleotide preference around the 5' and 3' read ends
 ### 2.2 Example
 
 ```bash
+
 merge_digestion \
     -l *_5end_pwm.txt *_3end_pwm.txt \
     -o RIBO
