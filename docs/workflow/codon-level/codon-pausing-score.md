@@ -25,7 +25,7 @@ rpf_Pausing   # Calculate sample-specific codon pausing scores
 
 ## Step 1: Run `rpf_Pausing`
 
-The input is the merged density file produced by `rpf_Merge` (see [4.5.5 Merge density](../../quality-control/merge-density.md)). Both the compact JSONL format and the plain TXT table are supported.
+The input is the merged density file produced by `rpf_Merge` (see [4.5.5 Merge density](../quality-control/merge-density.md)). Both the compact JSONL format and the plain TXT table are supported.
 
 ### 1.1 Parameters
 

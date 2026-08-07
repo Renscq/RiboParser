@@ -28,7 +28,7 @@ The analysis is performed in five steps:
 
 ## Step 1: Run `rpf_Cumulative_CoV`
 
-The input is a density file produced by `rpf_Merge` (see [4.5.5 Merge density](../../quality-control/merge-density.md)). Both the compact JSONL format and the plain TXT table are supported. The command works independently for each sample.
+The input is a density file produced by `rpf_Merge` (see [4.5.5 Merge density](../quality-control/merge-density.md)). Both the compact JSONL format and the plain TXT table are supported. The command works independently for each sample.
 
 ### 1.1 Parameters
 

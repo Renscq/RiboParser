@@ -18,7 +18,7 @@ rpf_Shift   # Detect in-gene reading-frame switches (programmed ribosomal frames
 
 ## Step 1: Run `rpf_Shift`
 
-The input is the merged frame-resolved density file produced by `rpf_Merge` (see [4.2.1 RPF density merge](../../ribosome/merge.md)).
+The input is the merged frame-resolved density file produced by `rpf_Merge` (see [4.5.5 Merge density](../quality-control/merge-density.md)).
 
 ### 1.1 Parameters
 

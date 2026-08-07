@@ -67,7 +67,7 @@ By default (`--fdr bhfdr`) sites are filtered on `bhfdr`; with `--fdr pvalue` th
 
 ## Step 1: Run `rpf_Odd_Ratio`
 
-The input is the frame-resolved RPF density file produced by `rpf_Merge` (see [4.5.5 Merge density](../../quality-control/merge-density.md)), either the TXT table or the JSONL/JSONL.GZ format. The control and treatment sample names must exactly match the sample columns in the density file.
+The input is the frame-resolved RPF density file produced by `rpf_Merge` (see [4.5.5 Merge density](../quality-control/merge-density.md)), either the TXT table or the JSONL/JSONL.GZ format. The control and treatment sample names must exactly match the sample columns in the density file.
 
 ### 1.1 Parameters
 

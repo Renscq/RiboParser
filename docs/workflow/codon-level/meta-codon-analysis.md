@@ -25,7 +25,7 @@ The analysis is performed in seven steps:
 
 ## Step 1: Run `rpf_Meta_Codon`
 
-The RPF density input is the same compact file as in the other `rpf_*` analyses (see [4.5.5 Merge density](../../quality-control/merge-density.md)). If a TXT density table must be used, the shared reader also accepts it.
+The RPF density input is the same compact file as in the other `rpf_*` analyses (see [4.5.5 Merge density](../quality-control/merge-density.md)). If a TXT density table must be used, the shared reader also accepts it.
 
 ### 1.1 Parameters
 

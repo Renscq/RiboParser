@@ -34,7 +34,7 @@ rpf_CST   # Calculate sample-specific codon selection time
 
 ## Step 1: Run `rpf_CST`
 
-The inputs are the merged density files produced by `rpf_Merge` (see [4.5.5 Merge density](../../quality-control/merge-density.md)) for the RPF and RNA channels. Both the compact JSONL format and the plain TXT table are supported.
+The inputs are the merged density files produced by `rpf_Merge` (see [4.5.5 Merge density](../quality-control/merge-density.md)) for the RPF and RNA channels. Both the compact JSONL format and the plain TXT table are supported.
 
 ### 1.1 Parameters
 

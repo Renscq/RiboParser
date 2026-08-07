@@ -34,7 +34,7 @@ rpf_CDT   # Calculate sample-specific codon decoding time
 
 ## Step 1: Run `rpf_CDT`
 
-The inputs are the merged density files produced by `rpf_Merge` (see [4.5.5 Merge density](../../quality-control/merge-density.md)) for the RPF and RNA channels. Both the compact JSONL format and the plain TXT table are supported.
+The inputs are the merged density files produced by `rpf_Merge` (see [4.5.5 Merge density](../quality-control/merge-density.md)) for the RPF and RNA channels. Both the compact JSONL format and the plain TXT table are supported.
 
 ### 1.1 Parameters
 

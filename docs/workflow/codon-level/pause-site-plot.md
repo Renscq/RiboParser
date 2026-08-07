@@ -40,7 +40,7 @@ Because the pause threshold values are read from the metadata columns of the inp
 
 ## Step 1: Run `rpf_PSplot`
 
-The input is the site-level table produced by `rpf_Odd_Ratio` (see [4.7.8 Codon odds ratio](codon-odds-ratio.md)) and the compact RPF density file used by that analysis (see [4.5.5 Merge density](../../quality-control/merge-density.md)). The density file is streamed, so only the target transcripts are kept in memory.
+The input is the site-level table produced by `rpf_Odd_Ratio` (see [4.7.8 Codon odds ratio](codon-odds-ratio.md)) and the compact RPF density file used by that analysis (see [4.5.5 Merge density](../quality-control/merge-density.md)). The density file is streamed, so only the target transcripts are kept in memory.
 
 ### 1.1 Parameters
 
