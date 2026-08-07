@@ -6,6 +6,7 @@ To standardize project analysis, the following directory structure is recommende
 
 ```text
 .
+sce
 ├── 1.reference
 │   ├── genome
 │   ├── mrna
