@@ -1,4 +1,4 @@
-{% set version = os.environ.get("PACKAGE_VERSION", "0.3.12") %}
+{% set version = os.environ.get("PACKAGE_VERSION", "0.3.13") %}
 {% set sha256 = os.environ.get("PACKAGE_SHA256", "71b42325e7c3e919973679abfb93d0657539325f273e6289772ef87e04a99769") %}
 {% set source_url = os.environ.get("PACKAGE_URL", "https://pypi.org/packages/source/r/riboparser/riboparser-" + version + ".tar.gz") %}
 
