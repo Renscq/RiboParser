@@ -23,11 +23,21 @@ The full documentation is available at:
 
 ## Installation
 
+Install the dependency packages with `micromamba`.
 ```bash
-conda install riboparser -c rensc
-# or
+micromamba install cutadapt bowtie samtools star bedtools subread rsem gffread sra-tools \
+ ucsc-genepredtogtf ucsc-gtftogenepred ucsc-gff3togenepred ucsc-bedgraphtobigwig ucsc-bedsort \
+ -c bioconda
+
+micromamba install pigz -c conda-forge
+```
+
+Install the RiboParser.
+```bash
 micromamba install riboparser -c rensc
 ```
+
+or
 
 ```bash
 pip install riboparser
