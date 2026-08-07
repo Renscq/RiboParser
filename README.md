@@ -35,11 +35,9 @@ micromamba install pigz -c conda-forge
 Install the RiboParser.
 ```bash
 micromamba install riboparser -c rensc
-```
 
-or
+# or
 
-```bash
 pip install riboparser
 ```
 
