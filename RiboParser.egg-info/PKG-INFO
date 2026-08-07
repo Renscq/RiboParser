@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: RiboParser
-Version: 0.3.12
+Version: 0.3.13
 Summary: A pipeline for ribosome profiling data analysis
 Author-email: Ren Shuchao <rensc0718@163.com>
 License-Expression: GPL-3.0-or-later
@@ -48,13 +48,21 @@ The full documentation is available at:
 
 ## Installation
 
+Install the dependency packages with `micromamba`.
 ```bash
-conda install riboparser -c rensc
-# or
-micromamba install riboparser -c rensc
+micromamba install cutadapt bowtie samtools star bedtools subread rsem gffread sra-tools \
+ ucsc-genepredtogtf ucsc-gtftogenepred ucsc-gff3togenepred ucsc-bedgraphtobigwig ucsc-bedsort \
+ -c bioconda
+
+micromamba install pigz -c conda-forge
 ```
 
+Install the RiboParser.
 ```bash
+micromamba install riboparser -c rensc
+
+# or
+
 pip install riboparser
 ```
 
