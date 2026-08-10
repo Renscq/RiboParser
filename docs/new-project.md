@@ -74,7 +74,10 @@ sce
 └── 6.serp
     ├── 01.peak
     ├── 02.overlap
-    └── 03.properties
+    ├── 03.summary
+    ├── 04.peak_plot
+    ├── 05.metaplot
+    └── 06.properties
 ```
 
 ## Basic package check
