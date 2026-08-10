@@ -24,7 +24,7 @@ from utils.ribo.ArgsParser import (
     step_print,
     title_print,
 )
-from utils.serp.Plot import SeRPPlot
+from utils.serp.SeRPPlot import SeRPPlot
 
 
 def _build_parser() -> argparse.ArgumentParser:
