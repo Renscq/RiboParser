@@ -124,7 +124,10 @@ nav:
           - "4.9 SeRP overview": workflow/serp/index.md
           - "4.9.1 SeRP peak": workflow/serp/peak.md
           - "4.9.2 SeRP overlap": workflow/serp/overlap.md
-          - "4.9.3 SeRP properties": workflow/serp/properties.md
+          - "4.9.3 SeRP summary": workflow/serp/summary.md
+          - "4.9.4 SeRP peak plot": workflow/serp/plot.md
+          - "4.9.5 SeRP metaplot": workflow/serp/metaplot.md
+          - "4.9.6 SeRP properties": workflow/serp/properties.md
 
   - "5. Utility toolkits":
       - "5.1 Toolkit overview": workflow/others/toolkits.md

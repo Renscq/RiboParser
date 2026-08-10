@@ -2,7 +2,7 @@
 
 ## `serp_peak`
 
-`serp_peak` detects enriched SeRP/IP signal peaks from a merged RPF coverage table by comparing immunoprecipitation samples with control samples.
+`serp_peak` detects enriched SeRP/IP signal peaks from RPF density profiles by comparing immunoprecipitation samples with control samples.
 
 ### Function
 
@@ -12,13 +12,13 @@ Use this command when you want to:
 - normalize sample read counts to RPM;
 - scan smoothed IP/control enrichment ratios along transcripts;
 - identify enriched binding or collision peak regions;
-- export peak tables, BED regions, peak-associated sequences, ratio tables, and optional figures.
+- export peak tables, BED regions, peak-associated sequences, ratio tables, and reusable enrichment profiles for later plotting.
 
 ### Input
 
-The main input should be a RiboParser merged RPF coverage table. The command expects the first annotation columns and then frame-specific sample columns.
+The main input is a RiboParser merged RPF coverage table in TXT format, or a JSON/JSONL density file. The command expects the first annotation columns and then frame-specific sample columns.
 
-A typical table has the following structure:
+A typical TXT table has the following structure:
 
 ```text
 name  now_nt  from_tis  from_tts  region  codon  CK1_f0  CK1_f1  CK1_f2  IP1_f0  IP1_f1  IP1_f2  ...
@@ -37,31 +37,37 @@ Optional inputs:
 
 | Parameter | Required | Meaning |
 |---|---:|---|
-| `-r` | yes | Input RPF coverage table. |
+| `-r` | yes | Input RPF density file in TXT, JSON, JSONL, or compressed JSON format. |
+| `--ck` | yes | Control sample names, separated by commas, for example `CK1,CK2`. In consensus mode, the sample order defines biological replicate pairing with `--ip`. |
+| `--ip` | yes | Immunoprecipitation sample names, separated by commas, for example `IP1,IP2`. In consensus mode, the sample order defines biological replicate pairing with `--ck`. |
+| `-o` | yes | Output file prefix. |
 | `-n` | no | Total RPF count table used for normalization. If omitted, total counts are calculated from the input table. |
-| `--scale` | no | Normalization scale. Default: `1000000` for RPM. |
 | `-a` | no | Gene annotation file in TXT format. |
-| `--ck` | yes | Control sample names, separated by commas, for example `CK1,CK2`. |
-| `--ip` | yes | Immunoprecipitation sample names, separated by commas, for example `IP1,IP2`. |
-| `-m` | no | Minimum gene-level RPF coverage required for a gene to be retained. Default: `50`. |
-| `--corr` | no | Minimum replicate correlation required within each group. Default: `0.3`. |
-| `-f` | no | Missing-value filling mode. Default: `30`, meaning the first 30 amino-acid positions are used as the background region. Use `-1` for the current-gene mean, or `0` for the global gene mean. |
-| `-s` | no | Savitzky-Golay smoothing window size. The value should be odd. Default: `3`. |
-| `-k` | no | Savitzky-Golay polynomial order. Default: `1`. |
+| `--method` | no | Peak-calling method. `legacy` uses the corrected historical algorithm; `consensus` uses matched biological replicates and peak-overlap support. Default: `legacy`. |
+| `-m` | no | Minimum gene-level RPF count required in every sample for a gene to be retained. Default: `50`. |
+| `--corr` | no | Minimum replicate correlation required within each group. Method defaults are `0.3` for legacy and `0.5` for consensus. |
+| `--scale` | no | Normalization scale. Default: `1000000` for RPM. |
+| `-f` | no | Legacy-only control zero-fill mode: `0` uses the global CDS background, `-1` uses the current-gene CDS mean, and positive values use a leading-codon window. Default: `30`. |
+| `--back` | no | Leading CDS codons treated as background/non-callable region. Legacy mode supports `0` or `30`; consensus mode accepts any non-negative value. Default: `0`, meaning no 5-prime background filter is applied. |
+| `--bf` | no | Legacy-only switch for maximum-background fold filtering. Defaults to `True`. |
+| `-s` | no | Legacy-only Savitzky-Golay smoothing window size; use `0` to disable smoothing. The value should be a positive odd integer when smoothing is enabled. Default: `3`. |
+| `-k` | no | Legacy-only Savitzky-Golay polynomial order. Default: `1`. |
 | `-w` | no | Minimum binding peak width in amino acids. Default: `5`. |
 | `-e` | no | Enrichment threshold for peak height. Default: `2.0`. |
-| `-c` | no | Enrichment threshold used for collision/edge extension around a peak. Default: `1.5`. |
-| `-g` | no | Maximum allowed internal gap width inside a peak. Default: `1`. |
-| `-p` | no | Maximum allowed gap proportion inside a peak. Default: `0.2`. |
-| `--back` | no | Background-region mode for filtering enrichment. Default: `0`, meaning no 5-prime background filter is applied. |
-| `--bf` | no | Keep the background-fold filter enabled. In the current implementation this option defaults to `True`. |
+| `-c` | no | Lower enrichment threshold used to bridge/extend peak edges. `--collision` is retained as a compatibility alias. Default: `1.5`. |
+| `-g` | no | Maximum consecutive gap length retained within a candidate peak. Default: `1`. |
+| `-p` | no | Maximum gap proportion retained within a candidate peak. Default: `0.2`. |
+| `--all` | no | Legacy-only: retain all qualified peak-region permutations. By default, only the optimal non-overlapping peak set is retained. |
+| `--consensus-window` | no | Centered rolling-sum window in codons used for each matched replicate pair. Default: `5`. |
+| `--pseudocount` | no | RPM pseudocount added before local IP/control ratio calculation. Default: `0.1`. |
+| `--min-support` | no | Minimum fraction of matched replicate pairs supporting each consensus peak. Default: `1.0`. |
+| `--min-overlap` | no | Minimum replicate/consensus peak overlap in codons; `0` uses `ceil(width/2)`. Default: `0`. |
+| `--stop-trim` | no | Number of terminal CDS codons excluded from consensus QC and peak calling. Default: `5`. |
+| `--min-codon-rpf` | no | Consensus-only minimum mean raw RPF count per analyzed CDS codon required in every CK/IP sample; `0` disables this filter. Default: `0.0`. |
+| `--max-edge-extension` | no | Consensus-only maximum lower-threshold edge extension per peak side in codons. Default: `10`. |
 | `--up` | no | Number of upstream codons retrieved around each peak. Default: `10`. |
 | `--down` | no | Number of downstream codons retrieved around each peak. Default: `10`. |
-| `-o` | no | Output prefix. Default: `results`. |
-| `--all` | no | Output all peak regions, including overlapping candidates. By default, only the optimal non-overlapping peak is retained. |
-| `--rpm` | no | Registered command-line option for peak RPM output. The current implementation does not write a separate peak RPM file because that output block is commented out. |
-| `--ratio` | no | Output original enrichment ratios for each gene. |
-| `--fig` | no | Draw demo figures for peak scanning results. This can take a long time for large datasets. |
+| `--ratio` | no | Also output method-specific replicate enrichment ratios: all-pairwise ratios for legacy mode or matched local ratios for consensus mode. |
 
 ### Output
 
@@ -74,11 +80,8 @@ The output prefix is controlled by `-o`.
 | `<prefix>_peaks.bed` | BED-like peak regions for all reported peaks. |
 | `<prefix>_sig_peaks.bed` | BED-like peak regions with `P_Value < 0.05`. |
 | `<prefix>_peaks_sequence.txt` | Upstream, peak, and downstream nucleotide/amino-acid sequences. |
-| `<prefix>_peaks_ratio.txt` | Smoothed enrichment-ratio table and peak/collision annotations. |
-| `<prefix>_enrich_ratio.txt` | Original per-gene ratio output. Written only when `--ratio` is used. |
-| `<prefix>_peaks_scripts.m` | MATLAB script output for peak regions. |
-| `<prefix>_peaks_none_scripts.m` | MATLAB script output for genes without peaks or filtered genes. |
-| `<prefix>_figures/` | Optional figure directory. Written only when `--fig` is used. |
+| `<prefix>_peaks_ratio.txt` | Smoothed enrichment-ratio table with peak/collision annotations. It can be reused by `serp_plot` for figure generation. |
+| `<prefix>_enrich_ratio.txt` | Method-specific replicate enrichment ratios. Written only when `--ratio` is used. |
 
 ### Examples
 
@@ -120,22 +123,23 @@ serp_peak \
   -o SeRP_strict
 ```
 
-Export original ratio values and demo figures:
+Run the replicate-consensus caller with matched biological replicate pairs and export matched local ratios:
 
 ```bash
 serp_peak \
   -r RIBO_merged.txt \
   --ck CK1,CK2 \
   --ip IP1,IP2 \
+  --method consensus \
   --ratio \
-  --fig \
-  -o SeRP_with_figures
+  -o SeRP_consensus
 ```
 
 ### Notes
 
 - `--ck` and `--ip` must use the same sample prefixes as the frame-specific columns in the RPF table.
-- The smoothing window supplied to `-s` should be an odd integer when smoothing is enabled.
-- `--fig` can be slow because it draws per-gene peak-scanning figures.
-- The `--rpm` option is present in the command-line parser, but the separate peak-RPM output section is currently commented out in the implementation.
-- `--bf` currently defaults to `True`, so passing the flag does not switch the background-fold filter from `False` to `True`; it is already enabled.
+- `--method consensus` requires equal numbers of `--ck` and `--ip` samples (at least two matched biological replicate pairs), and the sample order defines the pairing.
+- The smoothing window supplied to `-s` should be `0` or a positive odd integer when smoothing is enabled.
+- `--method legacy` only supports `--back 0` or `--back 30`; consensus mode accepts any non-negative `--back` value.
+- `--bf` is a boolean switch that defaults to `True`, so the maximum-background fold filter is enabled by default; pass `--no-bf` to disable it.
+- Figure generation is no longer part of `serp_peak`; use the independent `serp_plot` command with the reusable enrichment profiles written to `<prefix>_peaks_ratio.txt`.

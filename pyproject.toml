@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "RiboParser"
-version = "0.3.13"
+version = "0.3.15"
 authors = [{ name = "Ren Shuchao", email = "rensc0718@163.com" }]
 description = "A pipeline for ribosome profiling data analysis"
 readme = "README.md"
@@ -74,8 +74,11 @@ rna_Density = "utils.rna_Density:main"
 rna_Offset = "utils.rna_Offset:main"
 
 # SeRP
-serp_overlap = "utils.serp_overlap:main"
 serp_peak = "utils.serp_peak:main"
+serp_plot = "utils.serp_plot:main"
+serp_summary = "utils.serp_summary:main"
+serp_overlap = "utils.serp_overlap:main"
+serp_metaplot = "utils.serp_metaplot:main"
 serp_properties = "utils.serp_properties:main"
 
 # smORF
