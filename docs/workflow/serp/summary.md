@@ -113,6 +113,13 @@ Overlap-mode figures (`--plot`):
 
 ### Examples
 
+First, move to the working directory:
+
+```bash
+cd ./sce/6.serp/03.summary
+```
+
+
 Summarize an overlap comparison with both PDF and PNG figures:
 
 ```bash

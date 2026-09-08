@@ -104,13 +104,17 @@ The stacked barplot summarizes the proportion of reads assigned to each database
 
 ## Step 3: Align mRNA reads with STAR
 
-Reads that fail to map to any reference (`*.noncrna.fq.gz`) are aligned to the genome with STAR. 
+First, move to the working directory:
 
 ```bash
 mkdir -p ./sce/4.ribo-seq/3.star/
 
 cd ./sce/4.ribo-seq/3.star/
+```
 
+Reads that fail to map to any reference (`*.noncrna.fq.gz`) are aligned to the genome with STAR. 
+
+```bash
 genome='../../1.reference/star-index/'
 threads=12
 

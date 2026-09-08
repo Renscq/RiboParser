@@ -103,24 +103,28 @@ The stacked barplot summarizes the proportion of reads assigned to each database
 
 ## Step 3: Align mRNA reads with STAR
 
-Reads that fail to map to any reference (`*.noncrna.fq.gz`) are aligned to the genome with STAR. 
+First, move to the working directory:
 
 ```bash
 mkdir -p ./sce/3.rna-seq/3.star/
 
 cd ./sce/3.rna-seq/3.star/
+```
 
+Then align single-end RNA-seq reads to the genome with STAR. (For paired-end libraries, the code needs to be adapted.)
+
+```bash
 genome='../../1.reference/star-index/'
 threads=12
 
-for fastq in ../2.bowtie/*.noncrna.fq.gz
+for fastq1 in ../2.bowtie/*_1.noncrna.fq.gz
 do
-  output=$(basename $fastq .noncrna.fq.gz)
+  output=$(basename $fastq1 _1.noncrna.fq.gz)
 
   STAR --runThreadN $threads \
     --readFilesCommand zcat \
     --genomeDir $genome \
-    --readFilesIn $fastq \
+    --readFilesIn $fastq1 $fastq2 \
     --outFileNamePrefix $output \
     --outSAMtype BAM Unsorted \
     --outFilterType BySJout \
@@ -154,7 +158,10 @@ RSEM estimates gene and isoform expression from the transcriptome-aligned BAM fi
 mkdir -p ./sce/3.rna-seq/4.quantification/
 
 cd ./sce/3.rna-seq/4.quantification/
+```
 
+
+```bash
 for bam in ../3.star/*Aligned.toTranscriptome.out.bam
 do
   rsem-calculate-expression -p 12 \

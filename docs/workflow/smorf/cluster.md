@@ -197,7 +197,10 @@ Annotated ORFs (`annotated_ORF` / `annotated_mORF`) are protected and always bec
 
 ```bash
 cd ./sce/5.smorf/02.cluster
+```
 
+
+```bash
 smorf_cluster \
   -i ../01.smorf_scan/gmx4.message.txt \
   --annotation ~/gmx/norm/gmx4.genepred \

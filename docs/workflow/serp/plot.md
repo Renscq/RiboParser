@@ -63,6 +63,13 @@ Each figure contains:
 
 ### Examples
 
+First, move to the working directory:
+
+```bash
+cd ./sce/6.serp/04.peak_plot
+```
+
+
 Draw a single transcript with the default settings:
 
 ```bash

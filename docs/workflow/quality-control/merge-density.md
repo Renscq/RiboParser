@@ -26,9 +26,17 @@ Scan the per-sample density files (or glob patterns) and create a sample list fo
 
 ### 1.2 Example
 
-```bash
-cd ./sce/4.ribo-seq/05.merge/
+First, move to the working directory:
 
+```bash
+cd ./sce/4.ribo-seq/5.riboparser/05.merge/
+```
+
+Then run `merge_dst_list` to scan the per-sample density files and create the sample list:
+
+```bash
+# Glob pattern
+merge_dst_list -l '*_rpf.jsonl.gz' -o RPF.file.list 
 # JSONL density files
 merge_dst_list -l '*_rpf.jsonl.gz' -o RPF.file.list
 
@@ -68,9 +76,15 @@ Merge all density files listed in the sample list into a single multi-sample den
 
 ### 2.2 Example
 
-```bash
-cd ./sce/4.ribo-seq/05.merge/
+If you started a new shell, move to the same working directory again:
 
+```bash
+cd ./sce/4.ribo-seq/5.riboparser/05.merge/
+```
+
+Then run `rpf_Merge` on the sample list to produce the merged density file:
+
+```bash
 # JSONL input -> merged JSONL (default)
 rpf_Merge -l RPF.file.list -o SRR
 

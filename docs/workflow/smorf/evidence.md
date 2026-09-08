@@ -188,14 +188,20 @@ A reliable smORF requires a reliable family with a supported or prior-compatible
 
 ## Examples
 
+First, move to the working directory:
+
 ```bash
 cd ./sce/5.smorf/03.evidence
+```
 
+Evaluate Ribo-seq translation evidence for the clustered smORF families, using the cluster output from ../02.cluster and the scanner output from ../01.scanner
+
+```bash
 smorf_evidence \
-  -i ../02.smorf_cluster/gmx4.reliable.family.message.txt \
-  -M ../02.smorf_cluster/gmx4.reliable.family.members.txt \
-  --orf-source ../01.smorf_scan/gmx4.message.txt \
-  --orf-genepred ../01.smorf_scan/gmx4.genePred \
+  -i ../02.cluster/gmx4.reliable.family.message.txt \
+  -M ../02.cluster/gmx4.reliable.family.members.txt \
+  --orf-source ../01.scanner/gmx4.message.txt \
+  --orf-genepred ../01.scanner/gmx4.genePred \
   --density-list ribo.bedgraph.list \
   --evidence-mode canonical \
   --positive-quantile 0.20 \

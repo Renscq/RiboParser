@@ -80,13 +80,17 @@ YBR217W
 ```
 
 
-Draw the pasuing-site plots for the four genes in `gene.list`:
+First, move to the working directory:
 
 ```bash
-cd ./sce/4.ribo-seq/19.pause_site_plot/
+cd ./sce/4.ribo-seq/5.riboparser/19.pause_site_plot/
+```
 
+Then run `rpf_PSplot` to draw the pausing-site plots for the four genes in `gene.list` on the merged RPF density file:
+
+```bash
 rpf_PSplot \
-    -i ../codon_odd_ratio/sce_codon_local_pause.txt \
+    -i ../18.odd_ratio/sce_codon_local_pause.txt \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \
     --target-list gene.list \
     --view gene \

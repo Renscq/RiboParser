@@ -61,12 +61,18 @@ The inputs are the merged density files produced by `rpf_Merge` (see [4.5.5 Merg
 
 ### 1.2 Example
 
-```bash
-cd ./sce/4.ribo-seq/13.codon_decoding_time/
+First, move to the working directory:
 
+```bash
+cd ./sce/4.ribo-seq/5.riboparser/13.codon_decoding_time/
+```
+
+Then run `rpf_CDT` on the merged RPF and RNA density files:
+
+```bash
 rpf_CDT \
     --rpf ../05.merge/sce_rpf_merged.jsonl.gz \
-    --rna ../../rna/05.merge/sce_rna_merged.jsonl.gz \
+    --rna ../../../3.rna/5.riboparser/05.merge/sce_merged.jsonl.gz \
     -o sce \
     -s P \
     -f all \

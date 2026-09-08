@@ -76,9 +76,15 @@ YHL035C-t26_1
 YHL034C-t26_1
 ```
 
-```bash
-cd ./sce/4.ribo-seq/16.cumulative_of_cov
+First, move to the working directory:
 
+```bash
+cd ./sce/4.ribo-seq/5.riboparser/16.cumulative_of_cov/
+```
+
+Then run `rpf_Cumulative_CoV` on the merged RPF density file:
+
+```bash
 rpf_Cumulative_CoV \
     -r ../05.merge/sce1_rpf_merged.jsonl.gz \
     -l gene.list \

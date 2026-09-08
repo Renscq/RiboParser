@@ -41,9 +41,15 @@ Step 3: Merge gene/read saturation
 
 ### 1.2 Example
 
-```bash
-cd ./sce/4.ribo-seq/01.qc/
+First, move to the working directory:
 
+```bash
+cd ./sce/4.ribo-seq/5.riboparser/01.qc/
+```
+
+Then run `rpf_Check` on each transcriptome-aligned BAM file:
+
+```bash
 for bam in ../../3.star/*Aligned.toTranscriptome.out.bam
 do
     prefix_name=$(basename ${bam} Aligned.toTranscriptome.out.bam)
@@ -100,6 +106,8 @@ The gene and read saturation curves evaluate whether sequencing depth is suffici
 
 ### 2.2 Example
 
+Merge the read-length distribution tables of all samples:
+
 ```bash
 merge_length \
     -l *_length_distribution.txt \
@@ -132,6 +140,8 @@ The dot-line plot and heatmap visualize the read-length profiles of all samples 
 | `-o` | Yes | Output prefix. The output table is `<prefix>_gene_saturation.txt`. |
 
 ### 3.2 Example
+
+Merge the gene saturation files of all samples:
 
 ```bash
 merge_saturation \

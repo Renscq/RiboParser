@@ -28,9 +28,15 @@ Calculate the frame-specific RPF distribution from a merged density file.
 
 ### 1.2 Example
 
-```bash
-cd ./sce/4.ribo-seq/06.periodicity/
+First, move to the working directory:
 
+```bash
+cd ./sce/4.ribo-seq/5.riboparser/06.periodicity/
+```
+
+Then run `rpf_Periodicity` on the merged RPF density file to calculate the frame-specific RPF distribution:
+
+```bash
 rpf_Periodicity \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \
     -m 30 \
@@ -75,6 +81,8 @@ Merge periodicity tables from multiple samples or analyses into a single table.
 | `-o`, `--output` | Yes | Output prefix. The merged table is written to `<prefix>_periodicity.txt`. |
 
 ### 2.2 Example
+
+Still in the same working directory, merge the periodicity tables of all samples:
 
 ```bash
 merge_period \

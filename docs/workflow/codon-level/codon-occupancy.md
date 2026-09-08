@@ -60,9 +60,15 @@ The input is the merged density file produced by `rpf_Merge` (see [4.5.5 Merge d
 
 ### 1.2 Example
 
-```bash
-cd ./sce/4.ribo-seq/12.codon_occupancy/
+First, move to the working directory:
 
+```bash
+cd ./sce/4.ribo-seq/5.riboparser/12.codon_occupancy/
+```
+
+Then run `rpf_Occupancy` on the merged RPF density file:
+
+```bash
 rpf_Occupancy \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \
     -o sce \

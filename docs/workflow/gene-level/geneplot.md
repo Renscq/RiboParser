@@ -60,9 +60,15 @@ The input is the merged density file produced by `rpf_Merge` (see [4.5.5 Merge d
 
 ### 1.2 Example
 
-```bash
-cd ./sce/04.ribo-seq/23.geneplot
+First, move to the working directory:
 
+```bash
+cd ./sce/4.ribo-seq/5.riboparser/23.geneplot/
+```
+
+Then run `rpf_Geneplot` on the merged density file to draw the IGV-like gene-level density profiles:
+
+```bash
 rpf_Geneplot \
     -r ../05.merge/sce1_rpf_merged.jsonl.gz \
     -g YHL001W-t26_1 \

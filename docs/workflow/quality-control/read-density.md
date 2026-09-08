@@ -40,9 +40,15 @@ Both commands write a gzip-compressed compact JSONL by default, which carries a 
 
 ### 1.2 Example
 
-```bash
-cd ./sce/4.ribo-seq/04.density/
+First, move to the working directory:
 
+```bash
+cd ./sce/3.rna-seq/5.riboparser/04.density/
+```
+
+Then run `rna_Density` for each sample to convert its BAM into the transcript-level RNA density file:
+
+```bash
 for bam in ../01.qc/*.bam
 do
     prefix_name=$(basename ${bam} .bam)
@@ -93,6 +99,14 @@ done
 
 ### 2.2 Example
 
+First, move to the working directory:
+
+```bash
+cd ./sce/4.ribo-seq/5.riboparser/04.density/
+```
+
+Then, run `rpf_Density` for each sample to convert its BAM into the P-site density file:
+
 ```bash
 for bam in ../01.qc/*.bam
 do
@@ -103,6 +117,7 @@ do
         -t ../../../1.reference/norm/gene.norm.txt \
         -s ../../../1.reference/norm/gene.norm.rna.fa \
         -p ../03.offset/${prefix_name}_SSCBM_offset.txt \
+        -r \
         -o ${prefix_name} \
         -l \
         -m 27 \

@@ -83,9 +83,15 @@ The matrix contains 11 metadata columns followed by one column per sample (in de
 
 ### Quantify all-frame density across samples
 
+First, move to the working directory:
+
 ```bash
 cd ./sce/5.smorf/04.quant
+```
 
+Quantify the P-site density of all frames for the reliable smORFs across all samples
+
+```bash
 smorf_quant \
   -g gmx4.smorf.reliable_smorf.genepred \
   -l ribo.bedgraph.list \
@@ -97,6 +103,7 @@ smorf_quant \
 ### Quantify frame-0 density and include the stop codon
 
 ```bash
+# Quantify frame-0 P-site density and include the complete terminal stop codon
 smorf_quant \
   -g gmx4.smorf.reliable_smorf.genepred \
   -l ribo.bedgraph.list \

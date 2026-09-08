@@ -70,9 +70,15 @@ The input is a density file produced by `rpf_Merge` (see [4.5.5 Merge density](.
 
 ### 1.2 Example
 
-```bash
-cd ./sce/4.ribo-seq/15.coefficient_of_variation/
+First, move to the working directory:
 
+```bash
+cd ./sce/4.ribo-seq/5.riboparser/15.coefficient_of_variation/
+```
+
+Then run `rpf_CoV` on the merged RPF density file, with the group design read from `design.txt`:
+
+```bash
 rpf_CoV \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \
     -f 0 \

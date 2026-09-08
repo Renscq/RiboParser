@@ -121,8 +121,15 @@ ATGACTGCAATTTTAGAGAGACGCGAGAGCGAAAGCCTATGGGGTCGCTTCTGTAACTGG
 
 ### Use the common scanning setup on a large genome
 
+First, move to the working directory:
+
 ```bash
 cd ./sce/5.smorf/01.scanner
+```
+
+Scan candidate smORFs from the soybean genome FASTA and the gmx4 genePred annotation
+
+```bash
 
 smorf_scanner \
   --genome ~/gmx/genome/GCF_000004515.6_Glycine_max_v4.0_genomic.fna \

@@ -30,9 +30,15 @@ Quantify transcript-level RPF density from a merged density file and generate no
 
 ### 1.2 Example
 
-```bash
-cd ./sce/04.ribo-seq/10.quantification/
+First, move to the working directory:
 
+```bash
+cd ./sce/4.ribo-seq/5.riboparser/10.quantification/
+```
+
+Then run `rpf_Quant` on the merged RPF density file to quantify transcript-level RPF counts and generate the normalized abundance tables:
+
+```bash
 rpf_Quant \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \
     --tis 0 \
@@ -112,6 +118,8 @@ Merge quantification tables from multiple samples or analyses into a single matr
 | `-o`, `--output` | Yes | Output prefix. The merged table is written to `<prefix>_rpf_quant.txt`. |
 
 ### 2.2 Example
+
+Then run `merge_quant` in the same working directory to merge the quantification tables of multiple samples or analyses into one matrix:
 
 ```bash
 merge_quant \

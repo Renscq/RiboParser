@@ -40,9 +40,15 @@ Step 2: Merge digestion results
 
 ### 1.2 Example
 
-```bash
-cd ./sce/4.ribo-seq/02.digestion/
+First, move to the working directory:
 
+```bash
+cd ./sce/4.ribo-seq/5.riboparser/02.digestion/
+```
+
+Then run `rpf_Digest` for each sample on its filtered BAM file under `../01.qc`:
+
+```bash
 for bam in ../01.qc/*.bam
 do
     prefix_name=$(basename ${bam} .bam)
@@ -96,8 +102,9 @@ The sequence logos show the nucleotide preference around the 5' and 3' read ends
 
 ### 2.2 Example
 
-```bash
+Merge the 5' and 3' digestion PWM files of all samples:
 
+```bash
 merge_digestion \
     -l *_5end_pwm.txt *_3end_pwm.txt \
     -o RIBO

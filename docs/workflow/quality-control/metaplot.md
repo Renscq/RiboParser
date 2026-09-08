@@ -37,9 +37,15 @@ Calculate metaplot profiles around TIS/TTS from a merged density file.
 
 ### 1.2 Example
 
-```bash
-cd ./sce/4.ribo-seq/07.metaplot/
+First, move to the working directory:
 
+```bash
+cd ./sce/4.ribo-seq/5.riboparser/07.metaplot/
+```
+
+Then run `rpf_Metaplot` on the merged RPF density file to calculate the TIS/TTS metaplot profiles:
+
+```bash
 rpf_Metaplot \
     -t /path/to/norm/sce.genepred \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \
@@ -86,6 +92,8 @@ Merge metaplot tables from multiple samples or analyses into a single table.
 | `-o`, `--output` | Yes | Output prefix. The merged table is written to `<prefix>_metagene.txt`. |
 
 ### 2.2 Example
+
+Still in the same working directory, merge the metaplot tables of all samples:
 
 ```bash
 merge_metagene \

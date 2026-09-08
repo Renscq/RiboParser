@@ -28,26 +28,44 @@ RNA_merged.txt
 
 | Section | Command | Purpose |
 |---|---|---|
-| 4.7.1 | `rpf_Pausing` | Calculate relative codon pausing scores from codon-level RPF density. |
-| 4.7.2 | `rpf_Occupancy` | Calculate absolute and relative codon occupancy. |
-| 4.7.3 | `rpf_CDT` | Estimate codon decoding time by combining Ribo-seq and RNA-seq density. |
-| 4.7.4 | `rpf_CST` | Estimate codon selection time using iterative Ribo-seq/RNA-seq codon-level calculations. |
-| 4.7.5 | `rpf_CoV` | Quantify coefficient of variation across CDS regions. |
-| 4.7.6 | `rpf_Cumulative_CoV` | Quantify cumulative coefficient of variation along the CDS. |
-| 4.7.7 | `rpf_Meta_Codon` | Extract and plot local RPF density around selected codons or codon motifs. |
-| 4.7.8 | `rpf_Odd_Ratio` | Compare codon-associated RPF enrichment between control and treatment samples. |
-| 4.7.9 | `rpf_PSplot` | Visualize the detected local pause sites on the raw RPF profiles. |
-s
-## Recommended order
+| 4.7.1 codon pausing scores | `rpf_Pausing` | Calculate relative codon pausing scores from codon-level RPF density. |
+| 4.7.2 codon occupancy | `rpf_Occupancy` | Calculate absolute and relative codon occupancy. |
+| 4.7.3 codon decoding time | `rpf_CDT` | Estimate codon decoding time by combining Ribo-seq and RNA-seq density. |
+| 4.7.4 codon selection time | `rpf_CST` | Estimate codon selection time using iterative Ribo-seq/RNA-seq codon-level calculations. |
+| 4.7.5 coefficient of variation | `rpf_CoV` | Quantify coefficient of variation across CDS regions. |
+| 4.7.6 cumulative CoV | `rpf_Cumulative_CoV` | Quantify cumulative coefficient of variation along the CDS. |
+| 4.7.7 codon metaplot | `rpf_Meta_Codon` | Extract and plot local RPF density around selected codons or codon motifs. |
+| 4.7.8 codon odd ratio | `rpf_Odd_Ratio` | Compare codon-associated RPF enrichment between control and treatment samples. |
+| 4.7.9 codon pause site | `rpf_PSplot` | Visualize the detected local pause sites on the raw RPF profiles. |
 
-A typical codon-level analysis can be organized as follows:
+## Suggested directory structure
 
-1. Run `rpf_Pausing` and `rpf_Occupancy` to obtain basic codon-level density summaries.
-2. Run `rpf_CDT` or `rpf_CST` when matched RNA-seq density is available.
-3. Run `rpf_CoV` or `rpf_Cumulative_CoV` to evaluate coverage-dependent variability.
-4. Run `rpf_Meta_Codon` for focused analysis around selected codons or motifs.
-5. Run `rpf_Odd_Ratio` when comparing codon-level enrichment between two groups.
-6. Run `rpf_PSplot` to visualize the detected pause sites on the raw RPF profiles.
+The codon-level modules are organized under `sce/4.ribo-seq/5.riboparser/` (see the project layout in [3 New project](../../new-project.md)). Sub-directories `01.qc` to `10.quantification` are created by the quality-control and gene-level modules; create the codon-level ones (`11`–`19`, matching the `4.7.1`–`4.7.9` sections above) as follows:
+
+```bash
+mkdir -p 11.pausing_score 12.codon_occupancy 13.codon_decoding_time \
+         14.codon_selection_time 15.coefficient_of_variation 16.cumulative_of_cov \
+         17.meta_codon 18.odd_ratio 19.pause_site_plot
+```
+
+## Input dependency
+
+Most codon-level modules consume the merged RPF density matrix produced by `rpf_Merge` in `05.merge` (see [4.5.5 Merge density](../quality-control/merge-density.md)); only `rpf_CDT` and `rpf_CST` additionally require a matched merged RNA density matrix from the RNA-seq branch. The per-module input and output are summarized below:
+
+| Section | Main input | Main output |
+|---|---|---|
+| Pausing | merged RPF density (`-r`) | relative codon pausing scores; per-sample tables and figures |
+| Occupancy | merged RPF density (`-r`) | absolute and relative codon occupancy tables |
+| CDT | merged RPF density (`--rpf`) + merged RNA density (`--rna`) | codon decoding-time tables, sample correlation, heatmaps, and rank plots |
+| CST | merged RPF density + merged RNA density | codon selection-time tables and figures |
+| CoV | merged RPF density (`-r`); optional sample-group table (`-g`) | transcript CoV tables, group comparison/fitting tables, and plots |
+| Cumulative CoV | merged RPF density (`-r`); optional transcript list (`-l`) | meta cumulative-CoV tables, meta/support curves, and per-transcript figures |
+| Codon metaplot | merged RPF density (`-r`); optional codon/motif list (`-c`) | per-motif meta density and sequence-context tables and line plots |
+| Odd ratio | merged RPF density (`-r`) + control and treatment sample names (`-c`/`-t`) | site-level local-pause table, codon-level summary, and figures |
+| Pause-site plot | `rpf_Odd_Ratio` site table (`-i`) + merged RPF density (`-r`); optional target gene list (`--target-list`) | per-gene, per-sample PSplot figures; optional pause-metrics table (`--export-metrics`) |
+
+Note that `rpf_PSplot` depends on the site-level table written by `rpf_Odd_Ratio`, so run section 4.7.8 before 4.7.9. For modules that support two input formats, both the compact JSONL/JSONL.GZ file (for example `sce_rpf_merged.jsonl.gz`) and the plain TXT table are accepted.
+
 
 ## Notes
 

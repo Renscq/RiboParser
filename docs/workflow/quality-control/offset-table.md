@@ -36,14 +36,28 @@ Step 4: Merge offset tables
 
 ### 1.2 Example
 
-```bash
-cd ./sce/4.ribo-seq/03.offset/
+First, move to the working directory:
 
-rna_Offset \
+```bash
+cd ./sce/3.rna-seq/5.riboparser/03.offset/
+```
+
+Then run `rna_Offset` for each sample to generate the uniform RNA-seq offset table:
+
+```bash
+for bam in ../01.qc/*.bam
+do
+    prefix_name=$(basename ${bam} .bam)
+
+    rna_Offset \
     -m 25 \
     -M 150 \
     -e 12 \
-    -o ${prefix_name}
+    -o ${prefix_name} \
+    &> ${prefix_name}.log
+done
+
+
 ```
 
 ### 1.3 Output
@@ -75,6 +89,14 @@ rna_Offset \
 | `-d / --detail` | No | Output detailed offset information (TIS/TTS read-end profiles). Disabled by default. |
 
 ### 2.2 Example
+
+Still in the same working directory, run `rpf_Offset` for each sample to detect the P-site offsets and write the SSCBM and RSBM offset tables:
+
+First, move to the working directory:
+
+```bash
+cd ./sce/4.ribo-seq/5.riboparser/03.offset/
+```
 
 ```bash
 for bam in ../01.qc/*.bam
@@ -142,6 +164,8 @@ SSCBM offset heatmap after scaling (`_scale`):
 
 ### 3.2 Example
 
+Still in the same working directory, run `rpf_Offset_RSBM` for a sample to directly compute the RSBM offset table:
+
 ```bash
 rpf_Offset_RSBM \
     -b ${bam} \
@@ -175,6 +199,8 @@ Merges RSBM or SSCBM offset tables from multiple samples into a single table. Th
 | `-l / --list` | Yes | Input offset files, such as `*_RSBM_offset.txt` or `*_SSCBM_offset.txt`. Multiple files can be provided. |
 | `-o` | Yes | Output prefix. The output table is `<prefix>_offset.txt`. |
 
+Merge the RSBM and SSCBM offset tables of all samples:
+
 ```bash
 merge_offset -l *_RSBM_offset.txt -o RIBO_RSBM
 merge_offset -l *_SSCBM_offset.txt -o RIBO_SSCBM
@@ -193,6 +219,8 @@ Merges the detailed TIS/TTS read-end profiles from multiple samples into a singl
 |---|---|---|
 | `-l / --list` | Yes | Input end files, such as `*_tis_5end.txt`, `*_tis_3end.txt`, `*_tts_5end.txt`, and `*_tts_3end.txt`. |
 | `-o` | Yes | Output prefix. The output table is `<prefix>_offset_end.txt`. |
+
+Merge the detailed TIS/TTS read-end profiles of all samples:
 
 ```bash
 merge_offset_detail -l *end.txt -o RIBO

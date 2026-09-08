@@ -42,9 +42,15 @@ Normalize transcripts into bins and generate metagene coverage profiles from a m
 
 ### 1.2 Example
 
-```bash
-cd ./sce/4.ribo-seq/08.coverage/
+First, move to the working directory:
 
+```bash
+cd ./sce/4.ribo-seq/5.riboparser/08.coverage/
+```
+
+Then run `rpf_Coverage` on the merged RPF density file to generate the metagene coverage profiles:
+
+```bash
 rpf_Coverage \
     -t /path/to/norm/sce.genepred \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \
@@ -112,6 +118,8 @@ Calculate the percentage of valid CDS codons covered by RPFs for each transcript
 
 ### 2.2 Example
 
+Still in the same working directory, run `rpf_Percent` to calculate the per-transcript CDS coverage percentage:
+
 ```bash
 rpf_Percent \
     -r ../05.merge/sce_rpf_merged.jsonl.gz \
@@ -152,6 +160,8 @@ Merge mean coverage files from multiple samples or analyses into a single table.
 | `-o`, `--output` | Yes | Output prefix. The merged table is written to `<prefix>_mean_coverage.txt`. |
 
 ### 3.2 Example
+
+Merge the mean coverage files of all samples:
 
 ```bash
 merge_coverage \

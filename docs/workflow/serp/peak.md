@@ -85,6 +85,13 @@ The output prefix is controlled by `-o`.
 
 ### Examples
 
+First, move to the working directory:
+
+```bash
+cd ./sce/6.serp/01.peak
+```
+
+
 Run peak detection with two control and two IP samples:
 
 ```bash

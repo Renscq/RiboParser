@@ -172,6 +172,13 @@ Example figures:
 
 ### Examples
 
+First, move to the working directory:
+
+```bash
+cd ./sce/6.serp/06.properties
+```
+
+
 Calculate sequence properties for CDS sequences:
 
 ```bash
