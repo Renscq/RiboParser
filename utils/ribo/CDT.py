@@ -3,7 +3,7 @@
 
 # Author: Rensc
 # Date: 2026-07-13
-# Version: 0.2.8-dev.001
+# Version: 0.2.8-dev.002
 # Function: Calculate sample-specific codon decoding time from paired RPF and RNA density data.
 # Input: RPF and RNA density files in JSONL or TXT format and an optional transcript filter.
 # Output: Codon decoding time tables, outlier records, summary JSON, correlation, heatmap, and rank plots.
@@ -481,14 +481,60 @@ class CodonDecodingTime(object):
         self.codon_cdt.sort_values(["Abbr", "codon", "Sample"], inplace=True)
 
     # ------------------------------------------------------------------
+    # Output formatting
+    # ------------------------------------------------------------------
+
+    def _format_cdt_wide(self) -> pd.DataFrame:
+        """Convert codon-level CDT results from long to wide format."""
+
+        base_columns = [
+            "codon",
+            "AA",
+            "Abbr",
+        ]
+
+        value_columns = [
+            "CodonCount",
+            "ValidCodonCount",
+            "RPFCount",
+            "NormalizedRPFSum",
+            "AbsoluteCDT",
+            "NormalizedCDT",
+            "RelativeCDT",
+            "NormalizedRelativeCDT",
+        ]
+
+        wide = self.codon_cdt.pivot_table(
+            index=base_columns,
+            columns="Sample",
+            values=value_columns,
+            aggfunc="first",
+        )
+
+        wide.columns = [
+            "{}_{}".format(sample, metric)
+            for metric, sample in wide.columns
+        ]
+
+        return wide.reset_index()
+
+    # ------------------------------------------------------------------
     # Output
     # ------------------------------------------------------------------
 
     def output_tables(self) -> None:
         """Write codon-level and optional detailed CDT tables."""
-        out_cdt = self.output + "_cdt.txt"
-        self.codon_cdt.to_csv(out_cdt, sep="\t", index=False)
+
+        wide_cdt = self._format_cdt_wide()
+
+        out_cdt = self.output + "_codon_decoding_time.txt"
+        wide_cdt.to_csv(out_cdt, sep="\t", index=False)
         self.output_files["cdt_table"] = out_cdt
+
+        # Keep long-format CDT table for compatibility and debugging.
+        out_cdt_long = self.output + "_codon_decoding_time.long.txt"
+        self.codon_cdt.to_csv(out_cdt_long, sep="\t", index=False)
+        self.output_files["cdt_long_table"] = out_cdt_long
 
         if self.output_all:
             out_position = self.output + "_cdt_position.txt"

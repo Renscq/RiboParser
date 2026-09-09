@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 # Author: Rensc
-# Date: 2026-07-13
-# Version: 0.2.8-dev.001
+# Date: 2026-09-10
+# Version: dev002
 # Function: Calculate sample-specific codon selection time from paired RPF and RNA density data.
 # Input: RPF and RNA density files in JSONL or TXT format and an optional transcript filter.
 # Output: Codon selection time tables, outlier records, summary JSON, correlation, heatmap, rank, and convergence plots.
@@ -592,7 +592,54 @@ class CodonSelectiveTime(object):
 
     # Backward-compatible method names.
     calc_cst = calculate_cst
-    format_cst_results = lambda self: None
+
+    def format_cst_results(self) -> pd.DataFrame:
+        """Convert the final long-format CST table to codon-wide format."""
+        if self.cst is None:
+            raise ValueError("CST has not been calculated.")
+
+        value_columns = [
+            "CodonCount",
+            "ValidCodonCount",
+            "RPFCount",
+            "RNACount",
+            "RPFProportion",
+            "InitialRNAProportion",
+            "AbsoluteCST",
+            "IterationsCompleted",
+            "Converged",
+            "RelativeCST",
+        ]
+        sample_order = [pair[0] for pair in self.sample_pairs]
+        annotation = self.codon_annotation.reset_index().rename(columns={"codon": "Codon"})
+        annotation = annotation[["Codon", "AA", "Abbr"]].copy()
+        annotation["_codon_order"] = pd.Categorical(
+            annotation["Codon"],
+            categories=self.codon_order,
+            ordered=True,
+        )
+
+        wide_parts = [annotation]
+        for sample in sample_order:
+            sample_table = self.cst.loc[
+                self.cst["Sample"] == sample,
+                ["Codon"] + value_columns,
+            ].copy()
+            rename_map = {
+                metric: "{}_{}".format(sample, metric)
+                for metric in value_columns
+            }
+            sample_table.rename(columns=rename_map, inplace=True)
+            wide_parts.append(sample_table)
+
+        wide = wide_parts[0]
+        for sample_table in wide_parts[1:]:
+            wide = wide.merge(sample_table, on="Codon", how="left", validate="one_to_one")
+
+        wide.sort_values("_codon_order", inplace=True)
+        wide.drop(columns="_codon_order", inplace=True)
+        wide.reset_index(drop=True, inplace=True)
+        return wide
 
     # ------------------------------------------------------------------
     # Output
@@ -604,7 +651,7 @@ class CodonSelectiveTime(object):
             raise ValueError("CST has not been calculated.")
 
         final_file = self.output + "_codon_selection_time.txt"
-        self.cst.to_csv(final_file, sep="\t", index=False)
+        self.format_cst_results().to_csv(final_file, sep="\t", index=False)
         self.output_files["cst_table"] = final_file
 
         iterative_file = self.output + "_iterative_codon_selection_time.txt"
@@ -630,7 +677,7 @@ class CodonSelectiveTime(object):
         summary = OrderedDict(
             [
                 ("tool", "rpf_CST"),
-                ("version", "0.2.8-dev.001"),
+                ("version", "dev002"),
                 ("input_rpf", os.path.abspath(self.rpf_file)),
                 ("input_rna", os.path.abspath(self.rna_file)),
                 ("rpf_format", self.rpf_format),
