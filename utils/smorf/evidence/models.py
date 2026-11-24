@@ -431,6 +431,10 @@ class EngineResult:
     reliable_smorfs: int
     sample_count: int
     effective_workers: int
+    priority_output: str = ""
+    candidate_evidence_output: str = ""
+    cds_overlap_output: str = ""
+    priority_smorfs: int = 0
 
 
 @dataclass(frozen=True, slots=True)

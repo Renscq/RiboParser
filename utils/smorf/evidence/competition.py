@@ -16,6 +16,7 @@ import csv
 import gzip
 import sqlite3
 from collections import defaultdict
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -106,6 +107,7 @@ def _apply_nested_competition(
     final_master_path: Path,
     connection: sqlite3.Connection,
     config: EngineConfig,
+    unresolved_splice_path: Callable[[str, str], bool] | None = None,
 ) -> tuple[dict[str, int], dict[str, int]]:
     """Assign transcript units and suppress explainable nested ORFs."""
     connection.execute("DROP TABLE IF EXISTS temp.candidate_calls")
@@ -136,6 +138,7 @@ def _apply_nested_competition(
         """
     )
     batch: list[tuple[Any, ...]] = []
+    unresolved_paths: set[str] = set()
     with gzip.open(raw_master_path, "rt", encoding="utf-8") as handle:
         reader = csv.DictReader(handle, delimiter="\t")
         for row in reader:
@@ -145,6 +148,9 @@ def _apply_nested_competition(
             if int(row.get("complete_candidate_count", "0") or 0) < 1 and not row.get(
                 "quant_primary"
             ):
+                continue
+            if unresolved_splice_path and unresolved_splice_path(row["family_id"], provisional_primary):
+                unresolved_paths.add(row["family_id"])
                 continue
             batch.append(
                 (
@@ -430,7 +436,10 @@ def _apply_nested_competition(
         )
         writer.writeheader()
         for row in reader:
-            status = competition.get(row["family_id"])
+            if row["family_id"] in unresolved_paths:
+                status = ("SplicePathUnresolved", "", 0.0, "NotEvaluated", "no_replicated_diagnostic_p_sites")
+            else:
+                status = competition.get(row["family_id"])
             if status is not None:
                 row["nested_competition_status"] = status[0]
                 row["dominant_parent_orf"] = status[1]

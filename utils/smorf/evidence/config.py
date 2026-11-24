@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Final
 
-SCHEMA_VERSION: Final[int] = 9
+SCHEMA_VERSION: Final[int] = 10
 
 STOP_CODONS: Final[frozenset[str]] = frozenset({"TAA", "TAG", "TGA"})
 

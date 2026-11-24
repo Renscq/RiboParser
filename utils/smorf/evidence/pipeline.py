@@ -30,11 +30,20 @@ from .calibration import (
     calibrate_samples,
     resolve_length_models,
 )
+from .cds_overlap import (
+    CONTEXT_COLUMNS,
+    EvidenceContext,
+    cds_sample_columns,
+    cds_sample_evidence,
+    write_cds_overlap_audit,
+)
 from .competition import _apply_nested_competition
 from .config import ADVANCED_DEFAULTS
 from .extent import _output_columns
+from .geometry import _geometry_blocks
 from .input import (
     _chromosomes,
+    _coding_nt_length,
     _effective_workers,
     _run_signature,
     build_density_cache,
@@ -55,6 +64,87 @@ from .output import (
     _is_annotated_category,
     _process_chromosome,
 )
+from .reporting import (
+    CANDIDATE_COLUMNS,
+    DensityProfiles,
+    SplicePath,
+    SplicePathEvidence,
+    coding_positions,
+    priority_sample_pass,
+    splice_sample_pass,
+    summarize_counts,
+)
+
+
+def _audit_export_candidate(
+    row: dict[str, str],
+    geometry: sqlite3.Row,
+    writer: csv.DictWriter,
+    profiles: DensityProfiles,
+    context: EvidenceContext,
+    path: SplicePath,
+    config: EngineConfig,
+) -> str:
+    """Write per-sample evidence and return the selected ORF's export tier."""
+    orf_id, transcript_id = row["quant_primary"], geometry["transcript_id"]
+    chrom, strand = geometry["chrom"], geometry["strand"]
+    blocks = _geometry_blocks(geometry)
+    positions = coding_positions(blocks, strand, _coding_nt_length(dict(geometry)))
+    masks, metadata = context.describe(
+        chrom, strand, blocks, positions, {row["gene_id"]}, {transcript_id}, {orf_id},
+    )
+    priority_samples: list[str] = []
+    splice_samples: list[str] = []
+    sample_rows: list[dict[str, object]] = []
+    for sample, counts in profiles.counts(chrom, strand, positions):
+        detail: dict[str, object] = {"sample": sample, "group": profiles.groups[sample]}
+        sample_rows.append(detail)
+        if counts is None:
+            continue
+        summary = summarize_counts(counts)
+        priority_pass = priority_sample_pass(summary, geometry["aa_length"])
+        if priority_pass:
+            priority_samples.append(sample)
+        detail.update(
+            total_rpf=summary.total, frame0_rpf=summary.frame0, frame0_ratio=summary.frame0_ratio,
+            frame0_codons=summary.frame0_codons, frame0_segments=summary.frame0_segments,
+            priority_sample_pass=int(priority_pass),
+        )
+        if path.role == "Branch":
+            rpf, occupied, splice_pass = splice_sample_pass(
+                counts, positions, path.diagnostic_positions, config.min_window_rpf,
+            )
+            detail.update(
+                splice_diagnostic_frame0_rpf=rpf, splice_diagnostic_frame0_codons=occupied,
+                splice_sample_pass=int(splice_pass),
+            )
+            if splice_pass:
+                splice_samples.append(sample)
+        if masks is not None:
+            detail.update(cds_sample_columns(cds_sample_evidence(counts, masks)))
+
+    if path.role == "SharedBody" or (
+        path.role == "Branch" and len(splice_samples) < config.reliable_sample
+    ):
+        tier = "SplicePathUnresolved"
+    elif len(priority_samples) >= config.reliable_sample:
+        tier = "Priority"
+    else:
+        tier = "Exploratory"
+    diagnostic_codons = len(set(positions[::3]).intersection(path.diagnostic_positions))
+    common = {
+        "orf_id": orf_id, "family_id": row["family_id"], "gene_id": row["gene_id"],
+        "transcript_id": transcript_id, "category": geometry["category"], "chrom": chrom,
+        "strand": strand, "start0": int(positions[0]), "aa_length": geometry["aa_length"],
+        "exon_starts": geometry["exon_starts"], "exon_ends": geometry["exon_ends"],
+        "priority_supporting_samples": ",".join(priority_samples), "candidate_tier": tier,
+        "splice_path_role": path.role, "splice_scaffold_ids": path.scaffolds,
+        "splice_diagnostic_codons": diagnostic_codons, "splice_supporting_samples": ",".join(splice_samples),
+        **metadata,
+    }
+    for detail in sample_rows:
+        writer.writerow({key: _format_value(value) for key, value in {**common, **detail}.items()})
+    return tier
 
 
 def _merge_outputs(
@@ -65,6 +155,9 @@ def _merge_outputs(
     sample_count: int,
     effective_workers: int,
     orf_genepred: str | Path,
+    profiles: DensityProfiles,
+    context: EvidenceContext,
+    cds_overlap_table: str | Path | None,
     logger: _StageLogger | None = None,
 ) -> EngineResult:
     """Merge evidence and atomically export the reliable ORF annotation."""
@@ -72,18 +165,23 @@ def _merge_outputs(
     reliable_path = Path(str(output_prefix) + ".reliable_smorf.txt")
     genepred_path = Path(str(output_prefix) + ".reliable_smorf.genepred")
     summary_path = Path(str(output_prefix) + ".evidence_summary.txt")
+    priority_path = Path(str(output_prefix) + ".priority_smorf.txt")
+    candidate_path = Path(str(output_prefix) + ".smorf_candidate_evidence.txt")
+    cds_path = Path(str(output_prefix) + ".cds_overlap_evidence.txt")
     master_raw_tmp = master_path.with_name(master_path.name + ".raw.tmp")
     master_tmp = master_path.with_name(master_path.name + ".tmp")
     reliable_tmp = reliable_path.with_name(reliable_path.name + ".tmp")
     genepred_tmp = genepred_path.with_name(genepred_path.name + ".tmp")
     summary_tmp = summary_path.with_name(summary_path.name + ".tmp")
-    temporary_paths = (
-        master_raw_tmp,
-        master_tmp,
-        reliable_tmp,
-        genepred_tmp,
-        summary_tmp,
-    )
+    priority_tmp = priority_path.with_name(priority_path.name + ".tmp")
+    candidate_tmp = candidate_path.with_name(candidate_path.name + ".tmp")
+    cds_tmp = cds_path.with_name(cds_path.name + ".tmp")
+    outputs = [
+        (master_tmp, master_path), (reliable_tmp, reliable_path), (genepred_tmp, genepred_path),
+        (priority_tmp, priority_path), (candidate_tmp, candidate_path), (summary_tmp, summary_path),
+    ]
+    if cds_overlap_table:
+        outputs.insert(-1, (cds_tmp, cds_path))
     reliable_columns = (
         "family_id",
         "gene_id",
@@ -155,6 +253,8 @@ def _merge_outputs(
         "phase_audit_status",
     )
     reliable_smorfs_written = 0
+    candidate_tiers: dict[str, int] = defaultdict(int)
+    cds_statuses: dict[str, int] = {}
     annotated_controls_excluded = 0
     reliable_genepred_records = 0
     connection: sqlite3.Connection | None = None
@@ -177,6 +277,7 @@ def _merge_outputs(
 
         connection = sqlite3.connect(database_path)
         connection.row_factory = sqlite3.Row
+        splice_paths = SplicePathEvidence(connection, profiles, config)
         if logger is not None:
             logger.write(
                 "Stage5b: Resolve transcript translation units and nested ORF competition."
@@ -186,6 +287,7 @@ def _merge_outputs(
             master_tmp,
             connection,
             config,
+            splice_paths.unresolved if splice_paths.paths else None,
         )
         connection.execute(
             """
@@ -195,71 +297,87 @@ def _merge_outputs(
             ) WITHOUT ROWID
             """
         )
-        with reliable_tmp.open("w", encoding="utf-8", buffering=8 * 1024 * 1024) as output_handle:
-            output_handle.write("\t".join(reliable_columns) + "\n")
-            with master_tmp.open("r", encoding="utf-8") as input_handle:
-                reader = csv.DictReader(input_handle, delimiter="\t")
-                for row in reader:
-                    if not (
-                        row["evidence_status"] == "Reliable"
-                        and row["translated_extent_status"] in {"Supported", "Compatible"}
-                        and row["quant_primary"]
-                        and row["nested_competition_status"]
-                        not in {
-                            "ShadowedByLongORF",
-                            "ShadowedByHighOverlapORF",
-                            "ShadowedByCanonicalATG",
-                        }
-                    ):
-                        continue
-                    if _is_annotated_category(row.get("category", "")):
-                        annotated_controls_excluded += 1
-                        continue
-                    geometry = connection.execute(
-                        """
-                        SELECT transcript_id, category, start_codon, stop_codon,
-                               nt_length, aa_length, exon_starts, exon_ends
-                        FROM geometry WHERE orf_id=?
-                        """,
-                        (row["quant_primary"],),
-                    ).fetchone()
-                    if geometry is None:
-                        raise EvidenceEngineError(
-                            "Reliable quantification primary is absent from "
-                            f"the geometry index: {row['quant_primary']}"
-                        )
-                    if _is_annotated_category(geometry["category"]):
-                        annotated_controls_excluded += 1
-                        continue
-                    try:
-                        connection.execute(
-                            "INSERT INTO reliable_export (orf_id) VALUES (?)",
-                            (row["quant_primary"],),
-                        )
-                    except sqlite3.IntegrityError as error:
-                        raise EvidenceEngineError(
-                            "One ORF is the quantification primary of multiple "
-                            "reliable families: "
-                            f"{row['quant_primary']}"
-                        ) from error
-                    output = {
-                        **row,
-                        "transcript_id": geometry["transcript_id"],
-                        "start_codon": geometry["start_codon"],
-                        "stop_codon": geometry["stop_codon"],
-                        "nt_length": geometry["nt_length"],
-                        "aa_length": geometry["aa_length"],
-                        "exon_starts": geometry["exon_starts"],
-                        "exon_ends": geometry["exon_ends"],
-                    }
-                    output_handle.write(
-                        "\t".join(
-                            _format_value(output.get(column, "")) for column in reliable_columns
-                        )
-                        + "\n"
+        with (
+            reliable_tmp.open("w", encoding="utf-8", buffering=8 * 1024 * 1024) as output_handle,
+            priority_tmp.open("w", encoding="utf-8") as priority_handle,
+            candidate_tmp.open("w", encoding="utf-8", newline="") as candidate_handle,
+            master_tmp.open("r", encoding="utf-8") as input_handle,
+        ):
+            candidate_writer = csv.DictWriter(
+                candidate_handle, fieldnames=CANDIDATE_COLUMNS + CONTEXT_COLUMNS,
+                delimiter="\t", lineterminator="\n",
+            )
+            candidate_writer.writeheader()
+            for handle in (output_handle, priority_handle):
+                handle.write("\t".join(reliable_columns) + "\n")
+            reader = csv.DictReader(input_handle, delimiter="\t")
+            for row in reader:
+                if not (
+                    row["evidence_status"] == "Reliable"
+                    and row["translated_extent_status"] in {"Supported", "Compatible"}
+                    and row["quant_primary"]
+                    and row["nested_competition_status"]
+                    not in {"ShadowedByLongORF", "ShadowedByHighOverlapORF", "ShadowedByCanonicalATG"}
+                ):
+                    continue
+                if _is_annotated_category(row.get("category", "")):
+                    annotated_controls_excluded += 1
+                    continue
+                geometry = connection.execute(
+                    "SELECT * FROM geometry WHERE orf_id=?", (row["quant_primary"],)
+                ).fetchone()
+                if geometry is None:
+                    raise EvidenceEngineError(
+                        "Reliable quantification primary is absent from "
+                        f"the geometry index: {row['quant_primary']}"
                     )
-                    reliable_smorfs_written += 1
+                if _is_annotated_category(geometry["category"]):
+                    annotated_controls_excluded += 1
+                    continue
+                tier = _audit_export_candidate(
+                    row, geometry, candidate_writer, profiles, context,
+                    splice_paths.paths.get(row["family_id"], SplicePath()), config,
+                )
+                candidate_tiers[tier] += 1
+                if tier == "SplicePathUnresolved":
+                    continue
+                try:
+                    connection.execute(
+                        "INSERT INTO reliable_export (orf_id) VALUES (?)",
+                        (row["quant_primary"],),
+                    )
+                except sqlite3.IntegrityError as error:
+                    raise EvidenceEngineError(
+                        "One ORF is the quantification primary of multiple "
+                        "reliable families: "
+                        f"{row['quant_primary']}"
+                    ) from error
+                output = {
+                    **row,
+                    "transcript_id": geometry["transcript_id"],
+                    "start_codon": geometry["start_codon"],
+                    "stop_codon": geometry["stop_codon"],
+                    "nt_length": geometry["nt_length"],
+                    "aa_length": geometry["aa_length"],
+                    "exon_starts": geometry["exon_starts"],
+                    "exon_ends": geometry["exon_ends"],
+                }
+                line = "\t".join(
+                    _format_value(output.get(column, "")) for column in reliable_columns
+                ) + "\n"
+                output_handle.write(line)
+                if tier == "Priority":
+                    priority_handle.write(line)
+                reliable_smorfs_written += 1
         connection.commit()
+
+        if cds_overlap_table:
+            if logger is not None:
+                logger.write("Audit CDS-overlapping candidates excluded by smorf_cluster.")
+            with cds_tmp.open("w", encoding="utf-8", newline="") as handle:
+                cds_statuses = write_cds_overlap_audit(
+                    cds_overlap_table, handle, profiles, context, config.reliable_sample,
+                )
 
         if logger is not None:
             logger.write("Stage6: Export reliable smORF genePred annotation.")
@@ -315,6 +433,12 @@ def _merge_outputs(
             for key, value in totals.items():
                 handle.write(f"{key}\t{value}\n")
             handle.write(f"reliable_genepred_records\t{reliable_genepred_records}\n")
+            handle.write("priority_smorfs\t{}\n".format(candidate_tiers["Priority"]))
+            handle.write("exploratory_smorfs\t{}\n".format(candidate_tiers["Exploratory"]))
+            handle.write("splice_path_unresolved_smorfs\t{}\n".format(candidate_tiers["SplicePathUnresolved"]))
+            handle.write("cds_overlap_audit_enabled\t{}\n".format(int(bool(cds_overlap_table))))
+            for status, count in sorted(cds_statuses.items()):
+                handle.write("cds_overlap_{}\t{}\n".format(status, count))
             handle.write(
                 f"annotated_controls_excluded_from_reliable_smorf\t{annotated_controls_excluded}\n"
             )
@@ -327,8 +451,8 @@ def _merge_outputs(
             handle.write(
                 "reliable_smorf_definition\t"
                 "Reliable family with a supported or prior-compatible "
-                "translated extent, a quant_primary, and no dominant ORF "
-                "within the same transcript translation unit\n"
+                "translated extent, a quant_primary, diagnostic support for "
+                "ambiguous splice paths, and no dominant ORF in the same transcript unit\n"
             )
             handle.write(
                 "uncertain_definition\t"
@@ -408,19 +532,14 @@ def _merge_outputs(
                     "candidate reading frames."
                 )
     except BaseException:
-        for path in temporary_paths:
+        for path in (master_raw_tmp, *(temporary for temporary, _ in outputs)):
             path.unlink(missing_ok=True)
         raise
     finally:
         if connection is not None:
             connection.close()
 
-    for temporary, final in (
-        (master_tmp, master_path),
-        (reliable_tmp, reliable_path),
-        (genepred_tmp, genepred_path),
-        (summary_tmp, summary_path),
-    ):
+    for temporary, final in outputs:
         os.replace(temporary, final)
     master_raw_tmp.unlink(missing_ok=True)
 
@@ -429,6 +548,10 @@ def _merge_outputs(
         reliable_output=str(reliable_path),
         reliable_genepred_output=str(genepred_path),
         summary_output=str(summary_path),
+        priority_output=str(priority_path),
+        candidate_evidence_output=str(candidate_path),
+        cds_overlap_output=str(cds_path) if cds_overlap_table else "",
+        priority_smorfs=candidate_tiers["Priority"],
         sample_count=sample_count,
         effective_workers=effective_workers,
         **{
@@ -536,6 +659,14 @@ def run_family_evidence_engine(args: object) -> EngineResult:
     """Run the complete bottom-up family evidence engine."""
     tracks = read_density_tracks(args)
     config = _build_config(args)
+    cds_overlap_table = getattr(args, "cds_overlap_table", None)
+    annotation_path = getattr(args, "annotation", None)
+    if cds_overlap_table and not annotation_path:
+        raise ValueError("--annotation is required with --cds-overlap-table.")
+    audit_context = EvidenceContext(
+        annotation_path, getattr(args, "tis_evidence", None),
+        getattr(args, "splice_support", None), getattr(args, "peptide_evidence", None),
+    )
     output_prefix = Path(args.output).expanduser().resolve()
     output_prefix.parent.mkdir(parents=True, exist_ok=True)
     work_directory = Path(str(output_prefix) + ".evidence_work")
@@ -644,6 +775,9 @@ def run_family_evidence_engine(args: object) -> EngineResult:
             sample_count=len({track.sample for track in tracks}),
             effective_workers=workers,
             orf_genepred=args.orf_genepred,
+            profiles=DensityProfiles(work_directory, tracks),
+            context=audit_context,
+            cds_overlap_table=cds_overlap_table,
             logger=logger,
         )
         logger.write(

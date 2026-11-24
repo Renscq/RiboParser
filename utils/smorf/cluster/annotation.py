@@ -280,29 +280,35 @@ class AnnotationIndex:
         candidate: Candidate,
     ) -> Iterator[AnnotatedORF]:
         """Yield unique annotated ORFs overlapping a candidate span."""
-        span_first_bin = candidate.blocks[0][0] // ANNOTATION_BIN_SIZE
-        span_last_bin = (candidate.blocks[-1][1] - 1) // ANNOTATION_BIN_SIZE
+        yield from self.annotated_orfs_at(candidate.chrom, candidate.strand, candidate.blocks)
+
+    def annotated_orfs_at(
+        self, chrom: bytes, strand: bytes, blocks: Sequence[tuple[int, int]]
+    ) -> Iterator[AnnotatedORF]:
+        """Yield annotated CDS structures potentially overlapping the genomic blocks."""
+        span_first_bin = blocks[0][0] // ANNOTATION_BIN_SIZE
+        span_last_bin = (blocks[-1][1] - 1) // ANNOTATION_BIN_SIZE
         if span_first_bin == span_last_bin:
             indices: Iterable[int] = self.annotated_bins.get(
-                (candidate.chrom, candidate.strand, span_first_bin),
+                (chrom, strand, span_first_bin),
                 (),
             )
         else:
             unique_indices: set[int] = set()
-            for block_start, block_end in candidate.blocks:
+            for block_start, block_end in blocks:
                 first_bin = block_start // ANNOTATION_BIN_SIZE
                 last_bin = (block_end - 1) // ANNOTATION_BIN_SIZE
                 for bin_number in range(first_bin, last_bin + 1):
                     unique_indices.update(
                         self.annotated_bins.get(
-                            (candidate.chrom, candidate.strand, bin_number),
+                            (chrom, strand, bin_number),
                             (),
                         )
                     )
             indices = unique_indices
 
-        candidate_start = candidate.blocks[0][0]
-        candidate_end = candidate.blocks[-1][1]
+        candidate_start = blocks[0][0]
+        candidate_end = blocks[-1][1]
         for annotated_index in indices:
             annotated_orf = self.annotated_orfs[annotated_index]
             if (

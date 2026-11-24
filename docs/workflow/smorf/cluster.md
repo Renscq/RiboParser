@@ -89,6 +89,7 @@ The family table keeps all scanner columns and appends the annotated-overlap col
 | Annotated overlap (4) | `matched_annotated_orf_id`, `annotated_overlap_relation`, `annotated_overlap_nt`, `annotated_overlap_codon` |
 | Filtering (7) | `kozak_pwm_name`, `kozak_pwm_score`, `kozak_pwm_level`, `kozak_valid_ratio`, `structure_status`, `filter_status`, `filter_reason` |
 | Family (12) | `family_id`, `family_role`, `family_type`, `family_size`, `family_representative_count`, `family_transcript_count`, `family_exact_duplicate_count`, `family_alt_start_count`, `family_collapsed_count`, `family_categories`, `family_start_codons`, `primary_selection_rule` |
+| Splice paths (3) | `splice_path_role`, `splice_scaffold_ids`, `splice_unique_positions` |
 
 Key columns:
 
@@ -106,6 +107,9 @@ Key columns:
 | `family_categories` | Comma-separated union of member categories. |
 | `family_start_codons` | Comma-separated union of member start codons. |
 | `primary_selection_rule` | Rule string used to select the primary ORF. |
+| `splice_path_role` | `Branch` for a path in a split component or `SharedBody` for a coding suffix compatible with multiple branches. Empty for families with a single path. |
+| `splice_scaffold_ids` | Scanner ORF IDs of the branch scaffold or the scaffolds sharing a suffix. |
+| `splice_unique_positions` | Zero-based genomic first bases of complete branch-specific coding codons in translation order. All three bases of each codon lie outside competing paths. |
 
 Example row (truncated):
 
@@ -170,7 +174,9 @@ ORFs are grouped by `(chrom, strand, source_strand, blocks)`. Within each group 
 
 ### Family clustering
 
-Representatives are bucketed by `(chrom, strand, source_strand, stop_boundary, stop_codon)` and joined with a union-find structure over a spliced suffix index. The resulting `family_type` is:
+Representatives are bucketed by chromosome, strand, source strand, the three ordered genomic stop bases, and stop codon sequence. A spliced suffix index finds related paths within each bucket. Every member of an alternative-start family must be an in-frame spliced suffix of its longest member. When a shorter ORF fits several incompatible longer paths, it is assigned once to a shared-body family with those scaffold IDs.
+
+The resulting `family_type` describes the members of each family.
 
 - `SINGLETON` — a family with a single member.
 - `TRANSCRIPT_DUPLICATE` — members that are exact duplicates across transcripts.

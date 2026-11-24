@@ -14,8 +14,10 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Sequence
+from itertools import islice
 from typing import Any
 
+from ..coordinates import is_spliced_suffix, spliced_positions
 from .config import PRIMARY_SELECTION_RULE
 from .models import Candidate, ClusterSummary, ExactRepresentative, Family, _SuffixState, _UnionFind
 from .output import _ShardWriter
@@ -158,7 +160,7 @@ class _FamilyMixin:
             return []
         union_find = _UnionFind(len(representatives))
         buckets: dict[
-            tuple[bytes, bytes, bytes, int, bytes],
+            tuple[bytes, bytes, bytes, tuple[int, ...], bytes],
             list[int],
         ] = defaultdict(list)
         for index, representative in enumerate(representatives):
@@ -168,7 +170,7 @@ class _FamilyMixin:
                     candidate.chrom,
                     candidate.strand,
                     candidate.source_strand,
-                    candidate.stop_boundary,
+                    candidate.stop_positions,
                     candidate.stop_codon,
                 )
             ].append(index)
@@ -186,11 +188,68 @@ class _FamilyMixin:
 
         families: list[Family] = []
         for component in components.values():
-            component.sort(key=lambda item: item.primary.input_order)
-            primary = min(component, key=self._primary_rank)
-            families.append(Family(primary=primary, representatives=component))
+            families.extend(self._split_splice_paths(component))
         families.sort(key=lambda item: item.primary.primary.input_order)
         return families
+
+    def _split_splice_paths(self, component: list[ExactRepresentative]) -> list[Family]:
+        """Keep each start family on one maximal coding path."""
+        if len(component) == 1:
+            return [Family(primary=component[0], representatives=component)]
+
+        reverse = component[0].primary.strand == b"-"
+        ordered = sorted(component, key=lambda item: (-item.primary.nt_length, item.primary.input_order))
+        longest = ordered[0].primary.oriented_blocks
+        if all(is_spliced_suffix(longest, item.primary.oriented_blocks, reverse) for item in ordered[1:]):
+            return [self._make_family(component)]
+
+        paths: list[list[ExactRepresentative]] = []
+        shared: dict[tuple[int, ...], list[ExactRepresentative]] = defaultdict(list)
+        for item in ordered:
+            matches = tuple(
+                index for index, path in enumerate(paths)
+                if is_spliced_suffix(path[0].primary.oriented_blocks, item.primary.oriented_blocks, reverse)
+            )
+            if not matches:
+                paths.append([item])
+            elif len(matches) == 1:
+                paths[matches[0]].append(item)
+            else:
+                shared[matches].append(item)
+
+        result: list[Family] = []
+        scaffolds = [path[0].primary for path in paths]
+        for index, path in enumerate(paths):
+            scaffold = scaffolds[index]
+            competing_blocks = tuple(
+                block for other in scaffolds if other is not scaffold for block in other.blocks
+            )
+            positions = islice(spliced_positions(scaffold.oriented_blocks, reverse), scaffold.aa_length * 3)
+            unique = tuple(
+                first for first, second, third in zip(positions, positions, positions)
+                if all(
+                    not any(start <= base < end for start, end in competing_blocks)
+                    for base in (first, second, third)
+                )
+            )
+            result.append(self._make_family(path, b"Branch", (scaffolds[index].orf_id,), unique))
+        for matches, members in shared.items():
+            # Each ORF is recorded once even when its coding path fits several scaffolds.
+            result.append(self._make_family(
+                members, b"SharedBody", tuple(scaffolds[index].orf_id for index in matches)
+            ))
+        return result
+
+    def _make_family(
+        self,
+        members: list[ExactRepresentative],
+        role: bytes = b"",
+        scaffold_ids: tuple[bytes, ...] = (),
+        unique_positions: tuple[int, ...] = (),
+    ) -> Family:
+        """Build a family while retaining the original primary ranking."""
+        members.sort(key=lambda item: item.primary.input_order)
+        return Family(min(members, key=self._primary_rank), members, role, scaffold_ids, unique_positions)
 
     def _ordered_start_codons(
         self,
@@ -272,6 +331,11 @@ class _FamilyMixin:
         )
         fields[family_lookup[b"family_start_codons"]] = self._ordered_start_codons(all_members)
         fields[family_lookup[b"primary_selection_rule"]] = PRIMARY_SELECTION_RULE
+        fields[family_lookup[b"splice_path_role"]] = family.splice_path_role
+        fields[family_lookup[b"splice_scaffold_ids"]] = b",".join(family.splice_scaffold_ids)
+        fields[family_lookup[b"splice_unique_positions"]] = ",".join(
+            str(position) for position in family.splice_unique_positions
+        ).encode("ascii")
         writer.write_family(fields)
 
         primary_id = family.primary.primary.orf_id

@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any
 
+from ..coordinates import terminal_positions
 from .annotation import TranscriptMeta
 from .config import _BASE_BYTES, _DEFAULT_START_INDEX, _KOZAK_CACHE_SIZE
 from .kozak import KozakModel
@@ -206,6 +207,11 @@ class Candidate:
     stop_boundary: int
 
     @property
+    def stop_positions(self) -> tuple[int, ...]:
+        """Return the physical stop triplet in coding order."""
+        return terminal_positions(self.oriented_blocks, self.strand == b"-")
+
+    @property
     def transcript_length(self) -> int:
         return self.transcript_meta.transcript_length
 
@@ -261,6 +267,9 @@ class Family:
 
     primary: ExactRepresentative
     representatives: list[ExactRepresentative]
+    splice_path_role: bytes = b""
+    splice_scaffold_ids: tuple[bytes, ...] = ()
+    splice_unique_positions: tuple[int, ...] = ()
 
 
 @dataclass(slots=True)

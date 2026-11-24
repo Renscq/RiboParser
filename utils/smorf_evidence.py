@@ -135,6 +135,28 @@ def _build_parser() -> argparse.ArgumentParser:
         help=("Minimum independent samples supporting a reliable family (default: %(default)s)."),
     )
 
+    audit = parser.add_argument_group("Candidate evidence audit")
+    audit.add_argument(
+        "--cds-overlap-table",
+        help="Audit CDS-overlapping candidates in the smorf_cluster removed table.",
+    )
+    audit.add_argument(
+        "--annotation",
+        help="Transcript genePred for CDS phase context. Required with --cds-overlap-table.",
+    )
+    audit.add_argument(
+        "--tis-evidence",
+        help="External initiation TSV with chrom, strand, start0, and ltm_reads columns.",
+    )
+    audit.add_argument(
+        "--splice-support",
+        help="RNA junction TSV with transcript_id, supporting_reads, and source columns.",
+    )
+    audit.add_argument(
+        "--peptide-evidence",
+        help="ORF-specific peptide evidence TSV with orf_id and evidence_id columns.",
+    )
+
     manual = parser.add_argument_group("Manual evidence thresholds")
     manual.add_argument(
         "--min-rpf-sum",
@@ -250,6 +272,11 @@ def _validate_args(args: Namespace) -> None:
         args.orf_genepred,
         args.density_list,
     )
+    if args.cds_overlap_table and not args.annotation:
+        raise ValueError("--annotation is required with --cds-overlap-table.")
+    file_check(*(path for path in (
+        args.cds_overlap_table, args.annotation, args.tis_evidence, args.splice_support, args.peptide_evidence,
+    ) if path))
     if args.threads < 1:
         raise ValueError("--thread must be >= 1.")
     if args.reliable_sample < 1:
@@ -321,21 +348,25 @@ def main(argv: Sequence[str] | None = None) -> None:
         raise
 
     step_print(3, "Report final smORF evidence.")
-    result_print(
-        [
-            ("Biological samples", result.sample_count),
-            ("Effective workers", result.effective_workers),
-            ("Total families", f"{result.total_families:,}"),
-            ("Reliable families", f"{result.reliable_families:,}"),
-            ("Reliable smORFs", f"{result.reliable_smorfs:,}"),
-            ("Uncertain families", f"{result.uncertain_families:,}"),
-            ("No-evidence families", f"{result.no_evidence_families:,}"),
-            ("Family evidence", result.master_output),
-            ("Reliable smORFs", result.reliable_output),
-            ("Reliable genePred", result.reliable_genepred_output),
-            ("Summary", result.summary_output),
-        ]
-    )
+    outputs = [
+        ("Biological samples", result.sample_count),
+        ("Effective workers", result.effective_workers),
+        ("Total families", f"{result.total_families:,}"),
+        ("Reliable families", f"{result.reliable_families:,}"),
+        ("Reliable smORFs", f"{result.reliable_smorfs:,}"),
+        ("Uncertain families", f"{result.uncertain_families:,}"),
+        ("No-evidence families", f"{result.no_evidence_families:,}"),
+        ("Family evidence", result.master_output),
+        ("Reliable smORFs", result.reliable_output),
+        ("Reliable genePred", result.reliable_genepred_output),
+        ("Priority smORFs", "{:,}".format(result.priority_smorfs)),
+        ("Priority smORF table", result.priority_output),
+        ("Candidate evidence", result.candidate_evidence_output),
+        ("Summary", result.summary_output),
+    ]
+    if result.cds_overlap_output:
+        outputs.append(("CDS overlap evidence", result.cds_overlap_output))
+    result_print(outputs)
 
     title_print("All done.")
     now_time()

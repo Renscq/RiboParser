@@ -37,7 +37,7 @@ The smORF workflow combines two kinds of external inputs. `smorf_scanner` recons
 |---|---|---|
 | Scanner (4.8.1) | genome FASTA (`-g`) and genePred annotation (`-a`) | ORF annotation `*.genePred`, candidate ORF table `*.message.txt`, and nucleotide/peptide FASTA `*.nt.fa` / `*.pep.fa` |
 | Cluster (4.8.2) | scanner message table (`-i`) and genePred annotation (`-a`) | clustered family tables `*.family.message.txt` / `*.family.members.txt`, removed-ORF table, and cluster summary |
-| Evidence (4.8.3) | clustered family tables, scanner message table and ORF genePred, and a density list pointing to P-site tracks (`-l`) | family evidence table, reliable smORF table and genePred, and evidence summary |
+| Evidence (4.8.3) | clustered family tables, scanner message table and ORF genePred, and a density list pointing to P-site tracks (`-l`) | family evidence, reliable and priority smORFs, candidate evidence, reliable genePred, and an optional CDS overlap audit |
 | Quant (4.8.4) | reliable smORF genePred (`-g`) and density list (`-l`) | ORF-by-sample raw P-site count matrix `<prefix>.density_quant.txt` |
 
 ## Main evidence levels

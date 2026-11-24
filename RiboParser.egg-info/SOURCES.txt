@@ -1,3 +1,4 @@
+NEWS.md
 README.md
 pyproject.toml
 RiboParser.egg-info/PKG-INFO
@@ -61,6 +62,8 @@ scripts/rsem/__init__.py
 scripts/rsem/merge_rsem.py
 scripts/unix/__init__.py
 scripts/unix/dos2unix.py
+tests/test_smorf_evidence_reports.py
+tests/test_smorf_families.py
 utils/__init__.py
 utils/riboparser.py
 utils/rna_Density.py
@@ -158,6 +161,7 @@ utils/serp/SummaryPlot.py
 utils/serp/__init__.py
 utils/smorf/__init__.py
 utils/smorf/contracts.py
+utils/smorf/coordinates.py
 utils/smorf/density.py
 utils/smorf/cluster/__init__.py
 utils/smorf/cluster/annotation.py
@@ -171,6 +175,7 @@ utils/smorf/cluster/output.py
 utils/smorf/cluster/pipeline.py
 utils/smorf/evidence/__init__.py
 utils/smorf/evidence/calibration.py
+utils/smorf/evidence/cds_overlap.py
 utils/smorf/evidence/competition.py
 utils/smorf/evidence/config.py
 utils/smorf/evidence/extent.py
@@ -180,6 +185,7 @@ utils/smorf/evidence/input.py
 utils/smorf/evidence/models.py
 utils/smorf/evidence/output.py
 utils/smorf/evidence/pipeline.py
+utils/smorf/evidence/reporting.py
 utils/smorf/quant/__init__.py
 utils/smorf/quant/counter.py
 utils/smorf/quant/input.py

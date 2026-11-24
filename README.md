@@ -17,6 +17,8 @@
 
 RiboParser provides an integrated workflow for RNA-seq and ribosome profiling (Ribo-seq) analysis, including reference preparation, raw data preprocessing, alignment, quantification, quality control, RPF density construction, gene-level analysis, codon-level analysis, SeRP analysis, smORF analysis, and downstream visualization with RiboShiny.
 
+See the [0.3.16 release notes](NEWS.md) for changes to smORF family construction and evidence reporting.
+
 The full documentation is available at:
 
 <https://renscq.github.io/RiboParser/>

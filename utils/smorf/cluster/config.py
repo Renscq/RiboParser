@@ -63,6 +63,9 @@ CLUSTER_COLUMNS: Final[tuple[bytes, ...]] = (
     b"family_categories",
     b"family_start_codons",
     b"primary_selection_rule",
+    b"splice_path_role",
+    b"splice_scaffold_ids",
+    b"splice_unique_positions",
 )
 MEMBER_COLUMNS: Final[tuple[bytes, ...]] = (
     b"family_id",

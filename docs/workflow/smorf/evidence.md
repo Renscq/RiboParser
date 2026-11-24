@@ -75,6 +75,16 @@ ribo-2	-	../ribo-2_minus.rpf.bedgraph	bedgraph	treat
 | `--group` | `group` | Density-list column containing biological replicate groups. |
 | `--reliable-sample` | `2` | Minimum number of independent samples supporting a reliable family. |
 
+### Candidate evidence audit
+
+| Parameter | Input |
+|---|---|
+| `--annotation` | Transcript genePred from the same reference as the scanner and cluster. Enables annotated CDS phase context. |
+| `--cds-overlap-table` | `*.removed.message.txt` from `smorf_cluster`. Requires `--annotation`. |
+| `--tis-evidence` | TSV with `chrom`, `strand`, `start0`, and `ltm_reads`. |
+| `--splice-support` | TSV with `transcript_id`, `supporting_reads`, and `source`. |
+| `--peptide-evidence` | TSV with `orf_id` and `evidence_id`. Use scanner ORF IDs for peptide evidence already assigned to a specific ORF. |
+
 ### Manual evidence thresholds
 
 Used by `--evidence-mode manual`:
@@ -106,13 +116,16 @@ Used by `--evidence-mode manual`:
 
 ## Output files
 
-With `-o gmx4.smorf` four files are written:
+The output prefix is set with `-o`.
 
 | File | Description |
 |---|---|
 | `<prefix>.smorf_evidence.txt` | Master family-level evidence table (one row per family). |
 | `<prefix>.reliable_smorf.txt` | Reliable smORF table (one row per reliable ORF). |
 | `<prefix>.reliable_smorf.genepred` | genePred annotation of the reliable smORFs (ORF ids in column 1). |
+| `<prefix>.priority_smorf.txt` | Subset of the reliable table with distributed candidate-specific P-site support. |
+| `<prefix>.smorf_candidate_evidence.txt` | Per-sample measurements on the selected candidate, including splice-path diagnostics and priority tier. |
+| `<prefix>.cds_overlap_evidence.txt` | CDS overlap audit written when `--cds-overlap-table` is supplied. |
 | `<prefix>.evidence_summary.txt` | `metric` / `value` statistics. |
 
 ### Master evidence table (`smorf_evidence.txt`)
@@ -177,6 +190,28 @@ The `reliability_reason` column describes how a family was classified:
 ### Reliable smORF definition
 
 A reliable smORF requires a reliable family with a supported or prior-compatible translated extent, a `quant_primary`, and no dominant ORF within the same transcript translation unit.
+
+For an ambiguous splice branch, diagnostic frame-0 P-sites must meet `--min-window-rpf` and cover at least two branch-specific codons when two are available. The diagnostic rule applies separately in each sample and uses `--reliable-sample` for replication. The shared suffix and branches without replicated diagnostic support receive `SplicePathUnresolved` in the competition audit and stay out of the reliable export. Run `smorf_cluster` with 0.3.16 to also apply this rule to older analyses.
+
+### Candidate priority
+
+The priority rule uses the selected ORF's spliced coding positions with its stop codon removed. Each supporting sample must have at least 10 P-sites, a frame-0 fraction of at least 0.60, and frame-0 P-sites in at least two of three consecutive coding segments. It also requires at least four occupied frame-0 codons, or three for ORFs of 10–19 aa. At least `--reliable-sample` distinct sample names must meet all four criteria individually.
+
+The candidate table reports `Priority`, `Exploratory`, or `SplicePathUnresolved`. `Exploratory` ORFs are available in the reliable table and genePred. Empty sample metrics indicate an unavailable strand track. An available track with no P-sites is recorded as zero.
+
+### Annotated CDS overlap
+
+The optional report combines exact spliced geometries and retains their scanner IDs, transcript IDs, and categories. It reports candidate frame-0 signal shared with any annotated CDS, phase-0 signal from an annotated CDS in a competing frame, and signal at codons lying entirely outside all overlapping annotated CDS isoforms.
+
+| Status | Interpretation |
+|---|---|
+| `AlternativeStartSupported` | Exact external initiation at a site distinct from overlapping annotated CDS starts, with replicated candidate body support. Body support requires 10 P-sites, frame-0 fraction 0.60, three occupied frame-0 codons, and two occupied segments in each supporting sample. |
+| `IndependentExtentSupported` | Replicated signal at codons outside the annotated CDSs. Each supporting sample needs 10 outside P-sites, frame-0 fraction 0.60, and at least three occupied outside frame-0 codons, or both codons if only two are available. |
+| `SharedCDSSignal` | Observed frame-0 signal that an annotated CDS can explain. |
+| `NoIndependentSupport` | Neither outside P-site support nor shared frame-0 signal qualifies. |
+| `NoAnnotatedCDSOverlap` | The supplied annotation has no overlapping CDS coding bases for this entry. |
+
+The initiation TSV uses the zero-based genomic coordinate of the first translated base on either strand. LTM reads must be positive, and `ltm_minus_chx` must be positive when supplied. Optional `gene_id`, `source`, `source_class`, `tissue`, and `nterminal_peptides` fields preserve the observation's identity. Initiation supports a start coordinate, and transcript junction evidence supports RNA splicing. ORF-specific peptide evidence is recorded separately. CDS audit rows are available in the dedicated report.
 
 ## Calibration (canonical mode)
 

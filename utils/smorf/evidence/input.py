@@ -31,6 +31,7 @@ from utils.smorf.density import (
     prepare_density,
 )
 
+from ..coordinates import is_spliced_suffix
 from .config import (
     FAMILY_BATCH_SIZE,
     MAX_WORKERS,
@@ -95,6 +96,10 @@ def _run_signature(args: object, tracks: Sequence[DensityTrack]) -> str:
         "orf_genepred": _file_signature(args.orf_genepred),
         "tracks": [_file_signature(track.path) for track in tracks],
     }
+    for name in ("cds_overlap_table", "annotation", "tis_evidence", "splice_support", "peptide_evidence"):
+        path = getattr(args, name, None)
+        if path:
+            files[name] = _file_signature(path)
     options = {
         key: value
         for key, value in sorted(vars(args).items())
@@ -294,7 +299,10 @@ def _create_database_schema(connection: sqlite3.Connection) -> None:
             category TEXT NOT NULL,
             family_type TEXT NOT NULL,
             family_size INTEGER NOT NULL,
-            structural_primary TEXT NOT NULL
+            structural_primary TEXT NOT NULL,
+            splice_path_role TEXT NOT NULL,
+            splice_scaffold_ids TEXT NOT NULL,
+            splice_unique_positions TEXT NOT NULL
         );
         CREATE TABLE representatives (
             family_id TEXT NOT NULL,
@@ -391,6 +399,9 @@ def build_family_database(
                         row["family_type"],
                         int(row["family_size"]),
                         row["orf_id"],
+                        row.get("splice_path_role", ""),
+                        row.get("splice_scaffold_ids", ""),
+                        row.get("splice_unique_positions", ""),
                     )
                 )
                 rep_rows.append((row["family_id"], row["orf_id"], 1))
@@ -412,7 +423,7 @@ def build_family_database(
                 )
                 if len(family_rows) >= SQL_BATCH_SIZE:
                     connection.executemany(
-                        "INSERT INTO families VALUES (?,?,?,?,?,?,?,?)",
+                        "INSERT INTO families VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                         family_rows,
                     )
                     connection.executemany(
@@ -430,7 +441,7 @@ def build_family_database(
                     progress_print(f"family index: {number:,}")
             if family_rows:
                 connection.executemany(
-                    "INSERT INTO families VALUES (?,?,?,?,?,?,?,?)",
+                    "INSERT INTO families VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                     family_rows,
                 )
                 connection.executemany(
@@ -708,16 +719,7 @@ def _is_suffix(
     """Return whether a representative is an exact spliced suffix."""
     scaffold = _oriented_blocks(scaffold_starts, scaffold_ends, strand)
     representative = _oriented_blocks(rep_starts, rep_ends, strand)
-    if not representative or len(representative) > len(scaffold):
-        return False
-    tail = scaffold[-len(representative) :]
-    if len(representative) > 1 and tail[1:] != representative[1:]:
-        return False
-    long_first = tail[0]
-    short_first = representative[0]
-    if strand == "+":
-        return short_first[1] == long_first[1] and short_first[0] >= long_first[0]
-    return short_first[0] == long_first[0] and short_first[1] <= long_first[1]
+    return is_spliced_suffix(scaffold, representative, strand == "-")
 
 
 def _row_to_mapping(row: sqlite3.Row) -> dict[str, Any]:
